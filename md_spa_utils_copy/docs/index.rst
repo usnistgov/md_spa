@@ -1,5 +1,5 @@
 Welcome to MD-SPA-utils's documentation!
-======================================
+========================================================
 
 .. include:: readme.rst
 
@@ -21,8 +21,7 @@ API Reference
 Contents:
 
 .. toctree::
-   :maxdepth: 2
-   :caption: API reference
+   :maxdepth: 1
 
    api_reference
 

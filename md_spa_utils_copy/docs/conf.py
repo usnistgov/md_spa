@@ -50,6 +50,7 @@ import md_spa_utils
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc',  # auto document docstrings
               'sphinx.ext.napoleon',  # autodoc understands numpy docstrings
+              "sphinx.ext.autosummary",
               'sphinx.ext.viewcode',
               'sphinx.ext.intersphinx',
               'sphinx.ext.autosectionlabel',
@@ -61,6 +62,13 @@ extensions = ['sphinx.ext.autodoc',  # auto document docstrings
               'sphinxcontrib.blockdiag',
               'sphinxarg.ext',
               ]
+
+autosummary_generate = True
+add_module_names = False
+napoleon_google_docstring = False
+napoleon_use_param = False
+napoleon_use_ivar = True
+#todo_include_todos = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
