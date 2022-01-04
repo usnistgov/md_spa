@@ -10,7 +10,18 @@ with open('README.rst') as readme_file:
 with open('CHANGELOG.rst') as history_file:
     history = history_file.read()
 
-requirements = ['sphinx',"sphinx-argparse", "sphinx_rtd_theme", 'sphinx-jsonschema','sphinxcontrib.blockdiag']
+requirements = [
+                'sphinx',
+                "sphinx-argparse",
+                "sphinx_rtd_theme",
+                'sphinx-jsonschema',
+                'sphinxcontrib.blockdiag',
+                'numpy',
+                'scipy',
+                'lmfit',
+                'matplotlib',
+                'md_spa_utils',
+                ]
 
 setup_requirements = ['pytest-runner', 'wheel', ]
 

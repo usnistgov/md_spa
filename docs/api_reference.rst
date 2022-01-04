@@ -1,6 +1,13 @@
 
-md_spa
-=============
+.. currentmodule:: md_spa
+.. autosummary::
+   :toctree: _autosummary
 
-.. automodule:: md_spa
-   :members:
+    read_lammps
+    conversions
+    coordination_number
+    custom_fit
+    mdanalysis_lammps
+    msd
+    rdf
+    

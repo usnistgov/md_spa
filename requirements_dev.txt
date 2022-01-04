@@ -24,3 +24,8 @@ sphinx-argparse
 pygments==2.6.1
 
 
+matplotlib
+numpy
+scipy
+lmfit
+md_spa_utils
