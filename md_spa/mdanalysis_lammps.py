@@ -457,7 +457,7 @@ def debye_waller_by_zones(data_file, dump_file, frames_per_tau, type_reference=N
     if select == None:
         if type_reference==None or type_target==None:
             raise ValueError("Both type_reference and type_target must be defined, respectively given: {} and {}".format(type_reference,type_target))
-        select = "type {} and around {} type {}".format(type_target, {}, type_reference)
+        select = "type {} and isolayer {} {} type {}".format(type_target, {}, {}, type_reference)
     else:
         try:
             tmp = select.format(0)
@@ -481,37 +481,35 @@ def debye_waller_by_zones(data_file, dump_file, frames_per_tau, type_reference=N
     for i in range(stop_frame):
         if verbose:
             print("Calculating Frame {} out of {}".format(i,stop_frame))
-        msd = [[] for x in range(nzones)]
+        positions_start_finish = [[] for x in range(nzones)]
 
         # Calculate initial positions of atoms that start in respective zones
         u.trajectory[i]
-        Zones = []
-        for z in range(nzones):
-            Zones.append(u.select_atoms(select.format(r_start+dr*z)))
+        Zones = [u.select_atoms(select.format(0, r_start))]
+        for z in range(1,nzones):
+            Zones.append(u.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for z in range(nzones):
-            for z2 in range(z):
-                Zones[z] = Zones[z] - Zones[z2]
-            msd[z].append(Zones[z].positions)
+            positions_start_finish[z].append(Zones[z].positions)
 
         # Calculate final positions of atoms that started in each respective zone,
         # and find atoms that are currently in respective zones (i.e. Zone2)
         u.trajectory[i+frames_per_tau]
-        Zones2 = []
-        for z in range(nzones):
-            Zones2.append(u.select_atoms(select.format(r_start+dr*z)))
+        Zones2 = [u.select_atoms(select.format(0, r_start))]
+        for z in range(1,nzones):
+            Zones2.append(u.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for z in range(nzones):
-            msd[z].append(Zones[z].positions)
-            msd_total[z].extend(list(np.sum(np.square(msd[z][1]-msd[z][0]),axis=1)))
+            positions_start_finish[z].append(Zones[z].positions)
+            msd_total[z].extend(list(np.sum(np.square(positions_start_finish[z][1]-positions_start_finish[z][0]),axis=1)))
 
-            for z2 in range(z):
-                Zones2[z] = Zones2[z] - Zones2[z2]
             tmp_ind1 = [x.ix for x in Zones[z]]
             RetainedFraction = Zones[z] - Zones[z].difference(Zones2[z])
             for atom in RetainedFraction:
                 ind = tmp_ind1.index(atom.ix)
-                msd_retained[z].append(np.sum(np.square(msd[z][1][ind]-msd[z][0][ind])))
+                msd_retained[z].append(np.sum(np.square(
+                    positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
+                )))
 
             fraction_retained[z].append(len(RetainedFraction)/len(Zones[z]))
 
