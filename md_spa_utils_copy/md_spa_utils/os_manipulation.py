@@ -61,7 +61,7 @@ def find_csv_entries(filename, matching_entries=None, indices=None):
         This list indicates the criteria for narrowing the selection of rows. The first columns of each considered row mus
 t match these entries.
     indices : float/list, Optional, default=None
-        The index of a column or a list of indices of the columns to extract from those rows that meet specification. A value of None returns all columns. WARNING! The indexing for this variable is np.shape(data)[1]-len(matching_entries), so the column after the columns that meet the matching criteria is specified with indices=0.
+        The index of a column or a list of indices of the columns to extract from those rows that meet specification. A value of None returns all columns. WARNING! The indexing for this variable is ``np.shape(data)[1]-len(matching_entries)``, so the column after the columns that meet the matching criteria is specified with indices=0.
 
     Returns
     -------
@@ -243,21 +243,33 @@ def sed_file(target_dir, template_file, replaced_values, replacement_values):
         else:
             os.system('sed -i "s/{}/{}/g" {}'.format(before, after, newfile))
 
-if __name__ == "__main__":
+def write_csv(filename, array, mode="a", header=None, header_comment="#", delimiter=", "):
+    """
+    Write or append csv file.
 
-    L = len(sys.argv)
-    if L == 8:
-        target_dir = sys.argv[1]
-        template_file = [sys.argv[2], sys.argv[5]]
-        replaced_values = [sys.argv[3].strip("[] ").split(","),sys.argv[6].strip("[] ").split(",")]
-        replacement_values = [sys.argv[4].strip("[] ").split(","),sys.argv[7].strip("[] ").split(",")]
-    else:
-        print(sys.argv)
-        raise ValueError("Input should be 'python run_lammps.py [target_dir] [lammps_input] [lammps replaced values] [lammps replacement values] [submission file] [submission replaced values] [submission replacement values]'")
+    Parameters
+    ----------
+    filename : str
+        Filename and path to csv file
+    array : list
+        This iterable object should be oriented so that axis=0 represents rows
+    mode : str, Optional, default="a"
+        String to identify the mode with which to ``open(filename, mode)``
+    header : list, Optional, default=None
+        List of the same length as the second dimension
+    delimiter : str, Optional, default=", "
+        Delimiter between header and line entries
 
-    om.check_create_dir(target_dir, create=True)
-    replace_submit_lammps(target_dir, template_file, replaced_values, replacement_values)
 
+    Returns
+    -------
+    Write csv file
 
+    """
 
+    with open(filename,mode) as f:
+        if header != None:
+            f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
+        for line in array:
+            f.write(delimiter.join([str(x) for x in line])+"\n")
 

@@ -20,6 +20,7 @@ def basic_stats(data, confidence=0.95):
         Standard error of the data
     interval : float
         When added and subtracted from the mean, forms the confidence interval
+        
     """
     data = np.array(data,np.float)
     se = np.std(data)/np.sqrt(len(data))
