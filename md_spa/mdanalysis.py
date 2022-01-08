@@ -12,16 +12,88 @@ from MDAnalysis.analysis.waterdynamics import SurvivalProbability as SP
 
 import md_spa_utils.os_manipulation as om
 
-def calc_partial_rdf(data_file, dump_file, groups, rmin=0.0, rmax=12.0, nbins=1000, verbose=False, exclusion_block=None, run_kwargs={}, universe_kwargs={}):
+def check_universe(universe):
+    """
+    Function that checks whether a valid universe was provided, and if not, a universe is generated with the provided information.
+
+    Parameters
+    ----------
+    universe : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    Returns
+    -------
+    universe : obj
+        ``MDAnalysis.Universe`` object instance
+    """
+
+    if isinstance(universe, mda.core.universe.Universe):
+        u = universe
+    elif om.isiterable(universe):
+        length = len(universe)
+        if length < 2:
+            raise ValueError("To generate an mda universe, the format type keyword from md_spa.mdanalysis.generate_universe and appropriate arguments in a tuple")
+        elif length > 3:
+            raise ValueError("To generate an mda universe, the format type keyword from md_spa.mdanalysis.generate_universe, appropriate arguments in a tuple, and dictionary of keyword arguments.")
+        elif length == 2:
+            u = generate_universe(*universe)
+        elif length == 3:
+            u = generate_universe(universe[0], universe[1], **universe[2])
+    else:
+        raise ValueError("Input, {}, of type, {}, cannot be used to produce an MDAnalysis universe".format(universe, type(universe)))
+
+    return u
+
+def generate_universe(package, args, kwargs={}):
+    """
+    Generate MDAnalysis universe
+
+    Parameters
+    ----------
+    package : str
+        String to indicate the universe ``format`` to interpret. The supported formats are:
+            
+        - LAMMPS: Must include the path to a data file with the atom_type full (unless otherwise specified.), and optionally include a list of paths to sequential dump files.           
+
+    args : tuple
+        Arguments for ``MDAnalysis.Universe``
+    kwargs : dict, Optional, default={"format": package_identifier}
+        Keyword arguments for ``MDAnalysis.Universe``. Note that the ``format`` will be added internally.
+                 
+    Returns
+    -------
+    universe : obj
+        ``MDAnalysis.Universe`` object instance
+
+    """
+
+    supported_packages = ["LAMMPS"]
+
+    if package == "LAMMPS":
+        kwargs["format"] = "LAMMPSDUMP"
+        u = mda.Universe(*args, **kwargs)
+    else:
+        raise ValueError("The package, {}, is not supported, choose one of the following: {}".format(package,", ".join(supported_packages)))
+
+    return u
+        
+def calc_partial_rdf(u, groups, rmin=0.0, rmax=12.0, nbins=1000, verbose=False, exclusion_block=None, run_kwargs={}):
     """
     Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
     Parameters
     ----------
-    data_file : str
-        LAMMPS data file with "full" formatting
-    dump_file : list
-        The name of a dump file or list of dump files in "atom" formatting containing trajectories pertaining to `data_file`.
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
     groups : list[tuples]
         List of tuples containing pairs of strings that individually identify a MDAnalysis AtomGroup with universe.select_atoms(groups[i])
     rmin : float, Optional, default=0.0
@@ -36,8 +108,6 @@ def calc_partial_rdf(data_file, dump_file, groups, rmin=0.0, rmax=12.0, nbins=10
         A tuple representing the tile to exclude from the distance array.
     run_kwargs : dict, Optional, default={}
         Other keyword arguments from MDAnalysis.analysis.rdf.InterRDF.run()
-    universe_kwargs :dict, Optional, default={}
-        Other keyword arguments from MDAnalysis.Universe.universe
 
     Returns
     -------
@@ -46,8 +116,7 @@ def calc_partial_rdf(data_file, dump_file, groups, rmin=0.0, rmax=12.0, nbins=10
 
     """
 
-    # Extract System information and trajectory
-    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP",**universe_kwargs)
+    u = check_universe(u)
 
     if not om.isiterable(groups):
         raise ValueError("The entry `groups` must be an iterable structure with selection strings.")
@@ -69,16 +138,19 @@ def calc_partial_rdf(data_file, dump_file, groups, rmin=0.0, rmax=12.0, nbins=10
 
     return rdf_output
 
-def calc_persistence_length(data_file, dump_file, backbone_indices, save_plot=True, figure_name="plot_lp_fit.png", verbose=True):
+def calc_persistence_length(u, backbone_indices, save_plot=True, figure_name="plot_lp_fit.png", verbose=True):
     """
     Calculate the persistence length of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
     Parameters
     ----------
-    data_file : str
-        LAMMPS data file with "full" formatting
-    dump_file : list
-        The name of a dump file or list of dump files in "atom" formatting containing trajectories pertaining to `data_file`.
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
     backbone_indices : list
         List of atomID for atoms along backbone, starting at 1
     save_plot : bool, Optional, default=True
@@ -95,7 +167,7 @@ def calc_persistence_length(data_file, dump_file, backbone_indices, save_plot=Tr
 
     """
 
-    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP")
+    u = check_universe(u)
     
     tmp_indices = [x-1 for x in backbone_indices]
     #tmp_indices = backbone_indices
@@ -121,16 +193,19 @@ def calc_persistence_length(data_file, dump_file, backbone_indices, save_plot=Tr
 
     return plen.results.lp
 
-def calc_gyration(data_file, dump_file, select="all"):
+def calc_gyration(u, select="all"):
     """
     Calculate the radius of gyration and anisotropy of a polymer given a LAMMPS data file, dump file(s).
 
     Parameters
     ----------
-    data_file : str
-        LAMMPS data file with "full" formatting
-    dump_file : list
-        The name of a dump file or list of dump files in "atom" formatting containing trajectories pertaining to `data_file`.
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
     select : str, Optional, default="all"
         This string should align with MDAnalysis universe.select_atoms(select) rules
 
@@ -143,7 +218,7 @@ def calc_gyration(data_file, dump_file, select="all"):
 
     """
 
-    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP")
+    u = check_universe(u)
     ag = u.atoms
     u.trajectory.add_transformations(unwrap(ag))
     group = u.select_atoms(select)  # a selection (a AtomGroup)
@@ -159,16 +234,19 @@ def calc_gyration(data_file, dump_file, select="all"):
     
     return rgyr, kappa, anisotropy
 
-def calc_end2end(data_file, dump_file, indices):
+def calc_end2end(u, indices):
     """
     Calculate the persistence length of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
     Parameters
     ----------
-    data_file : str
-        LAMMPS data file with "full" formatting
-    dump_file : list
-        The name of a dump file or list of dump files in "atom" formatting containing trajectories pertaining to `data_file`.
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
     indices : list
         Pair of atomIDs to obtain distance between (starting at 1)
 
@@ -186,7 +264,7 @@ def calc_end2end(data_file, dump_file, indices):
         raise ValueError("A pair of indices are required. {} given.".format(indices))
         
 
-    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP")
+    u = check_universe(u)
     ag = u.atoms
     u.trajectory.add_transformations(unwrap(ag))
     tmp_indices = [x-1 for x in indices]
@@ -199,16 +277,19 @@ def calc_end2end(data_file, dump_file, indices):
 
     return r_end2end
 
-def hydrogen_bonding(data_file, dump_file, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", file_prefix=""):
+def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", file_prefix=""):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
     Parameters
     ----------
-    data_file : str
-        LAMMPS data file with "full" formatting
-    dump_file : list
-        The name of a dump file or list of dump files in "atom" formatting containing trajectories pertaining to `data_file`.
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
     indices : list
         A list of lists containing the type for the hydrogen bond donor, hydrogen, and acceptor. If an atom type is unknown or more than one is desired, put None instead.
     dt : float
@@ -242,7 +323,7 @@ def hydrogen_bonding(data_file, dump_file, indices, dt, tau_max=100, verbose=Fal
     else:
         raise ValueError("Input, indices, but be a list of iterables of length three")
 
-    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP", dt=dt)
+    u = check_universe(u)
     if verbose:
         print("Imported trajectory")
 
@@ -320,18 +401,21 @@ def hydrogen_bonding(data_file, dump_file, indices, dt, tau_max=100, verbose=Fal
             plt.title("Donor Type {}, Hydrogen Type {}, Acceptor Type {}".format(*ind))
             plt.show()
 
-def survival_probability(data_file, dump_file, dt, type_reference=None, type_target=None, r_start=2.0, r_end=5, select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", file_prefix=""):
+def survival_probability(u, dt, type_reference=None, type_target=None, r_start=2.0, r_end=5, select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", file_prefix=""):
     """
-    Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
+    Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
     This method requires a characteristic time, generally on the order of a picosecond. This time is equal to the beta relaxation time and is generally temperature independent, and so can be determined from the minimum of the logarithmic derivative of the MSD, and low temperature may be necessary.
 
     Parameters
     ----------
-    data_file : str
-        LAMMPS data file with "full" formatting
-    dump_file : list
-        The name of a dump file or list of dump files in "atom" formatting containing trajectories pertaining to `data_file`.
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
     dt : float
         Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
     type_reference : int, Optional, default=None
@@ -368,17 +452,14 @@ def survival_probability(data_file, dump_file, dt, type_reference=None, type_tar
     if select == None:
         if type_reference==None or type_target==None:
             raise ValueError("Both type_reference and type_target must be defined, respectively given: {} and {}".format(type_reference,type_target))
-#        select = "type {} and around {} type {} and not around {} type {}".format(type_target, r_start, type_reference, r_end, type_reference)
-        select = "type {} and sphlayer {} {} type {}".format(type_target, r_start, r_end, type_reference)
-#        select = "type {} and around {} type {}".format(type_target, r_start, type_reference)
-#        select = "type {} and around {} type {}".format(type_target, r_end, type_reference)
+        select = "type {} and isolayer {} {} type {}".format(type_target, r_start, r_end, type_reference)
     else:
         try:
             tmp = select.format(0)
         except:
             raise ValueError("Provided select string must take one value to define the zones")
 
-    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP", dt=dt)
+    u = check_universe(u)
     if verbose:
         print("Imported trajectory")
 
@@ -406,7 +487,7 @@ def survival_probability(data_file, dump_file, dt, type_reference=None, type_tar
 
 
 
-def debye_waller_by_zones(data_file, dump_file, frames_per_tau, type_reference=None, type_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False):
+def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False):
     """
     Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -414,10 +495,13 @@ def debye_waller_by_zones(data_file, dump_file, frames_per_tau, type_reference=N
 
     Parameters
     ----------
-    data_file : str
-        LAMMPS data file with "full" formatting
-    dump_file : list
-        The name of a dump file or list of dump files in "atom" formatting containing trajectories pertaining to `data_file`.
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
     frames_per_tau : int
         Number of frames in the characteristic time, tau.
     type_reference : int, Optional, default=None
@@ -464,7 +548,7 @@ def debye_waller_by_zones(data_file, dump_file, frames_per_tau, type_reference=N
         except:
             raise ValueError("Provided select string must take one value to define the zones")
 
-    u = mda.Universe(data_file, dump_file, format="LAMMPSDUMP")
+    u = check_universe(u)
     if verbose:
         print("Imported trajectory")
 

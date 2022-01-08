@@ -13,6 +13,7 @@ from scipy.ndimage.filters import gaussian_filter1d
 
 from . import read_lammps as f
 import md_spa_utils.os_manipulation as om
+import md_spa.custom_fit as cfit
 
 def consolidate_arrays(rdf_array, file_out="rdf_out.txt", pairs=None):
     """
@@ -216,12 +217,27 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
         if gr[i] > tol:
             ind_0 = i-1
             break
+
     r_0 = r[ind_0]
     rfit = r[ind_0:]
     grfit = gr[ind_0:]
 
+    #######
+    #if smooth_sigma == None: # Trying to automate choosing a smoothing value
+    #    Npts_avg = 20
+    #    stderror = 1e-5
+    #    sigma_min = 1.1
+    #    window_len = (np.std(grfit[-Npts_avg:])/stderror)**2
+    #    smooth_sigma = (window_len-1)/6.0
+    #    print(smooth_sigma, window_len, np.std(grfit[-Npts_avg:]))
+    #    if smooth_sigma < sigma_min:
+    #        smooth_sigma = sigma_min 
+    #print(smooth_sigma)
+    #grfit = gaussian_filter1d(grfit, sigma=smooth_sigma)
+    #######
     if smooth_sigma != None:
         grfit = gaussian_filter1d(grfit, sigma=smooth_sigma)
+    ######
 
     spline = InterpolatedUnivariateSpline(rfit,grfit-1.0)
     roots = spline.roots().tolist()
@@ -238,8 +254,8 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
             r2 = np.linspace(rfit[0],rfit[-1],int(1e+4))
             gr2 = spline(r2)
             for tmp in extrema:
-                plt.plot([tmp,tmp],[0,np.max(gr)])
-            plt.plot(r2,gr2,"r",label="Spline")
+                plt.plot([tmp,tmp],[0,np.max(gr)],"c",linewidth=0.5)
+            plt.plot(r2,gr2,"r",label="Spline",linewidth=0.5)
             plt.show()
         raise ValueError("Found {} extrema, consider smoothing the data with `smooth_sigma` option.".format(len(extrema)))
     tmp_spline = InterpolatedUnivariateSpline(rfit,grfit, k=5).derivative().derivative()
@@ -284,13 +300,13 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
         plt.plot([r[0],r[-1]],[0,0],"k",linewidth=0.5)
         r2 = np.linspace(rfit[0],rfit[-1],int(1e+4))
         gr2 = spline(r2)
-        plt.plot(r2,gr2,"r",label="Spline")
+        plt.plot(r2,gr2,"r",linewidth=0.5,label="Spline")
         for i in range(len(r_peaks)):
-            plt.plot([r_peaks[i],r_peaks[i]],[min(gr),max(gr)],"c")
+            plt.plot([r_peaks[i],r_peaks[i]],[min(gr),max(gr)],"c",linewidth=0.5)
         for i in range(len(r_mins)):
-            plt.plot([r_mins[i],r_mins[i]],[min(gr),max(gr)],"b")
-        plt.plot([r_0,r_0],[min(gr),max(gr)],"m")
-        plt.plot([r_clust,r_clust],[min(gr),max(gr)],"m")
+            plt.plot([r_mins[i],r_mins[i]],[min(gr),max(gr)],"b",linewidth=0.5)
+        plt.plot([r_0,r_0],[min(gr),max(gr)],"m",linewidth=0.5)
+        plt.plot([r_clust,r_clust],[min(gr),max(gr)],"m",linewidth=0.5)
         plt.ylabel("g(r)")
         plt.xlabel("r [Distance Units]")
         plt.title(title)
@@ -385,3 +401,290 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", additional_entries=None
         for tmp in tmp_data:
             f.write(", ".join([str(x) for x in tmp])+"\n")
     
+
+def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=25, save_fit=False, plotname="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
+    """
+    From rdf, extract key points of interest.
+
+    Based on the work found at `DOI: 10.1021/jp064661f <https://doi.org/10.1021/jp064661f>`_
+
+    Parameters
+    ----------
+    r : np.array
+        Distance between bead centers
+    gr : np.array
+        Radial distribution function
+    tol : float, Optional, default=1e-3
+        Tolerance used in determining where the rdf function first becomes nonzero.
+    show_fit : bool, Optional, default=False
+        Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
+    smooth_sigma : float, default=None
+        If the data should be smoothed, provide a value of sigma used in ``scipy gaussian_filter1d``
+    error_length : int, Optional, default=25
+        The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
+    save_fit : bool, Optional, default=False
+        Save comparison plot of each rdf being analyzed. With the name ``plotname``
+    plotname : str, Optional, default="rdf_debye-waller.png"
+        If `save_fit` is true, the generated plot is saved. The ``title`` is added as a prefix to this str
+    title : str, Optional, default="Pair-RDF"
+        The title used in the pair distribution function plot, note that this str is also added as a prefix to the ``plotname``.
+    extrema_cutoff : float, Optional, default=0.01
+        All peaks with an absolute value of gr that is less than this value are ignored.
+    verbose : bool, Optional, default=False
+        Set whether calculation will be run with comments
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ["amplitude", "center", "sigma", "fwhm", "height"] where sigma is the debye-waller factor and the amplitude is equal to N_0/rho_0, (coordination number) / (number density)
+    stnd_errors : numpy.ndarray
+        Array containing uncertainties for parameters
+
+    """
+
+    flag = None
+
+    if not om.isiterable(r):
+        raise ValueError("Given distances, r, should be iterable")
+    else:
+        r = np.array(r)
+    if not om.isiterable(gr):
+        raise ValueError("Given radial distribution values, gr, should be iterable")
+    else:
+        gr = np.array(gr)
+
+    # Find beginning of g(r) where becomes nonzero
+    ind_0 = None
+    for i in range(len(gr)):
+        if gr[i] > tol:
+            ind_0 = i-1
+            break
+
+    rfit = r[ind_0:]
+    grfit = gr[ind_0:]
+
+    if len(rfit) < 10:
+        raise ValueError("RDF has too few points to analyze with length {}".format(len(rfit)))
+
+    # Smooth data if specified
+    if smooth_sigma != None:
+        grfit = gaussian_filter1d(grfit, sigma=smooth_sigma)
+
+    # Fit spline and identify extrema
+    spline = InterpolatedUnivariateSpline(rfit,grfit-1.0)
+    roots = spline.roots().tolist()
+    spline = InterpolatedUnivariateSpline(rfit,grfit, k=4)
+    extrema = spline.derivative().roots().tolist()
+    extrema = [x for i,x in enumerate(extrema) if (i<4 or np.abs(spline(x)-1.0)>extrema_cutoff)]
+    extrema = [x for x in extrema if np.abs(spline(x))>extrema_cutoff]
+
+    if len(extrema) > error_length:
+        flag = "extrema"
+
+    tmp_spline = InterpolatedUnivariateSpline(rfit,grfit, k=5).derivative().derivative()
+    inflection = tmp_spline.roots().tolist()
+    concavity = tmp_spline(extrema)
+    inflection = [x for x in inflection if x < extrema[-1]]
+
+    r_peak = None
+    r_min = None
+    for i,rtmp in enumerate(extrema):
+        if concavity[i] > 0 and r_min == None:
+            r_min = rtmp
+        elif concavity[i] < 0 and r_peak == None:
+            r_peak = rtmp
+
+        if r_min != None and r_peak != None:
+            break
+
+    r_inflection = [None, None]
+    for rtmp in inflection:
+        if rtmp < r_peak:
+            if r_inflection[0] == None:
+                r_inflection[0] = rtmp
+            else:
+                flag = "first inflection"
+
+        if rtmp > r_peak and rtmp < r_min:
+            if r_inflection[1] == None:
+                r_inflection[1] = rtmp
+            else:
+                flag = "second inflection"
+
+        if not None in r_inflection:
+            break
+
+    # Throw errors if any with extrema or inflection points
+    if flag != None:
+        if show_fit:
+            plt.plot(r,gr,"k",label="Data")
+            plt.plot([r[0],r[-1]],[1,1],"k",linewidth=0.5)
+            plt.plot([r[0],r[-1]],[0,0],"k",linewidth=0.5)
+            r2 = np.linspace(rfit[0],rfit[-1],int(1e+4))
+            gr2 = spline(r2)
+            for tmp in extrema:
+                plt.plot([tmp,tmp],[0,np.max(gr)],"c",linewidth=0.5)
+            for tmp in inflection:
+                plt.plot([tmp,tmp],[0,np.max(gr)],"m",linewidth=0.5)
+            plt.plot(r2,gr2,"r",label="Spline",linewidth=0.5)
+            plt.show()
+
+        if flag == "extrema":
+            raise ValueError("Found {} extrema, consider smoothing the data with `smooth_sigma` option.".format(len(extrema)))
+        elif flag == "first inflection":
+            raise ValueError("Found more than one inflection point before first peak.")
+        elif flag == "second inflection":
+            raise ValueError("Found more than one inflection point between first peak ({}) and first minimum ({}): {}".format(r_peak, r_min, inflection))
+
+    if None in r_inflection:
+        raise ValueError("Two inflection points are needed for gaussian fitting.")
+
+    # Use inflection points to bound actual data
+    ind_r_lower = np.where((r-r_inflection[0]) > 0)[0][0]
+    ind_r_upper = np.where((r-r_inflection[1]) > 0)[0][0]
+
+    r_array = r[ind_r_lower:ind_r_upper]
+    y_array = 4*np.pi*r_array**2*gr[ind_r_lower:ind_r_upper]
+
+    print(r_peak, np.max(y_array))
+    set_params = {
+                  #"center": {"vary": False, "value": r_peak},
+                  "height": {"vary": False, "value": np.max(y_array), "expr": None},
+                  #"fwhm": {},
+                  "amplitude": {"expr": "height*sigma/0.3989423"}, # Equal to N_0/rho_0, (coordination number) / (number density)
+                  #"sigma": {}, # debye-waller factor
+                 }
+
+    output, uncertainty = cfit.gaussian( r_array, y_array, set_params=set_params, verbose=verbose)
+    # "amplitude", "center", "sigma", "fwhm", "height"
+    output[-1] = output[-1]/(4*np.pi*r_array[np.where(y_array==np.max(y_array))[0][0]]**2)
+
+    if show_fit or save_fit:
+        # Figure 1
+        plt.figure(1)
+        plt.plot(r,gr,"k",label="Data", linewidth=0.5)
+        plt.plot([r[0],r[-1]],[1,1],"k",linewidth=0.5)
+        plt.plot([r[0],r[-1]],[0,0],"k",linewidth=0.5)
+
+        r2 = np.linspace(rfit[0],rfit[-1],int(1e+4))
+        gr2 = spline(r2)
+        plt.plot(r2,gr2,"r",linewidth=0.5,label="Spline")
+
+        gr2 = output[0]/output[2]/np.sqrt(2*np.pi)*np.exp(-(r2-output[1])**2/(2*output[2]**2))/(4*np.pi*r2**2)
+        plt.plot(r2,gr2,"--g",linewidth=0.5,label="Gaussian")
+        plt.plot([r_peak,r_peak],[min(gr),max(gr)],"c",linewidth=0.5)
+        for i in range(len(r_inflection)):
+            plt.plot([r_inflection[i],r_inflection[i]],[min(gr),max(gr)],"m",linewidth=0.5)
+        plt.ylabel("g(r)")
+        plt.xlabel("r [Distance Units]")
+        plt.title(title)
+        plt.xlim(rfit[0],r_min)
+        plt.legend(loc="best")
+        plt.tight_layout()
+        if save_fit:
+            tmp = os.path.split(plotname)
+            filename = os.path.join(tmp[0],"rdf_"+title.replace(" ", "")+"_"+tmp[1])
+            plt.savefig(filename, dpi=300)
+
+        # Figure 2
+        plt.figure(2)
+        plt.plot(r_array,y_array,"k",label="Data", linewidth=0.5)
+        plt.plot([r[0],r[-1]],[1,1],"k",linewidth=0.5)
+        plt.plot([r[0],r[-1]],[0,0],"k",linewidth=0.5)
+
+        r2 = np.linspace(*r_inflection,int(1e+3))
+        gr2 = output[0]/output[2]/np.sqrt(2*np.pi)*np.exp(-(r2-output[1])**2/(2*output[2]**2))
+        plt.plot(r2,gr2,"--g",linewidth=0.5,label="Gaussian")
+        plt.ylabel("4$\pi$$r^2$g(r)")
+        plt.xlabel("r [Distance Units]")
+        plt.title(title)
+        plt.xlim(rfit[0],r_min)
+        plt.legend(loc="best")
+        plt.tight_layout()
+        if save_fit:
+            tmp = os.path.split(plotname)
+            filename = os.path.join(tmp[0],"fit_"+title.replace(" ", "")+"_"+tmp[1])
+            plt.savefig(filename, dpi=300)
+        if show_fit:
+            plt.show()
+        plt.close("all")
+
+    return output, uncertainty
+
+def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", additional_entries=None, additional_header=None, extract_debye_waller_kwargs={}, file_header_kwargs={}):
+    """
+    Given the path to a csv file containing rdf data, extract key values and save them to a .csv file. The file of rdf data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
+
+    Parameters
+    ----------
+    filename : str
+        Input filename and path to lammps rdf output file
+    fileout : str, Optional, default="rdf.csv"
+        Filename of output .csv file
+    mode : str, Optional, default="a"
+        Mode used in writing the csv file, either "a" or "w".
+    additional_entries : list, Optional, default=None
+        This iterable structure can contain additional information about this data to be added to the beginning of the row
+    additional_header : list, Optional, default=None
+        If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
+    extract_debye_waller_kwargs : dict, Optional, default={}
+        Keywords for ``extract_debye_waller`` function
+    file_header_kwargs : dict, Optional, default={}
+        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
+
+    Returns
+    -------
+    csv file
+    
+    """
+    if not os.path.isfile(filename):
+        raise ValueError("The given file could not be found: {}".format(filename))
+
+    headers = om.find_header(filename, **file_header_kwargs)
+    data = np.transpose(np.genfromtxt(filename, delimiter=","))
+    if len(headers) != len(data):
+        raise ValueError("The number of column headers found does not equal the number of columns")
+
+    if np.all(additional_entries != None):
+        flag_add_ent = True
+        if not om.isiterable(additional_entries):
+            raise ValueError("The provided variable `additional_entries` must be iterable")
+    else:
+        flag_add_ent = False
+    if np.all(additional_header != None):
+        flag_add_header = True
+        if not om.isiterable(additional_header):
+            raise ValueError("The provided variable `additional_header` must be iterable")
+    else:
+        flag_add_header = False
+
+    if flag_add_ent:
+        if flag_add_header:
+            if len(additional_entries) != len(additional_header):
+                raise ValueError("The variables `additional_entries` and `additional_header` must be of equal length")
+        else:
+            additional_header = ["-" for x in additional_entries]
+            flag_add_header = True
+
+    r = data[0]
+    tmp_data = []
+    for i in range(1,len(data)):
+        tmp = extract_debye_waller(r,data[i], title=headers[i], **extract_debye_waller_kwargs)
+        tmp_data.append(list(additional_entries)
+            +[headers[i]]+list(tmp[0])+list(tmp[1]))
+
+
+    file_headers = ["Pairs", "amplitude", "center", "sigma", "fwhm", "height", "amplitude SE", "center SE", "sigma SE", "fwhm SE", "height SE"]
+    if not os.path.isfile(fileout) or mode=="w":
+        if flag_add_header:
+            file_headers = list(additional_header) + file_headers
+        flag_header = True
+    else:
+        flag_header = False
+
+    with open(fileout,mode) as f:
+        if flag_header:
+            f.write("#"+", ".join([str(x) for x in file_headers])+"\n")
+        for tmp in tmp_data:
+            f.write(", ".join([str(x) for x in tmp])+"\n")
+

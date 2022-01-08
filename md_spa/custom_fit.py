@@ -131,3 +131,56 @@ def exponential(filename, delimiter=",", minimizer="nelder", verbose=False, save
 
     return output, uncertainties
 
+def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
+    """
+    Fit Gaussian function to data with ``lmfit.GaussianModel``
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ydata : dependent data set
+    fit_kws : dict, Optional, default={}
+        Keywords used in ``lmfit.minimize``
+    set_parameters : dict, Optional, default={}
+        Dictionary where keys are one of the Gaussian parameters: "center", "amplitude", "height", "sigma", "fwhm" and the value is a dictionary containing parameter settings according to ``lmfit.Model.set_param_hint()``
+    verbose : bool, Optional, default=False
+        If true, final parameters will be printed
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ["amplitude", "center", "sigma", "fwhm", "height"]
+    stnd_errors : numpy.ndarray
+        Array containing uncertainties for parameters
+    
+    """
+
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+
+    model = lmfit.models.GaussianModel(nan_policy="omit")
+    for param, values in set_params.items():
+        if param not in ["center", "amplitude", "height", "sigma", "fwhm"]:
+            raise ValueError("Given parameter, {}, is not supported".format(param))
+        else:
+            model.set_param_hint(param, **values)
+
+    pars = model.guess(yarray, x=xarray)
+    result = model.fit(yarray, pars, x=xarray, fit_kws=fit_kws)
+
+    if verbose:
+        lmfit.printfuncs.report_fit(result.params)
+
+    output = np.zeros(5)
+    uncertainties = np.zeros(5)
+    for i,(param, value) in enumerate(result.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    return output, uncertainties
+
+
+    
+
+
