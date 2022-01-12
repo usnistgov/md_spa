@@ -155,8 +155,8 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
     if len(msd) != len(time):
         raise ValueError("Arrays for time and msd are not of equal length.")
 
-    time = time[:int(len(time)*use_frac)]
     msd = msd[:int(len(time)*use_frac)]
+    time = time[:int(len(time)*use_frac)]
 
     if min_Npts > len(time):
         warning.warn("Resetting minimum number of points, {}, to be within length of provided data * use_frac, {}".format(min_Npts,len(time)))
@@ -170,11 +170,11 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
             msd_tmp = msd[i:(i+npts)]
             d_tmp, stder_tmp, exp_tmp, intercept = diffusivity(t_tmp, msd_tmp, verbose=verbose, dim=dim)
 
-            if exp_tmp > best[4] or np.isnan(best[4]):
+            if np.abs(exp_tmp-1.0) < np.abs(best[4]-1.0) or np.isnan(best[4]):
                 best = np.array([d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, intercept, npts])
 
             if (exp_tmp >=  min_exp and longest[-1] <= npts) or np.isnan(longest[4]):
-                if (longest[-1] < npts or longest[4] < exp_tmp) or np.isnan(longest[4]):
+                if (longest[-1] < npts or np.abs(longest[4]-1.0) > np.abs(exp_tmp-1.0)) or np.isnan(longest[4]):
                     longest = np.array([d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, intercept, npts])
 
             if verbose:
