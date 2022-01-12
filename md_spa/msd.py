@@ -90,7 +90,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
 
     return dw
 
-def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1):
+def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1, min_R2=0.95):
     """
     Analyzing the long-time msd, to extract the diffusivity.
 
@@ -106,6 +106,8 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         Minimum number of points in the "best" region outputted.
     skip : int, Optional, default=1
         Number of points to skip over in scanning different regions. A value of 1 will be most thorough, but a larger value will decrease computation time.
+    min_R2 : float, Optional, default=0.95
+        Minimum allowed coefficient of determination to consider proposed exponent. This prevents linearity from skipping over curves.
     save_plot : bool, Optional, default=False
         choose to save a plot of the fit
     show_plot : bool, Optional, default=False
@@ -168,17 +170,18 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         for i in range(0,len(time)-npts,skip):
             t_tmp = time[i:(i+npts)]
             msd_tmp = msd[i:(i+npts)]
-            d_tmp, stder_tmp, exp_tmp, intercept = diffusivity(t_tmp, msd_tmp, verbose=verbose, dim=dim)
+            d_tmp, stder_tmp, exp_tmp, intercept, r2_tmp = diffusivity(t_tmp, msd_tmp, verbose=verbose, dim=dim)
 
-            if np.abs(exp_tmp-1.0) < np.abs(best[4]-1.0) or np.isnan(best[4]):
-                best = np.array([d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, intercept, npts])
+            if r2_tmp > min_R2:
+                if np.abs(exp_tmp-1.0) < np.abs(best[4]-1.0) or np.isnan(best[4]):
+                    best = np.array([d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, intercept, npts])
 
-            if (exp_tmp >=  min_exp and longest[-1] <= npts) or np.isnan(longest[4]):
-                if (longest[-1] < npts or np.abs(longest[4]-1.0) > np.abs(exp_tmp-1.0)) or np.isnan(longest[4]):
-                    longest = np.array([d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, intercept, npts])
+                if (exp_tmp >=  min_exp and longest[-1] <= npts) or np.isnan(longest[4]):
+                    if (longest[-1] < npts or np.abs(longest[4]-1.0) > np.abs(exp_tmp-1.0)) or np.isnan(longest[4]):
+                        longest = np.array([d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, intercept, npts])
 
-            if verbose:
-                print("Region Diffusivity: {} +- {}, from Time: {} to {}, with and exponent of {} using {} points".format(d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, npts))
+                if verbose:
+                    print("Region Diffusivity: {} +- {}, from Time: {} to {}, with and exponent of {} using {} points".format(d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, npts))
 
     if save_plot or show_plot:
         plt.plot(time,msd,"k",label="Data", linewidth=0.5)
@@ -227,6 +230,8 @@ def diffusivity(time, msd, verbose=False, dim=3):
         Exponent of fit data, should be close to unity
     intercept : float
         Intercept of time versus msd for plotting purposes
+    r_squared : float
+        Coefficient of determination for the linear fitted log-log plot, from which the exponent is derived.
 
     """
 
@@ -249,12 +254,13 @@ def diffusivity(time, msd, verbose=False, dim=3):
     msd_log = msd_log[1:]
     result = linregress(t_log,msd_log)
     exponent = result.slope
+    r_squared = result.rvalue**2
 
     result = linregress(time,msd)
     diffusivity = result.slope/2/dim
     sterror = result.stderr/2/dim
     intercept = result.intercept
 
-    return diffusivity, sterror, exponent, intercept
+    return diffusivity, sterror, exponent, intercept, r_squared
 
     
