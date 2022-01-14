@@ -75,7 +75,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
             for tmp in extrema[1:]:
                 plt.plot([tmp,tmp],[0,np.max(msd)], linewidth=0.5)
         plt.xlabel("time")
-        plt.ylabel("distance squared")
+        plt.ylabel("MSD")
         plt.tight_layout()
         if save_plot:
             plt.savefig(plot_name,dpi=300)
@@ -90,7 +90,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
 
     return dw
 
-def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1, min_R2=0.95):
+def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1, min_R2=0.97):
     """
     Analyzing the long-time msd, to extract the diffusivity.
 
@@ -106,7 +106,7 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         Minimum number of points in the "best" region outputted.
     skip : int, Optional, default=1
         Number of points to skip over in scanning different regions. A value of 1 will be most thorough, but a larger value will decrease computation time.
-    min_R2 : float, Optional, default=0.95
+    min_R2 : float, Optional, default=0.97
         Minimum allowed coefficient of determination to consider proposed exponent. This prevents linearity from skipping over curves.
     save_plot : bool, Optional, default=False
         choose to save a plot of the fit
