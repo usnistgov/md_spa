@@ -139,7 +139,7 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
         kwargs_fit_tmp = copy.deepcopy(kwargs_fit)
         if "plot_name" in kwargs_fit:
             tmp = kwargs_fit["plot_name"].split(".")
-            tmp[0] += str(titles[i])
+            tmp[0] += "_"+str(titles[i])
             kwargs_fit_tmp["plot_name"] = ".".join(tmp)
         output, _ = cfit.exponential(t_tmp, data[i], **kwargs_fit_tmp)
         tmp = [titles[i], output[0], output[1]*output[2]+output[3]*output[4], output[5]*output[6]+output[7]*output[8]+output[9]*output[10]]

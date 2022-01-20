@@ -10,8 +10,45 @@ from MDAnalysis.transformations import unwrap
 from MDAnalysis.analysis.hydrogenbonds.hbond_analysis import HydrogenBondAnalysis as HBA
 from MDAnalysis.analysis.waterdynamics import SurvivalProbability as SP
 import MDAnalysis.analysis.msd as msd
+from MDAnalysis import transformations as trans
 
 import md_spa_utils.data_manipulation as dm
+
+def center_universe_around_group(universe, select, verbose=False):
+    """
+
+    Parameters
+    ----------
+    universe : obj
+        ``MDAnalysis.Universe`` object instance
+    select : str
+        This string should align with ``MDAnalysis.universe.select_atoms(select)`` rules
+    verbose : bool, Optional, default=False
+        Set whether calculation will be run with comments
+
+    Returns
+    -------
+    universe : obj 
+        ``MDAnalysis.Universe`` object instance
+
+    """
+
+    group_target = universe.select_atoms(select)
+    group_remaining = universe.select_atoms("all") - group_target
+    
+    box_center = universe.trajectory[0].dimensions[:3] / 2
+    if verbose:
+        print("Polymer Center of Mass Before", group_target.center_of_mass())
+    transforms = [
+        trans.unwrap(group_target),
+        trans.center_in_box(group_target),
+        trans.wrap(group_remaining)
+    ]
+    universe.trajectory.add_transformations(*transforms)
+    if verbose:
+        print("Group Center of Mass After", group.center_of_mass())
+
+    return universe
 
 def check_universe(universe):
     """
