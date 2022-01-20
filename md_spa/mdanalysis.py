@@ -362,15 +362,15 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
 
     """
 
-    if verbose:
-        for ind in indices:
-            print("Lifetime stastistics of donor type {}, hydrogen type {}, and acceptor type {}".format(*ind))
-
     if dm.isiterable(indices):
         if not dm.isiterable(indices[0]):
             indices = [indices]
     else:
         raise ValueError("Input, indices, but be a list of iterables of length three")
+
+    if verbose:
+        for ind in indices:
+            print("Lifetime stastistics of donor type {}, hydrogen type {}, and acceptor type {}".format(*ind))
 
     u = check_universe(u)
     if verbose:
