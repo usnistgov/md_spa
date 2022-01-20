@@ -12,7 +12,8 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.ndimage.filters import gaussian_filter1d
 
 from . import read_lammps as f
-import md_spa_utils.os_manipulation as om
+import md_spa_utils.file_manipulation as fm
+import md_spa_utils.data_manipulation as dm
 import md_spa.custom_fit as cfit
 
 def consolidate_arrays(rdf_array, file_out="rdf_out.txt", pairs=None):
@@ -34,11 +35,12 @@ def consolidate_arrays(rdf_array, file_out="rdf_out.txt", pairs=None):
 
     """
     # Check inputs
-    if not om.isiterable(pairs):
+    if not dm.isiterable(pairs):
         raise ValueError("The input `pairs` should be iterable")
 
-    if not om.isiterable(rdf_array):
-        raise ValueError("The input `rdf_arrays` should be iterable")
+    if not dm.isiterable(rdf_array):
+        rdf_array = np.array([rdf_array])
+
     shape = np.shape(rdf_array)
     if len(shape) != 3:
         raise ValueError("Provided matrix should have 3 dimensions. The first distinguishes rdf data from equivalent but independent systems, the second contains first the distance and second the pair distributions (the same length in all systems), and third is the length of the data array.")
@@ -92,7 +94,7 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="rdf_out.t
     """
 
     # Check inputs
-    if not om.isiterable(boxes):
+    if not dm.isiterable(boxes):
         raise ValueError("The input `boxes` should be iterable")
 
     try:
@@ -202,11 +204,11 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
 
     """
 
-    if not om.isiterable(r):
+    if not dm.isiterable(r):
         raise ValueError("Given distances, r, should be iterable")
     else:
         r = np.array(r)
-    if not om.isiterable(gr):
+    if not dm.isiterable(gr):
         raise ValueError("Given radial distribution values, gr, should be iterable")
     else:
         gr = np.array(gr)
@@ -323,7 +325,7 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
     return np.array(r_peaks), np.array(gr_peaks), np.array(r_mins), r_0, r_clust
 
 
-def keypoints2csv(filename, fileout="rdf.csv", mode="a", additional_entries=None, additional_header=None, extract_keypoints_kwargs={}, file_header_kwargs={}):
+def keypoints2csv(filename, fileout="rdf.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, extract_keypoints_kwargs={}, file_header_kwargs={}):
     """
     Given the path to a csv file containing rdf data, extract key values and save them to a .csv file. The file of rdf data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
 
@@ -335,6 +337,10 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", additional_entries=None
         Filename of output .csv file
     mode : str, Optional, default="a"
         Mode used in writing the csv file, either "a" or "w".
+    delimiter : str, Optional, default=","
+        Delimiter between data in input file
+    titles : list[str], Optional, default=None
+        Titles for plots if that is specified in the ``extract_keypoints_kwargs``
     additional_entries : list, Optional, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
     additional_header : list, Optional, default=None
@@ -353,20 +359,21 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", additional_entries=None
     if not os.path.isfile(filename):
         raise ValueError("The given file could not be found: {}".format(filename))
 
-    headers = om.find_header(filename, **file_header_kwargs)
-    data = np.transpose(np.genfromtxt(filename, delimiter=","))
-    if len(headers) != len(data):
-        raise ValueError("The number of column headers found does not equal the number of columns")
+    if titles == None:
+        titles = fm.find_header(filename, **file_header_kwargs)
+    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
+    if len(titles) != len(data):
+        raise ValueError("The number of titles does not equal the number of columns")
 
     if np.all(additional_entries != None):
         flag_add_ent = True
-        if not om.isiterable(additional_entries):
+        if not dm.isiterable(additional_entries):
             raise ValueError("The provided variable `additional_entries` must be iterable")
     else:
         flag_add_ent = False
     if np.all(additional_header != None):
         flag_add_header = True
-        if not om.isiterable(additional_header):
+        if not dm.isiterable(additional_header):
             raise ValueError("The provided variable `additional_header` must be iterable")
     else:
         flag_add_header = False
@@ -382,29 +389,23 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", additional_entries=None
     r = data[0]
     tmp_data = []
     for i in range(1,len(data)):
-        tmp = extract_keypoints(r,data[i], title=headers[i], **extract_keypoints_kwargs)
+        if "title" not in extract_keypoints_kwargs:
+            extract_keypoints_kwargs["title"] = titles[i]
+        tmp = extract_keypoints(r,data[i], **extract_keypoints_kwargs)
         tmp_data.append(list(additional_entries)
-            +[headers[i]]+list(tmp[0])+list(tmp[1])+list(tmp[2])+list(tmp[3:]))
-
+            +[titles[i]]+list(tmp[0])+list(tmp[1])+list(tmp[2])+list(tmp[3:]))
 
     file_headers = ["Pairs", "r_peak1", "r_peak2", "r_peak3", "gr_peak1", "gr_peak2", "gr_peak3", "r_min1", "r_min2", "r_min3", "r_0", "r_clust"]
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
             file_headers = list(additional_header) + file_headers
-        flag_header = True
+        fm.write_csv(fileout, tmp_data, mode=mode, header=file_headers)
     else:
-        flag_header = False
+        fm.write_csv(fileout, tmp_data, mode=mode)
 
-    with open(fileout,mode) as f:
-        if flag_header:
-            f.write("#"+", ".join([str(x) for x in file_headers])+"\n")
-        for tmp in tmp_data:
-            f.write(", ".join([str(x) for x in tmp])+"\n")
-    
 
 def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=25, save_fit=False, plotname="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
     """
-    From rdf, extract key points of interest.
 
     Based on the work found at `DOI: 10.1021/jp064661f <https://doi.org/10.1021/jp064661f>`_
 
@@ -444,11 +445,11 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
 
     flag = None
 
-    if not om.isiterable(r):
+    if not dm.isiterable(r):
         raise ValueError("Given distances, r, should be iterable")
     else:
         r = np.array(r)
-    if not om.isiterable(gr):
+    if not dm.isiterable(gr):
         raise ValueError("Given radial distribution values, gr, should be iterable")
     else:
         gr = np.array(gr)
@@ -611,7 +612,7 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
 
     return output, uncertainty
 
-def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", additional_entries=None, additional_header=None, extract_debye_waller_kwargs={}, file_header_kwargs={}):
+def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, extract_debye_waller_kwargs={}, file_header_kwargs={}):
     """
     Given the path to a csv file containing rdf data, extract key values and save them to a .csv file. The file of rdf data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
 
@@ -623,6 +624,10 @@ def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", additional_
         Filename of output .csv file
     mode : str, Optional, default="a"
         Mode used in writing the csv file, either "a" or "w".
+    delimiter : str, Optional, default=","
+        Delimiter between data in input file
+    titles : list[str], Optional, default=None
+        Titles for plots if that is specified in the ``extract_debye_waller_kwargs``
     additional_entries : list, Optional, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
     additional_header : list, Optional, default=None
@@ -640,20 +645,21 @@ def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", additional_
     if not os.path.isfile(filename):
         raise ValueError("The given file could not be found: {}".format(filename))
 
-    headers = om.find_header(filename, **file_header_kwargs)
-    data = np.transpose(np.genfromtxt(filename, delimiter=","))
-    if len(headers) != len(data):
-        raise ValueError("The number of column headers found does not equal the number of columns")
+    if titles == None:
+        titles = fm.find_header(filename, **file_header_kwargs)
+    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
+    if len(titles) != len(data):
+        raise ValueError("The number of titles does not equal the number of columns")
 
     if np.all(additional_entries != None):
         flag_add_ent = True
-        if not om.isiterable(additional_entries):
+        if not dm.isiterable(additional_entries):
             raise ValueError("The provided variable `additional_entries` must be iterable")
     else:
         flag_add_ent = False
     if np.all(additional_header != None):
         flag_add_header = True
-        if not om.isiterable(additional_header):
+        if not dm.isiterable(additional_header):
             raise ValueError("The provided variable `additional_header` must be iterable")
     else:
         flag_add_header = False
@@ -669,22 +675,18 @@ def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", additional_
     r = data[0]
     tmp_data = []
     for i in range(1,len(data)):
-        tmp = extract_debye_waller(r,data[i], title=headers[i], **extract_debye_waller_kwargs)
+        if "title" not in extract_debye_waller_kwargs:
+            extract_debye_waller_kwargs["title"] = titles[i]
+        tmp = extract_debye_waller(r,data[i], **extract_debye_waller_kwargs)
         tmp_data.append(list(additional_entries)
-            +[headers[i]]+list(tmp[0])+list(tmp[1]))
+            +[titles[i]]+list(tmp[0])+list(tmp[1]))
 
 
     file_headers = ["Pairs", "amplitude", "center", "sigma", "fwhm", "height", "amplitude SE", "center SE", "sigma SE", "fwhm SE", "height SE"]
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
             file_headers = list(additional_header) + file_headers
-        flag_header = True
+        fm.write_csv(fileout, tmp_data, mode=mode, header=file_headers)
     else:
-        flag_header = False
-
-    with open(fileout,mode) as f:
-        if flag_header:
-            f.write("#"+", ".join([str(x) for x in file_headers])+"\n")
-        for tmp in tmp_data:
-            f.write(", ".join([str(x) for x in tmp])+"\n")
+        fm.write_csv(fileout, tmp_data, mode=mode)
 

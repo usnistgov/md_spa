@@ -10,9 +10,92 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import linregress
 from scipy.interpolate import InterpolatedUnivariateSpline
 
-import md_spa_utils.os_manipulation as om
+import md_spa_utils.data_manipulation as dm
+import md_spa_utils.file_manipulation as fm
 
-def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_name="debye-waller.png", verbose=False):
+def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, kwargs_find_diffusivity={}, kwargs_debye_waller={}, file_header_kwargs={}):
+    """
+    Given the path to a csv file containing msd data, extract key values and save them to a .csv file. The file of msd data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
+
+    Parameters
+    ----------
+    filename : str
+        Input filename and path to lammps msd output file
+    fileout : str, Optional, default="msd.csv"
+        Filename of output .csv file
+    mode : str, Optional, default="a"
+        Mode used in writing the csv file, either "a" or "w".
+    delimiter : str, Optional, default=","
+        Delimiter between data in input file
+    titles : list[str], Optional, default=None
+        Titles for plots if that is specified in the ``kwargs_find_diffusivity`` or ``kwargs_debye_waller``
+    additional_entries : list, Optional, default=None
+        This iterable structure can contain additional information about this data to be added to the beginning of the row
+    additional_header : list, Optional, default=None
+        If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
+    kwargs_find_diffusivity : dict, Optional, default={}
+        Keywords for `find_diffusivity` function
+    kwargs_debye_waller : dict, Optional, default={}
+        Keywords for `debye_waller` function
+    file_header_kwargs : dict, Optional, default={}
+        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
+
+    Returns
+    -------
+    csv file
+    
+    """
+    if not os.path.isfile(filename):
+        raise ValueError("The given file could not be found: {}".format(filename))
+
+    if titles == None:
+        titles = fm.find_header(filename, **file_header_kwargs)
+    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
+    if len(titles) != len(data):
+        raise ValueError("The number of titles does not equal the number of columns")
+
+    if np.all(additional_entries != None):
+        flag_add_ent = True
+        if not dm.isiterable(additional_entries):
+            raise ValueError("The provided variable `additional_entries` must be iterable")
+    else:
+        flag_add_ent = False
+    if np.all(additional_header != None):
+        flag_add_header = True
+        if not dm.isiterable(additional_header):
+            raise ValueError("The provided variable `additional_header` must be iterable")
+    else:
+        flag_add_header = False
+
+    if flag_add_ent:
+        if flag_add_header:
+            if len(additional_entries) != len(additional_header):
+                raise ValueError("The variables `additional_entries` and `additional_header` must be of equal length")
+        else:
+            additional_header = ["-" for x in additional_entries]
+            flag_add_header = True
+
+    t_tmp = data[0]
+    tmp_data = []
+    for i in range(1,len(data)):
+        if "title" not in kwargs_find_diffusivity:
+            kwargs_find_diffusivity["title"] = titles[i]
+        if "title" not in kwargs_debye_waller:
+            kwargs_debye_waller["title"] = titles[i]
+        best, longest = find_diffusivity(t_tmp, data[i], **kwargs_find_diffusivity)
+        dw, tau = debye_waller(t_tmp, data[i], **kwargs_debye_waller)
+        tmp_data.append(list(additional_entries)+[titles[i],dw, tau]+list(best)+list(longest))
+
+    file_headers = ["Group", "DW [Ang^2]", "tau [ps]", "Best D [Ang^2/ps]", "B D SE", "B t_bound1 [ps]", "B t_bound2 [ps]", "B Exponent", "B Intercept [Ang^2]", "B Npts", "Longest D [Ang^2/ps]", "L D SE", "L t_bound1 [ps]", "L t_bound2 [ps]", "L Exponent", "L Intercept [Ang^2]", "L Npts"]
+    if not os.path.isfile(fileout) or mode=="w":
+        if flag_add_header:
+            file_headers = list(additional_header) + file_headers
+        fm.write_csv(fileout, tmp_data, mode=mode, header=file_headers)
+    else:
+        fm.write_csv(fileout, tmp_data, mode=mode)
+
+
+def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=None, plot_name="debye-waller.png", verbose=False):
     """
     Analyzing the ballistic region of an MSD curve yields the debye-waller factor, which relates to the cage region that the atom experiences.
 
@@ -26,10 +109,12 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
         Choose what fraction of the msd to use. This will cut down on comutational time in spending time on regions with poor statistics.
     save_plot : bool, Optional, default=False
         choose to save a plot of the fit
+    title : str, Optional, default=None
+        The title used in the msd plot, note that this str is also added as a prefix to the ``plot_name``.
     show_plot : bool, Optional, default=False
         choose to show a plot of the fit
     plot_name : str, Optional, default="debye-waller.png"
-        If ``save_plot==True`` the msd will be saved with the debye-waller factor marked
+        If ``save_plot==True`` the msd will be saved with the debye-waller factor marked. The ``title`` is added as a prefix to this str
     verbose : bool, Optional, default=False
         Will print intermediate values or not
     
@@ -39,11 +124,11 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
 
     """
 
-    if not om.isiterable(time):
+    if not dm.isiterable(time):
         raise ValueError("Given distances, time, should be iterable")
     else:
         time = np.array(time)
-    if not om.isiterable(msd):
+    if not dm.isiterable(msd):
         raise ValueError("Given radial distribution values, msd, should be iterable")
     else:
         msd = np.array(msd)
@@ -58,15 +143,18 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
     dspline = spline.derivative()
     extrema = dspline.roots().tolist()
     if len(extrema) > 2:
+        tau = np.nan
         dw = np.nan
         warnings.warn("Found {} extrema, consider smoothing the data with `smooth_sigma` option for an approximate value, and then increase the statistics used to calculate the msd.".format(len(extrema)))
     elif len(extrema) == 2:
+        tau = extrema[1]
         dw = spline(extrema[1])
         if verbose:
             print("Found debye waller factor to be {}".format(dw))
     else:
         warnings.warn("This msd array does not contain a caged-region")
         dw = np.nan
+        tau = np.nan
 
     if save_plot or show_plot:
         plt.figure(1)
@@ -76,8 +164,13 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
                 plt.plot([tmp,tmp],[0,np.max(msd)], linewidth=0.5)
         plt.xlabel("time")
         plt.ylabel("MSD")
+        if title != None:
+            plt.title(title)
         plt.tight_layout()
         if save_plot:
+            if title != None:
+                tmp = os.path.split(plot_name)
+                plot_name = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(plot_name,dpi=300)
         plt.figure(2)
         plt.plot(time, dspline(time),"k", linewidth=0.5)
@@ -88,9 +181,9 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, plot_n
             plt.show()
         plt.close("all")
 
-    return dw
+    return dw, tau
 
-def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1, min_R2=0.97):
+def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, title=None, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1, min_R2=0.97):
     """
     Analyzing the long-time msd, to extract the diffusivity.
 
@@ -110,10 +203,12 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         Minimum allowed coefficient of determination to consider proposed exponent. This prevents linearity from skipping over curves.
     save_plot : bool, Optional, default=False
         choose to save a plot of the fit
+    title : str, Optional, default=None
+        The title used in the msd plot, note that this str is also added as a prefix to the ``plotname``.
     show_plot : bool, Optional, default=False
         choose to show a plot of the fit
     plot_name : str, Optional, default="debye-waller.png"
-        If ``save_plot==True`` the msd will be saved with the debye-waller factor marked
+        If ``save_plot==True`` the msd will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
     dim : int, Optional, default=3
         Dimensions of the system, usually 3
     verbose : bool, Optional, default=False
@@ -145,11 +240,11 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
 
     """
 
-    if not om.isiterable(time):
+    if not dm.isiterable(time):
         raise ValueError("Given distances, time, should be iterable")
     else:
         time = np.array(time)
-    if not om.isiterable(msd):
+    if not dm.isiterable(msd):
         raise ValueError("Given radial distribution values, msd, should be iterable")
     else:
         msd = np.array(msd)
@@ -181,7 +276,7 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
                         longest = np.array([d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, intercept, npts])
 
                 if verbose:
-                    print("Region Diffusivity: {} +- {}, from Time: {} to {}, with and exponent of {} using {} points".format(d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, npts))
+                    print("Region Diffusivity: {} +- {}, from Time: {} to {}, with and exponent of {} using {} points, Exp Rsquared: {}".format(d_tmp, stder_tmp, t_tmp[0], t_tmp[-1], exp_tmp, npts, r2_tmp))
 
     if save_plot or show_plot:
         plt.plot(time,msd,"k",label="Data", linewidth=0.5)
@@ -192,8 +287,13 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         plt.plot(tmp_time,tmp_longest, "b", label="Longest", linewidth=0.5)
         plt.xlabel("time")
         plt.ylabel("MSD")
+        if title != None:
+            plt.title(title)
         plt.tight_layout()
         if save_plot:
+            if title != None:
+                tmp = os.path.split(plot_name)
+                plot_name = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(plot_name,dpi=300)
         if show_plot:
             plt.show()
@@ -235,11 +335,11 @@ def diffusivity(time, msd, verbose=False, dim=3):
 
     """
 
-    if not om.isiterable(time):
+    if not dm.isiterable(time):
         raise ValueError("Given distances, time, should be iterable")
     else:
         time = np.array(time)
-    if not om.isiterable(msd):
+    if not dm.isiterable(msd):
         raise ValueError("Given radial distribution values, msd, should be iterable")
     else:
         msd = np.array(msd)
@@ -248,10 +348,8 @@ def diffusivity(time, msd, verbose=False, dim=3):
         raise ValueError("Arrays for time and msd are not of equal length.")
 
     # Find Exponent
-    t_log = np.log(time-time[0])
-    msd_log = np.log(msd-msd[0])
-    t_log = t_log[1:]
-    msd_log = msd_log[1:]
+    t_log = np.log(time[1:]-time[0])
+    msd_log = np.log(msd[1:]-msd[0])
     result = linregress(t_log,msd_log)
     exponent = result.slope
     r_squared = result.rvalue**2

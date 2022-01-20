@@ -9,8 +9,9 @@ from MDAnalysis.analysis import rdf as mda_rdf
 from MDAnalysis.transformations import unwrap
 from MDAnalysis.analysis.hydrogenbonds.hbond_analysis import HydrogenBondAnalysis as HBA
 from MDAnalysis.analysis.waterdynamics import SurvivalProbability as SP
+import MDAnalysis.analysis.msd as msd
 
-import md_spa_utils.os_manipulation as om
+import md_spa_utils.data_manipulation as dm
 
 def check_universe(universe):
     """
@@ -33,7 +34,7 @@ def check_universe(universe):
 
     if isinstance(universe, mda.core.universe.Universe):
         u = universe
-    elif om.isiterable(universe):
+    elif dm.isiterable(universe):
         length = len(universe)
         if length < 2:
             raise ValueError("To generate an mda universe, the format type keyword from md_spa.mdanalysis.generate_universe and appropriate arguments in a tuple")
@@ -81,7 +82,7 @@ def generate_universe(package, args, kwargs={}):
 
     return u
         
-def calc_partial_rdf(u, groups, rmin=0.0, rmax=12.0, nbins=1000, verbose=False, exclusion_block=None, run_kwargs={}):
+def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, run_kwargs={}):
     """
     Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
@@ -96,7 +97,7 @@ def calc_partial_rdf(u, groups, rmin=0.0, rmax=12.0, nbins=1000, verbose=False, 
 
     groups : list[tuples]
         List of tuples containing pairs of strings that individually identify a MDAnalysis AtomGroup with universe.select_atoms(groups[i])
-    rmin : float, Optional, default=0.0
+    rmin : float, Optional, default=0.1
         Minimum rdf cutoff
     rmax : float, Optional, default=12.0
         Maximum rdf cutoff
@@ -104,10 +105,8 @@ def calc_partial_rdf(u, groups, rmin=0.0, rmax=12.0, nbins=1000, verbose=False, 
         Number of bins in the rdf
     verbose : bool, Optional, default=False
         Set whether calculation will be run with comments
-    exclusion_block : tuple, Optional, default=None
-        A tuple representing the tile to exclude from the distance array.
     run_kwargs : dict, Optional, default={}
-        Other keyword arguments from MDAnalysis.analysis.rdf.InterRDF.run()
+        Other keyword arguments from ``MDAnalysis.analysis.rdf.InterRDF.run()``
 
     Returns
     -------
@@ -118,7 +117,7 @@ def calc_partial_rdf(u, groups, rmin=0.0, rmax=12.0, nbins=1000, verbose=False, 
 
     u = check_universe(u)
 
-    if not om.isiterable(groups):
+    if not dm.isiterable(groups):
         raise ValueError("The entry `groups` must be an iterable structure with selection strings.")
 
     group_dict = {}
@@ -137,6 +136,56 @@ def calc_partial_rdf(u, groups, rmin=0.0, rmax=12.0, nbins=1000, verbose=False, 
         rdf_output[i+1] = Rdf.results.rdf
 
     return rdf_output
+
+def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
+    """
+    Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    group : list
+        List of strings that identify a MDAnalysis AtomGroup with universe.select_atoms(group[i])
+    dt : float, Optional, default=1
+        Define dt to convert frame numbers to time in picoseconds
+    verbose : bool, Optional, default=False
+        Set whether calculation will be run with comments
+    run_kwargs : dict, Optional, default={}
+        Other keyword arguments from ``MDAnalysis.analysis.msd.MSD.run()``
+
+    Returns
+    -------
+    msd_output : numpy.ndarray
+        Array of times and MSD values. msd_output[0] is the time values and the remaining rows represent the given group MSDs.
+
+    """
+
+    u = check_universe(u)
+
+    if not dm.isiterable(groups):
+        raise ValueError("The entry `groups` must be an iterable structure with selection strings.")
+
+    nbins = len(u.trajectory)
+    msd_output = np.zeros((len(groups)+1,nbins))
+    flag_bins = False
+    for i, group in enumerate(groups):
+        MSD = msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=True)
+        MSD.run(verbose=verbose, **run_kwargs)
+        if verbose:
+            print("Generated MSD for group {}".format(group))
+
+        if not flag_bins:
+            flag_bins = True
+            msd_output[0] = np.arange(MSD.n_frames)*dt # ps
+        msd_output[i+1] = MSD.results.timeseries # angstroms^2
+
+    return msd_output
 
 def calc_persistence_length(u, backbone_indices, save_plot=True, figure_name="plot_lp_fit.png", verbose=True):
     """
@@ -277,7 +326,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", file_prefix=""):
+def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv"):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
@@ -304,7 +353,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
     path : str, Optional, default=""
         Path to save files
-    file_prefix : str, Optional, default=""
+    filename : str, Optional, default="lifetime.csv"
         Prefix on filename to further differentiate
 
     Returns
@@ -317,8 +366,8 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         for ind in indices:
             print("Lifetime stastistics of donor type {}, hydrogen type {}, and acceptor type {}".format(*ind))
 
-    if om.isiterable(indices):
-        if not om.isiterable(indices[0]):
+    if dm.isiterable(indices):
+        if not dm.isiterable(indices[0]):
             indices = [indices]
     else:
         raise ValueError("Input, indices, but be a list of iterables of length three")
@@ -343,7 +392,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         if indices[i][1] == None:
             hydrogens = hydrogen_list
         else:
-            if om.isiterable(indices[i][1]):
+            if dm.isiterable(indices[i][1]):
                 hydrogens = [str(x) for x in indices[i][1]]
             else:
                 hydrogens = [str(indices[i][1])]
@@ -351,7 +400,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         if indices[i][2] == None:
             acceptors = acceptor_list
         else:
-            if om.isiterable(indices[i][2]):
+            if dm.isiterable(indices[i][2]):
                 acceptors = [str(x) for x in indices[i][2]]
             else:
                 acceptors = [indices[i][2]]
@@ -361,6 +410,8 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
                 for a in acceptors:
                     new_indices.append([d,h,a])
 
+    output = []
+    titles = []
     for ind in new_indices:
         if verbose:
             print("Analyzing Donor Type {}, Hydrogen Type {}, Acceptor Type {}".format(*ind))
@@ -385,11 +436,10 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         # Lifetime analysis
         tau, timeseries = Hbonds.lifetime(tau_max=tau_max,  intermittency=intermittency)
         time = tau*dt
-        ind = [x if x != None else 0 for x in ind]
-        with open(os.path.join(path,"{}res_time_{}_{}_{}.csv".format(file_prefix,*ind)),"w") as f:
-            f.write("# time, probability\n")
-            for i in range(len(time)):
-                f.write("{}, {}\n".format(time[i],timeseries[i]))
+        if not output:
+            output.append(time)
+        output.append(timeseries)
+        titles.append("{}-{}-{}".format(*ind))
 
         if verbose:
             print("    Finished lifetime analysis")
@@ -401,7 +451,12 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
             plt.title("Donor Type {}, Hydrogen Type {}, Acceptor Type {}".format(*ind))
             plt.show()
 
-def survival_probability(u, dt, type_reference=None, type_target=None, r_start=2.0, r_end=5, select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", file_prefix=""):
+    with open(os.path.join(path,filename),"w") as f:
+        f.write("# time, {}\n".format(", ".join(titles)))
+        for tmp in np.transpose(np.array(output)):
+            f.write("{}\n".format(", ".join([str(x) for x in tmp])))
+
+def survival_probability(u, dt, type_reference=None, type_target=None, zones=[(2, 5)], select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
     """
     Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -422,12 +477,10 @@ def survival_probability(u, dt, type_reference=None, type_target=None, r_start=2
         This atom type must be provided unless ``select`` is provided. This atom type represents the core for the radial analysis. Note that with how this selection criteria is written, that if two atoms of this type are close together, a sort of iso-line is formed around the two atoms so that the DW parameter is not skewed by target atoms that are far from one reference type and close to another.
     type_target : int, Optional, default=None
         This atom type must be provided unless ``select`` is provided. The DW parameter of this atom type is the output of this function. 
-    r_start : float, Optional, default=2.0
-        Inner most radius to define the sphere
-    r_end : float, Optional, default=5
-        Outer most radius to define the sphere
+    zones : list[tuple], Optional, default=[(2.0, 5.0)]
+        List of tuples containing minimum and maximum zones to evaluate the survival probability
     select : str, Optional, default=None
-        A string to overwrite the default selection criteria: ``type {type_target} and around {r_start+i_zone*dr} type {type_reference}``
+        A string to overwrite the default selection criteria: ``type {type_target} and isolayer {zones[i][0]} {zones[i][1]} type {type_reference}``
     stop_frame : int, Optional, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
     tau_max : int, Optional, default=100
@@ -440,54 +493,60 @@ def survival_probability(u, dt, type_reference=None, type_target=None, r_start=2
         In a debugging mode, this option allows the time autocorrelation function to be viewed
     path : str, Optional, default=""
         Path to save files
-    file_prefix : str, Optional, default=""
+    filename : str, Optional, default="survival.csv"
         Prefix on filename to further differentiate
 
     Returns
     -------
-    Writes out .csv file: "{file_prefix}res_time_#typedonor_#typehydrogen_#typeacceptor.csv", where the type number is zero if a type is defined as None.
+    Writes out .csv file
 
     """
-
-    if select == None:
-        if type_reference==None or type_target==None:
-            raise ValueError("Both type_reference and type_target must be defined, respectively given: {} and {}".format(type_reference,type_target))
-        select = "type {} and isolayer {} {} type {}".format(type_target, r_start, r_end, type_reference)
-    else:
-        try:
-            tmp = select.format(0)
-        except:
-            raise ValueError("Provided select string must take one value to define the zones")
 
     u = check_universe(u)
     if verbose:
         print("Imported trajectory")
 
-    sp = SP(u, select, verbose=verbose)
-    sp.run(stop=stop_frame, tau_max=tau_max, intermittency=intermittency, verbose=verbose)
+    if select == None:
+        if type_reference==None or type_target==None:
+            raise ValueError("Both type_reference and type_target must be defined, respectively given: {} and {}".format(type_reference,type_target))
+        select = "type {} and isolayer {} {} type {}".format(type_target, {}, {}, type_reference)
+    else:
+        try:
+            tmp = select.format(0, 0)
+        except:
+            raise ValueError("Provided select string must take two values to define the zones")
 
-    tau = np.array(sp.tau_timeseries)
-    timeseries = np.array(sp.sp_timeseries)
-    time = tau*dt
+    output = []
+    titles = []
+    for r_start, r_end in zones:
+        sp = SP(u, select.format(r_start, r_end), verbose=verbose)
+        sp.run(stop=stop_frame, tau_max=tau_max, intermittency=intermittency, verbose=verbose)
 
-    with open(os.path.join(path,"{}survival_{}_around_{}_{}_to_{}.csv".format(file_prefix,type_target,type_reference,int(r_start),int(r_end))),"w") as f:
-        f.write("# For type {} around type {} from {} to {} \n# time, probability\n".format(type_target,type_reference,r_start,r_end))
-        for i in range(len(time)):
-            f.write("{}, {}\n".format(time[i],timeseries[i]))
+        tau = np.array(sp.tau_timeseries)
+        timeseries = np.array(sp.sp_timeseries)
+        time = tau*dt
+        if not output:
+            output.append(time)
+        output.append(timeseries)
+        titles.append("{:.3f}-{:.3f}".format(r_start, r_end))
 
-    if verbose:
-        print("    Finished survival analysis")
+        if verbose:
+            print("    Finished survival analysis")
 
-    if show_plot:
-        plt.plot(time,timeseries,".-")
-        plt.xlabel("Time")
-        plt.ylabel("Probability")
-        plt.title("Type {} around type {} from {} to {}".format(type_target,type_reference,r_start,r_end))
-        plt.show()
+        if show_plot:
+            plt.plot(time,timeseries,".-")
+            plt.xlabel("Time")
+            plt.ylabel("Probability")
+            plt.title("Type {} around type {} from {} to {}".format(type_target,type_reference,r_start,r_end))
+            plt.show()
+
+    with open(os.path.join(path,filename),"w") as f:
+        f.write("# time, {}\n".format(", ".join(titles)))
+        for tmp in np.transpose(np.array(output)):
+            f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
 
-
-def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False):
+def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100):
     """
     Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -520,6 +579,8 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
         Number of zones, counting the central Zone 0
     verbose : bool, Optional, default=False
         If true, progress will be printed
+    write_increment : int, Optional, default=100
+        If ``verbose`` write out progress every, this many frames.
 
     Returns
     -------
@@ -552,6 +613,7 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
     if verbose:
         print("Imported trajectory")
 
+    frames_per_tau = int(frames_per_tau)
     if stop_frame == None:
         stop_frame = len(u.trajectory)-frames_per_tau
     elif len(u.trajectory)-frames_per_tau < stop_frame:
@@ -562,8 +624,8 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
     msd_total = [[] for x in range(nzones)]
     msd_retained = [[] for x in range(nzones)]
     fraction_retained = [[] for x in range(nzones)]
-    for i in range(stop_frame):
-        if verbose:
+    for i in range(int(stop_frame)):
+        if verbose and i%write_increment == 0:
             print("Calculating Frame {} out of {}".format(i,stop_frame))
         positions_start_finish = [[] for x in range(nzones)]
 
@@ -595,7 +657,10 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
                     positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
                 )))
 
-            fraction_retained[z].append(len(RetainedFraction)/len(Zones[z]))
+            try: 
+                fraction_retained[z].append(len(RetainedFraction)/len(Zones[z]))
+            except:
+                fraction_retained[z].append(0)
 
     debye_waller_total = np.zeros(nzones)
     debye_waller_total_std = np.zeros(nzones)
@@ -611,6 +676,8 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
         survival_fraction[i] = np.nanmean(fraction_retained[i])
         survival_fraction_std[i] = np.nanstd(fraction_retained[i])
 
-    return debye_waller_total, debye_waller_total_std, debye_waller_retained, debye_waller_retained_std, survival_fraction, survival_fraction_std
+    zone_boundaries = np.array(range(nzones))*dr+r_start
+
+    return zone_boundaries, debye_waller_total, debye_waller_total_std, debye_waller_retained, debye_waller_retained_std, survival_fraction, survival_fraction_std
 
 

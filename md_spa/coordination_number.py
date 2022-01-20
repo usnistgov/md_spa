@@ -7,7 +7,6 @@ import matplotlib.image as img
 from scipy.interpolate import CubicSpline
 from scipy.interpolate import UnivariateSpline
 
-import md_spa_utils.os_manipulation as om
 import md_spa_utils.data_manipulation as dm
 
 from . import read_lammps as f
@@ -43,7 +42,7 @@ def consolidate(target_dir, boxes, column_names, file_in="coord.lammpstrj", file
     Nsets = len(column_names)
 
     # Check inputs
-    if not om.isiterable(boxes):
+    if not dm.isiterable(boxes):
         raise ValueError("The input `boxes` should be iterable")
 
     try:
@@ -54,7 +53,7 @@ def consolidate(target_dir, boxes, column_names, file_in="coord.lammpstrj", file
     if np.all(bins == None):
         bins = [20]
 
-    if not om.isiterable(bins) or len(bins) > 2:
+    if not dm.isiterable(bins) or len(bins) > 2:
         raise ValueError("The range given for the number of bins must be a list of length one or two.")
     else:
         if len(bins) == 2:
