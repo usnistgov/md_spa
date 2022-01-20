@@ -1,11 +1,7 @@
 
-import ast
-import csv
 import os
 import warnings
 from sys import platform
-import numpy as np
-
 
 def remove_lines(filename, start=None, end=None):
     """
@@ -49,129 +45,6 @@ def remove_lines(filename, start=None, end=None):
         for line in new_lines:
             f.write(line)
 
-def find_csv_entries(filename, matching_entries=None, indices=None):
-    """
-    This function will find a specific line in a csv file, and return the requested indices. The lines are specified by the `matching_entries` variable, that uses an iterable structure to narrow the number of rows down to those with the initial columns matching this list. The remaining matrix is then returned according to the `indices`.
-
-    Parameters
-    ----------
-    filename : str
-        The filename and path to the target csv file.
-    matching_entries : list, Optional, default=None
-        This list indicates the criteria for narrowing the selection of rows. The first columns of each considered row mus
-t match these entries.
-    indices : float/list, Optional, default=None
-        The index of a column or a list of indices of the columns to extract from those rows that meet specification. A value of None returns all columns. WARNING! The indexing for this variable is ``np.shape(data)[1]-len(matching_entries)``, so the column after the columns that meet the matching criteria is specified with indices=0.
-
-    Returns
-    -------
-    output : list/float
-         The resulting structure is returned. If more than one row meet the specified criteria this is a list or list of lists. If more than one index with specified this is a list or float.
-
-    """
-
-    if not os.path.isfile(filename):
-        raise ValueError("The file, {}, could not be found.".format(filename))
-
-    with open(filename, "r") as f:
-        contents = csv.reader(f)
-        data = list(map(list, contents))
-    data = [[ast.literal_eval(x.strip()) if x.strip().replace('.','',1).isdigit() else x.strip() for x in y] for y in data]
-
-    for j,match in enumerate(matching_entries):
-        row_indices = []
-        for i,row in enumerate(data):
-            if row[j] == match:
-                row_indices.append(i)
-        if not row_indices:
-            raise ValueError("Rows that meet your critera, {}, could not be found".format(matching_entries[:j+1]))
-        data = [data[x] for x in range(len(data)) if x in row_indices]
-
-    Nbuffer = len(matching_entries)
-    if isiterable(indices):
-        output = [[y[Nbuffer+x] for x in indices] for y in data] 
-    else:
-        if indices != None:
-            tmp_slice = indices + Nbuffer
-            output = [y[tmp_slice] for y in data]
-        else:
-            output = [y[Nbuffer:] for y in data]
-
-    if len(output) == 1:
-        output = output[0]
-
-    return output
-
-
-def find_header(filename, delimiter=",", comments="#"):
-    """
-    This function finds the column headers from a file and outputs a list. This function assumes the column headers are within the last commented line at the top of the file. 
-
-    Parameters
-    ----------
-    filename : str
-        Filename and path to target file.
-    delimiter : str, Optional, default=","
-        Character separating strings
-    comments : str, Optional, default="#"
-        Character at the start of a commented line
-
-    Returns
-    -------
-    col_headers : list
-        List of columns headers
-
-    """
-
-    if not os.path.isfile(filename):
-        raise ValueError("The given file could not be found: {}".format(filename))
-
-    with open(filename, "r") as f:
-        while(True):
-            line = f.readline()
-
-            if line == '\n':
-                continue 
-            linearray = line.split(delimiter)
-            if comments in linearray[0]:
-                col_headers = linearray
-            else:
-                break
-    col_headers = [x.strip().strip("# ") for x in col_headers]
-    if col_headers[0] == "":
-        col_headers = col_headers[1:]
-
-    return col_headers
-
-def isiterable(array):
-    """
-    Check if variable is an iterable type with a length (e.g. np.array or list)
-
-    Note that this could be test is ``isinstance(array, Iterable)``, however ``array=np.array(1.0)`` would pass that test and then fail in ``len(array)``.
-
-    Taken from github.com/jaclark5/despasito
-
-    Parameters
-    ----------
-    array
-        Variable of some type, that should be iterable
-
-    Returns
-    -------
-    isiterable : bool
-        Will be True if indexing is possible and False is not
-
-    """
-
-    array_tmp = np.array(array, dtype=object)
-    tmp = np.shape(array_tmp)
-
-    if tmp:
-        isiterable = True
-    else:
-        isiterable = False
-
-    return isiterable
 
 def check_create_dir(path, create=False, verbose=True):
     """
@@ -242,34 +115,4 @@ def sed_file(target_dir, template_file, replaced_values, replacement_values):
             os.system('sed -i "" "s/{}/{}/g" {}'.format(before, after, newfile))
         else:
             os.system('sed -i "s/{}/{}/g" {}'.format(before, after, newfile))
-
-def write_csv(filename, array, mode="a", header=None, header_comment="#", delimiter=", "):
-    """
-    Write or append csv file.
-
-    Parameters
-    ----------
-    filename : str
-        Filename and path to csv file
-    array : list
-        This iterable object should be oriented so that axis=0 represents rows
-    mode : str, Optional, default="a"
-        String to identify the mode with which to ``open(filename, mode)``
-    header : list, Optional, default=None
-        List of the same length as the second dimension
-    delimiter : str, Optional, default=", "
-        Delimiter between header and line entries
-
-
-    Returns
-    -------
-    Write csv file
-
-    """
-
-    with open(filename,mode) as f:
-        if header != None:
-            f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
-        for line in array:
-            f.write(delimiter.join([str(x) for x in line])+"\n")
 
