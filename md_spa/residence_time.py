@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import copy
 
 import md_spa_utils.file_manipulation as fm
 import md_spa_utils.data_manipulation as dm
@@ -135,11 +136,12 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
     t_tmp = data[0]
     tmp_data = []
     for i in range(1,len(data)):
+        kwargs_fit_tmp = copy.deepcopy(kwargs_fit)
         if "plot_name" in kwargs_fit:
             tmp = kwargs_fit["plot_name"].split(".")
             tmp[0] += str(titles[i])
-            kwargs_fit["plot_name"] = ".".join(tmp)
-        output, _ = cfit.exponential(t_tmp, data[i], **kwargs_fit)
+            kwargs_fit_tmp["plot_name"] = ".".join(tmp)
+        output, _ = cfit.exponential(t_tmp, data[i], **kwargs_fit_tmp)
         tmp = [titles[i], output[0], output[1]*output[2]+output[3]*output[4], output[5]*output[6]+output[7]*output[8]+output[9]*output[10]]
         tmp_data.append(list(additional_entries)+tmp+list(output))
 

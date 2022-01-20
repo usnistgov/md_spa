@@ -4,7 +4,7 @@ import os
 import lmfit
 from lmfit import minimize, Parameters
 
-def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, save_plot=False, show_plot=False, plot_name=True):
+def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png"):
 #def exponential(filename, delimiter=",", minimizer="nelder", verbose=False, save_plots=None, show_plot=False):
     """
     Data within a file with two columns is fit to one, two, and three exponentials, where the sum of the prefactors equals unity. 
