@@ -99,7 +99,7 @@ def find_csv_entries(filename, matching_entries=None, indices=None):
 
     return output
 
-def average_csv_files(filenames, file_out, headers=None, delimiter=","):
+def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_standard_error=False):
     """
     Average multiple data files of the same type and size across eachother.
 
@@ -113,6 +113,8 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=","):
         If the header for the new file is not given, the header of the first provided file is used.
     delimiter : str, Optional, default=","
         Data separating string used in ``numpy.genfromtxt``
+    calc_standard_error : bool, Optional, default=False
+        If True, the standard error is calculated and interleaved into data.
 
     Returns
     -------
@@ -125,22 +127,37 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=","):
     if not dm.isiterable(filenames):
         raise ValueError("A list of filenames should have been provided.")
 
-    data_in = np.array([np.genfromtxt(filename, delimiter=delimiter) for filename in filenames])
+    data_in = np.array([np.transpose(np.genfromtxt(filename, delimiter=delimiter)) for filename in filenames])
     if len(np.shape(data_in)) != 3:
         raise ValueError("Data in given files are not equivalent in size: {}".format(", ".join([str(np.shape(x)) for x in data_in])))
 
     data = np.mean(data_in, axis=0)
+    if calc_standard_error:
+        data_se = np.std(data_in, axis=0)/np.sqrt(len(data_in))
     
     if headers == None:
         with open(filenames[0],"r") as f:
-            headers = f.readline()
+            headers = f.readline().rstrip()
     elif dm.isiterable(headers):
-        headers = "# {}\n".format([str(x) for x in headers])
+        headers = "# {}".format([str(x) for x in headers])
+
+    data = np.transpose(data)
+    if calc_standard_error:
+        data_se = np.transpose(data_se)
 
     with open(file_out, "w") as f:
-        f.write(headers+"\n")
-        for line in np.transpose(data):
-            f.write(", ".join([str(x) for x in line])+"\n")
+        if calc_standard_error:
+            tmp_header = headers.split(",")
+            headers = [xx for x in tmp_header for xx in (x, x+" SE")]
+            f.write(", ".join(headers)+"\n")
+        else:
+            f.write(headers+"\n")
+
+        for i in range(len(data)):
+            if calc_standard_error:
+                f.write(", ".join([str(y) for y in [xx for x in zip(data[i],data_se[i]) for xx in x]])+"\n")    
+            else:
+                f.write(", ".join([str(x) for x in data[i]])+"\n")
     
 
 def write_csv(filename, array, mode="a", header=None, header_comment="#", delimiter=", "):
