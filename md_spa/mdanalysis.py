@@ -2,6 +2,7 @@
 import numpy as np
 import sys
 import os
+import warnings
 
 import MDAnalysis as mda
 from MDAnalysis.analysis import polymer
@@ -200,6 +201,8 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
     -------
     msd_output : numpy.ndarray
         Array of times and MSD values. msd_output[0] is the time values and the remaining rows represent the given group MSDs.
+    second_order_nongaussian_parameter : numpy.ndarray
+        Array of times and second order nongaussian parameter of the MSD. A first peak for an atomistic system may indicate bond vibration, while a second or solitary peak will represent the characteristic time for the cross over from ballistic to diffusive regimes. The MSD at this time equals six times the mean localization characterization length squared. DOI: 10.1103/PhysRevE.65.041804 
 
     """
 
@@ -210,6 +213,7 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
 
     nbins = len(u.trajectory)
     msd_output = np.zeros((len(groups)+1,nbins))
+    nongaussian_parameter = np.zeros((len(groups)+1,nbins))
     flag_bins = False
     for i, group in enumerate(groups):
         MSD = msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=True)
@@ -220,9 +224,12 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
         if not flag_bins:
             flag_bins = True
             msd_output[0] = np.arange(MSD.n_frames)*dt # ps
+            nongaussian_parameter[0] = np.arange(MSD.n_frames)*dt # ps
         msd_output[i+1] = MSD.results.timeseries # angstroms^2
+        nongaussian_parameter[i+1] = MSD.results.second_order_nongaussian_parameter
+        
 
-    return msd_output
+    return msd_output, nongaussian_parameter
 
 def calc_persistence_length(u, backbone_indices, save_plot=True, figure_name="plot_lp_fit.png", verbose=True):
     """
@@ -649,6 +656,7 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
     u = check_universe(u)
     if verbose:
         print("Imported trajectory")
+    dimensions = u.trajectory[0].dimensions[:3]
 
     frames_per_tau = int(frames_per_tau)
     if stop_frame == None:
@@ -684,7 +692,12 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
 
         for z in range(nzones):
             positions_start_finish[z].append(Zones[z].positions)
-            msd_total[z].extend(list(np.sum(np.square(positions_start_finish[z][1]-positions_start_finish[z][0]),axis=1)))
+            tmp = positions_start_finish[z][1]-positions_start_finish[z][0]
+            tmp_check = [ii for ii, x in enumerate(tmp) if np.any(np.abs(x) > dimensions/2)]
+            if tmp_check:
+                warnings.warn("{} atoms have either traveled over half the box length, or through periodic boundary conditions. It has been excluded from the reported dataset.".format(len(tmp_check)))
+                tmp = np.delete(tmp, tmp_check, axis=0)
+            msd_total[z].extend(list(np.sum(np.square(tmp),axis=1)))
 
             tmp_ind1 = [x.ix for x in Zones[z]]
             RetainedFraction = Zones[z] - Zones[z].difference(Zones2[z])

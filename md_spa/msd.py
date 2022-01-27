@@ -138,30 +138,53 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
 
     time = time[:int(len(time)*use_frac)]
     msd = msd[:int(len(time)*use_frac)]
+    logtime = np.log10(time)
+    logmsd = np.log10(msd)
+    if np.isnan(logmsd[0]):
+        logtime = logtime[1:]
+        logmsd = logmsd[1:]
 
-    spline = InterpolatedUnivariateSpline(time,msd, k=4)
+    spline = InterpolatedUnivariateSpline(logtime,logmsd, k=5)
+    if np.all(np.isnan(logmsd)):
+        raise ValueError("Spline could not be created with provided data:\n{}\n{}".format(time,msd))
     dspline = spline.derivative()
-    extrema = dspline.roots().tolist()
-    if len(extrema) > 2:
-        tau = np.nan
-        dw = np.nan
-        warnings.warn("Found {} extrema, consider smoothing the data with `smooth_sigma` option for an approximate value, and then increase the statistics used to calculate the msd.".format(len(extrema)))
-    elif len(extrema) == 2:
-        tau = extrema[1]
-        dw = spline(extrema[1])
-        if verbose:
-            print("Found debye waller factor to be {}".format(dw))
-    else:
+
+    extrema = dspline.derivative().roots().tolist()
+    extrema_concavity = dspline.derivative().derivative()
+    dw = np.ones(4)*np.nan
+    tau = np.ones(4)*np.nan
+    min_value = np.ones(4)*np.inf
+    i = 0
+    for min_max in extrema:
+        if extrema_concavity(min_max) > 0:
+            tau[i] = 10**min_max
+            dw[i] = 10**spline(min_max)
+            min_value[i] = dspline(min_max)
+            i += 1
+        if i == 3:
+            break
+
+    # Cut off minima after deepest
+    ind_min = np.where(min_value==np.min(min_value))[0][0]
+    for i in range(ind_min+1,4):
+        min_value[i] = np.inf
+        dw[i] = np.nan
+        tau[i] = np.nan
+
+    if np.all(np.isnan(dw)):
         warnings.warn("This msd array does not contain a caged-region")
-        dw = np.nan
-        tau = np.nan
+    else:
+        tau = np.array([x for _,x in sorted(zip(min_value,tau))])
+        dw = np.array([x for _,x in sorted(zip(min_value,dw))])
+        if verbose:
+            print("Found debye waller factor to be {} at {}".format(dw, tau))
 
     if save_plot or show_plot:
         plt.figure(1)
         plt.plot(time,msd,"k",label="Data", linewidth=0.5)
-        if len(extrema) > 1:
-            for tmp in extrema[1:]:
-                plt.plot([tmp,tmp],[0,np.max(msd)], linewidth=0.5)
+        if not np.all(np.isnan(dw)):
+            for tmp_tau in tau:
+                plt.plot([tmp_tau,tmp_tau],[0,np.max(msd)], linewidth=0.5)
         plt.xlabel("time")
         plt.ylabel("MSD")
         if title != None:
@@ -173,10 +196,18 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
                 plot_name = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(plot_name,dpi=300)
         plt.figure(2)
-        plt.plot(time, dspline(time),"k", linewidth=0.5)
-        plt.xlabel("time")
-        plt.ylabel("$d MSD / dt$")
+        yarray = dspline(logtime)
+        plt.plot(logtime, yarray,"k", linewidth=0.5)
+        if not np.all(np.isnan(dw)):
+            for tmp_tau in tau:
+                plt.plot(np.log10([tmp_tau,tmp_tau]),[0,np.max(yarray)], linewidth=0.5)
+        plt.xlabel("log(t)")
+        plt.ylabel("$d log(MSD) / d log(t)$")
         plt.tight_layout()
+        if save_plot:
+            tmp = os.path.split(plot_name)
+            tmp_plot_name = os.path.join(tmp[0],"dlog_"+tmp[1])
+            plt.savefig(tmp_plot_name,dpi=300)
         if show_plot:
             plt.show()
         plt.close("all")
