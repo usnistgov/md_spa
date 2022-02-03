@@ -120,7 +120,7 @@ def generate_universe(package, args, kwargs={}):
 
     return u
         
-def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, run_kwargs={}):
+def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, exclusion_block=(1,1), exclusion_mode="block", exclude=True, run_kwargs={}):
     """
     Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
@@ -143,6 +143,10 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
         Number of bins in the rdf
     verbose : bool, Optional, default=False
         Set whether calculation will be run with comments
+    exclusion_block : tuple, Optional, default=(1,1)
+        Allows the masking of pairs from within the same molecule.  For example, if there are 7 of each atom in each molecule, the exclusion mask `(7, 7)` can be used. The default removes self interaction.
+    exclusion_mode : str, Optional, default="block"
+        Set to "block" for traditional mdanalysis use, and use "relative" to remove ``exclusion_block[0]`` neighbors around reference atom.
     run_kwargs : dict, Optional, default={}
         Other keyword arguments from ``MDAnalysis.analysis.rdf.InterRDF.run()``
 
@@ -158,6 +162,14 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
     if not dm.isiterable(groups):
         raise ValueError("The entry `groups` must be an iterable structure with selection strings.")
 
+    if dm.isiterable(exclusion_block) and not dm.isiterable(exclusion_block[0]):
+        exclusion_block = [exclusion_block]
+
+    if exclusion_block == None:
+        exclusion_block = [None for x in range(len(groups))]
+    elif len(exclusion_block) != len(groups):
+        raise ValueError("Number of exclusion_blocks does not equal the number of group pairs.")
+
     group_dict = {}
     rdf_output = np.zeros((len(groups)+1,nbins))
     flag_bins = False
@@ -166,7 +178,7 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
             group_dict[group1] = u.select_atoms(group1)
         if group2 not in group_dict:
             group_dict[group2] = u.select_atoms(group2)
-        Rdf = mda_rdf.InterRDF(group_dict[group1],group_dict[group2],nbins=nbins,range=(rmin,rmax),verbose=verbose)
+        Rdf = mda_rdf.InterRDF(group_dict[group1],group_dict[group2],nbins=nbins,range=(rmin,rmax),verbose=verbose, exclusion_block=exclusion_block[i],exclusion_mode=exclusion_mode, exclude=exclude)
         Rdf.run(verbose=verbose, **run_kwargs)
         if not flag_bins:
             flag_bins = True

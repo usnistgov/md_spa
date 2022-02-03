@@ -5,8 +5,6 @@ import numpy as np
 import warnings
 import os
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import linregress
 from scipy.interpolate import InterpolatedUnivariateSpline
 
@@ -48,9 +46,10 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
     if not os.path.isfile(filename):
         raise ValueError("The given file could not be found: {}".format(filename))
 
+    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
+
     if titles == None:
         titles = fm.find_header(filename, **file_header_kwargs)
-    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
     if len(titles) != len(data):
         raise ValueError("The number of titles does not equal the number of columns")
 
@@ -60,6 +59,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
             raise ValueError("The provided variable `additional_entries` must be iterable")
     else:
         flag_add_ent = False
+        additional_entries = []
     if np.all(additional_header != None):
         flag_add_header = True
         if not dm.isiterable(additional_header):

@@ -118,6 +118,7 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
             raise ValueError("The provided variable `additional_entries` must be iterable")
     else:
         flag_add_ent = False
+        additional_entries = []
     if np.all(additional_header != None):
         flag_add_header = True
         if not dm.isiterable(additional_header):

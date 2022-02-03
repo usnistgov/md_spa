@@ -1,6 +1,7 @@
 import numpy as np
 import csv
 import sys
+import copy
 import os
 import warnings
 import matplotlib as mpl
@@ -371,6 +372,7 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", delimiter=",", titles=N
             raise ValueError("The provided variable `additional_entries` must be iterable")
     else:
         flag_add_ent = False
+        additional_entries = []
     if np.all(additional_header != None):
         flag_add_header = True
         if not dm.isiterable(additional_header):
@@ -389,9 +391,10 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", delimiter=",", titles=N
     r = data[0]
     tmp_data = []
     for i in range(1,len(data)):
-        if "title" not in extract_keypoints_kwargs:
-            extract_keypoints_kwargs["title"] = titles[i]
-        tmp = extract_keypoints(r,data[i], **extract_keypoints_kwargs)
+        tmp_extract_keypoints_kwargs = copy.deepcopy(extract_keypoints_kwargs)
+        if "title" not in tmp_extract_keypoints_kwargs:
+            tmp_extract_keypoints_kwargs["title"] = titles[i]
+        tmp = extract_keypoints(r,data[i], **tmp_extract_keypoints_kwargs)
         tmp_data.append(list(additional_entries)
             +[titles[i]]+list(tmp[0])+list(tmp[1])+list(tmp[2])+list(tmp[3:]))
 
@@ -547,7 +550,6 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
     r_array = r[ind_r_lower:ind_r_upper]
     y_array = 4*np.pi*r_array**2*gr[ind_r_lower:ind_r_upper]
 
-    print(r_peak, np.max(y_array))
     set_params = {
                   #"center": {"vary": False, "value": r_peak},
                   "height": {"vary": False, "value": np.max(y_array), "expr": None},

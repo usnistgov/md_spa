@@ -346,7 +346,64 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
 
     return output, uncertainties
 
+def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None):
+    """
+    Data within a file with two columns is fit to the function:
+    ..math:`\eta(t)=\eta_{\inf}(1-exp(-(t/\tau_{2})^{\beta_{S}}))` 
 
+    Values of zero and NaN are ignored in the fit.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ydata : numpy.ndarray
+        dependent data set
+    minimizer : str, Optional, default="nelder"
+        Fitting method supported by ``lmfit.minimize``
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ["A", "alpha", "tau1", "tau2"]
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: ["A", "alpha", "tau1", "tau2"]
+        
+    """
+
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+    weighting = weighting[ydata>0]
+
+    def exponential_res_1(x):
+        error = x["A"]*x["alpha"]*x["tau1"]*(1-np.exp(-(xarray/x["tau1"]))) \
+            + x["A"]*(1-x["alpha"])*x["tau2"]*(1-np.exp(-(xarray/x["tau2"]))) - yarray
+        if np.all(weighting != None):
+            if len(weighting) != len(error):
+                raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
+            error = error*np.array(weighting)
+        return error
+
+    exp1 = Parameters()
+    exp1.add("A", min=0, max=1e+4, value=1.0)
+    exp1.add("alpha", min=0, max=1, value=0.1)
+    exp1.add("tau1", min=0, max=1e+4, value=1.0)
+    exp1.add("tau2", min=0, max=1e+4, value=0.1)
+    result = lmfit.minimize(exponential_res_1, exp1, method=minimizer)
+
+    # Format output
+    output = np.zeros(4)
+    uncertainties = np.zeros(4)
+    for i,(param, value) in enumerate(result.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        lmfit.printfuncs.report_fit(result.params)
+
+    return output, uncertainties
     
 
 
