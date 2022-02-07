@@ -176,13 +176,17 @@ def write_csv(filename, array, mode="a", header=None, header_comment="#", delimi
         List of the same length as the second dimension
     delimiter : str, Optional, default=", "
         Delimiter between header and line entries
-
+    header_comment : str, Optional, default="#"
+        Symbol to comment out header for importing later (e.g. numpy.genfromtxt). Note that an additional header line could be placed before the headers if a `\\n` was added.
 
     Returns
     -------
     Write csv file
 
     """
+
+    if not dm.isiterable(array) or not dm.isiterable(array[0]):
+        raise ValueError("Input `array` must be an iterable type containing iterable elements.")
 
     with open(filename,mode) as f:
         if header != None:
