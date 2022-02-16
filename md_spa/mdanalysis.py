@@ -467,7 +467,6 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
                 acceptors = [indices[i][2]]
 
         for h in hydrogens:
-            print(donor_list_per_hydrogen)
             for d in donor_list_per_hydrogen[h]:
                 for a in acceptors:
                     new_indices.append([d,h,a])
