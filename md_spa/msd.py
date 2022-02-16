@@ -238,7 +238,7 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         The title used in the msd plot, note that this str is also added as a prefix to the ``plotname``.
     show_plot : bool, Optional, default=False
         choose to show a plot of the fit
-    plot_name : str, Optional, default="debye-waller.png"
+    plot_name : str, Optional, default="diffusivity.png"
         If ``save_plot==True`` the msd will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
     dim : int, Optional, default=3
         Dimensions of the system, usually 3
@@ -335,6 +335,57 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         print("Longest Region Diffusivity: {} +- {}, from Time: {} to {}, with and exponent of {} using {} points".format(*best[:5],best[-1]))
 
     return best, longest
+
+def msd(coords):
+    """
+    Calculate the MSD averaged over the number of particles and dimensions using FFT method described in DOI: 10.1051/sfn/201112010 
+
+    Parameters
+    ----------
+    coords : numpy.ndarray
+        (Nparticles, Ntime, Ndims) Matrix of coordinate values
+    
+    Returns
+    -------
+    msd : numpy.ndarray
+        msd averaged over all particles and coordinates
+    stderror : numpy.ndarray
+        standard error calculated over particles
+
+    """
+
+
+    if len(np.shape(np.array(coords))) == 1:
+        raise ValueError("An MSD cannot be calculated with a 1D array.")
+    if len(np.shape(np.array(coords))) == 2:
+        coords = np.array([coords])
+    nparticles, npts, dims = np.shape(np.array(coords))
+
+    for i in range(nparticles):
+        coords[i] = coords[i]-coords[i][0]
+
+    particle_msd = np.zeros((nparticles,npts, dims))
+    DSQ = np.sum(np.square(coords), axis=2) # 2D (nparticles, npts)
+    DSQ = np.concatenate((DSQ, np.zeros((nparticles,1))), axis=1)
+    SUMSQ = 2*np.sum(DSQ, axis=1) # 1D (nparticles)
+
+    particle_msd = np.zeros((nparticles,npts))
+    for i,particle in enumerate(coords):
+        Sab = np.zeros(npts)
+        for dim in range(dims):
+            Sab += dm.autocorrelation(particle[:,dim])
+
+        for t in range(npts):
+            SUMSQ[i] -= (DSQ[i,t-1] + DSQ[i,npts-t])
+            particle_msd[i,t] = SUMSQ[i] / (npts - t) - 2*Sab[t]
+
+    msd = np.mean(particle_msd, axis=0)
+    if nparticles > 1:
+        stderror = np.mean(msd, axis=0)/np.sqrt(nparticles)
+    else:
+        stderror = np.nan*np.ones(npts)
+
+    return msd, stderror
 
 def diffusivity(time, msd, verbose=False, dim=3):
     """

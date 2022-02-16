@@ -5,9 +5,8 @@ import lmfit
 from lmfit import minimize, Parameters
 
 def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png"):
-#def exponential(filename, delimiter=",", minimizer="nelder", verbose=False, save_plots=None, show_plot=False):
     """
-    Data within a file with two columns is fit to one, two, and three exponentials, where the sum of the prefactors equals unity. 
+    Provided data fit is fit to one, two, and three exponentials, where the sum of the prefactors equals unity. 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -37,9 +36,6 @@ def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, 
         
     """
 
-#    data = np.transpose(np.genfromtxt(filename,delimiter=","))
-#    xarray = data[0][data[1]>0]
-#    yarray = data[1][data[1]>0]
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
 
@@ -138,7 +134,7 @@ def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, 
 
 def one_exponential(xdata, ydata, minimizer="nelder", verbose=False):
     """
-    Data within a file with two columns is fit to an exponential function. 
+    Provided data fit to:
 
     Values of zero and NaN are ignored in the fit.
 
@@ -187,7 +183,7 @@ def one_exponential(xdata, ydata, minimizer="nelder", verbose=False):
 
 def two_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
     """
-    Data within a file with two columns is fit to two exponential functions where the prefactors sum to unity. 
+    Provided data fit to:
 
     Values of zero and NaN are ignored in the fit.
 
@@ -242,7 +238,7 @@ def two_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
 
 def three_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
     """
-    Data within a file with two columns is fit to two exponential functions where the prefactors sum to unity. 
+    Provided data fit to:
 
     Values of zero and NaN are ignored in the fit.
 
@@ -346,9 +342,9 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
 
     return output, uncertainties
 
-def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None):
+def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, minimizer_kwargs={}):
     """
-    Data within a file with two columns is fit to the function:
+    Provided data fit to:
     ..math:`\eta(t)=\eta_{\inf}(1-exp(-(t/\tau_{2})^{\beta_{S}}))` 
 
     Values of zero and NaN are ignored in the fit.
@@ -375,7 +371,13 @@ def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=Fals
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
-    weighting = weighting[ydata>0]
+
+    if np.all(weighting != None):
+        weighting = weighting[ydata>0]
+        if minimizer == "emcee":
+            minimizer_kwargs["is_weighted"] = True
+    elif minimizer == "emcee":
+        minimizer_kwargs["is_weighted"] = False
 
     def exponential_res_1(x):
         error = x["A"]*x["alpha"]*x["tau1"]*(1-np.exp(-(xarray/x["tau1"]))) \
@@ -387,11 +389,11 @@ def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=Fals
         return error
 
     exp1 = Parameters()
-    exp1.add("A", min=0, max=1e+4, value=1.0)
+    exp1.add("A", min=0, max=1e+4, value=np.nanmax(yarray))
     exp1.add("alpha", min=0, max=1, value=0.1)
     exp1.add("tau1", min=0, max=1e+4, value=1.0)
     exp1.add("tau2", min=0, max=1e+4, value=0.1)
-    result = lmfit.minimize(exponential_res_1, exp1, method=minimizer)
+    result = lmfit.minimize(exponential_res_1, exp1, method=minimizer, **minimizer_kwargs)
 
     # Format output
     output = np.zeros(4)
@@ -404,6 +406,65 @@ def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=Fals
         lmfit.printfuncs.report_fit(result.params)
 
     return output, uncertainties
-    
 
+def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, minimizer_kwargs={}):
+    """
+    Provided data fit to: ..math:`A*x^{b}` after linearizing with a log transform.
+
+    Values of zero and NaN are ignored in the fit.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ydata : numpy.ndarray
+        dependent data set
+    minimizer : str, Optional, default="nelder"
+        Fitting method supported by ``lmfit.minimize``
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ["A", "alpha", "tau1", "tau2"]
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: ["A", "alpha", "tau1", "tau2"]
+        
+    """
+    
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+
+    if np.all(weighting != None):
+        weighting = weighting[ydata>0]
+        if minimizer == "emcee":
+            minimizer_kwargs["is_weighted"] = True
+    elif minimizer == "emcee":
+        minimizer_kwargs["is_weighted"] = False
+
+    def power_law(x):
+        return x["A"]*xarray**x["b"] - yarray
+        if np.all(weighting != None):
+            if len(weighting) != len(error):
+                raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
+            error = error*np.array(weighting)
+        return error
+
+    exp1 = Parameters()
+    exp1.add("A", min=0, max=1e+4, value=1.0)
+    exp1.add("b", min=0, max=100, value=2)
+    result = lmfit.minimize(power_law, exp1, method=minimizer, **minimizer_kwargs)
+
+    # Format output
+    output = np.zeros(2)
+    uncertainties = np.zeros(2)
+    for i,(param, value) in enumerate(result.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        lmfit.printfuncs.report_fit(result.params)
+
+    return output, uncertainties
 

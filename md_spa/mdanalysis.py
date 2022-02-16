@@ -239,7 +239,6 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
             nongaussian_parameter[0] = np.arange(MSD.n_frames)*dt # ps
         msd_output[i+1] = MSD.results.timeseries # angstroms^2
         nongaussian_parameter[i+1] = MSD.results.second_order_nongaussian_parameter
-        
 
     return msd_output, nongaussian_parameter
 
@@ -382,7 +381,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv"):
+def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
@@ -411,6 +410,12 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         Path to save files
     filename : str, Optional, default="lifetime.csv"
         Prefix on filename to further differentiate
+    acceptor_kwargs : dict, Optional, default={}
+        Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_acceptors()``
+    donor_kwargs : dict, Optional, default={}
+        Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_donors()``
+    hydrogen_kwargs : dict, Optional, default={}
+        Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_hydrogens()``
 
     Returns
     -------
@@ -433,12 +438,12 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         print("Imported trajectory")
 
     Hbonds = HBA(universe=u)
-    acceptor_list = [x for x in Hbonds.guess_acceptors().split() if x not in ["type", "or"]]
-    hydrogen_list = [x for x in Hbonds.guess_hydrogens().split() if x not in ["type", "or"]]
+    acceptor_list = [x for x in Hbonds.guess_acceptors(**acceptor_kwargs).split() if x not in ["type", "or"]]
+    hydrogen_list = [x for x in Hbonds.guess_hydrogens(**hydrogen_kwargs).split() if x not in ["type", "or"]]
     donor_list_per_hydrogen = {}
     for hyd_type in hydrogen_list:
         Hbonds = HBA(universe=u, hydrogens_sel="type {}".format(hyd_type))
-        donor_list_per_hydrogen[hyd_type] = [x for x in Hbonds.guess_donors().split() if x not in ["type", "or"]]
+        donor_list_per_hydrogen[hyd_type] = [x for x in Hbonds.guess_donors(**donor_kwargs).split() if x not in ["type", "or"]]
 
     new_indices = []
     for i in range(len(indices)):
@@ -462,6 +467,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
                 acceptors = [indices[i][2]]
 
         for h in hydrogens:
+            print(donor_list_per_hydrogen)
             for d in donor_list_per_hydrogen[h]:
                 for a in acceptors:
                     new_indices.append([d,h,a])
