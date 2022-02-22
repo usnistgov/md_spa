@@ -85,3 +85,40 @@ def array2dict(array, keys):
 
     return dictionary
 
+def autocorrelation(x, mode="fft"):
+    """
+    Calculate the Autocorrelation function using FFT and multiple time origins.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Input function for which to calculate the autocorrelation function
+    mode : str, Optional, default="fft"
+        Method of calculating the autocorrelation function. FFT is two orders of magnitude faster than the ``loop`` method, and twice as fast as the numpy.correlate.
+       
+        - fft: Using Fourier transform to calculate the autocorrelation funct
+        - numpy: Use np.correlate with multiple start times
+        - loop: Hard coded loop taken from methematical definition
+
+    Returns
+    -------
+    Cx : numpy.ndarray
+        Autocorrelation function
+    """
+
+    lx = len(x)
+    norm = (lx-np.arange(0,lx))
+
+    if mode == "fft":
+        Cx = np.fft.ifft( np.abs(np.fft.fft(x, n=2*lx))**2)[:lx].real
+    elif mode == "numpy":
+        Cx = np.correlate(x, x, mode='full')[lx-1:]
+    elif mode == "loop":
+        Cx = np.zeros(lx)
+        for j in range(lx):
+            Cx[:lx-j] += x[j]*x[j:]
+    else:
+        raise ValueError("The autocorrelation method, {}, is not supported".format(mode))
+
+    return Cx/norm
+
