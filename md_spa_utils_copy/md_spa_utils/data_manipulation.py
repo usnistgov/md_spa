@@ -1,7 +1,8 @@
 
 import numpy as np
+import scipy.stats
 
-def basic_stats(data, confidence=0.95):
+def basic_stats(data, confidence=0.95, error_type="standard_error"):
     """
     Given a set of data, calculate the mean and standard error
 
@@ -10,7 +11,9 @@ def basic_stats(data, confidence=0.95):
     data : numpy.ndarray
         1D list or array of data
     confidence : float, Optional, default=0.95
-        Confidence Interval
+        Confidence Interval certainty, used when ``error_type = "confidence"``
+    error_type : str, Optional, default="standard_error"
+        Type of error to be output, can be "standard_error" or "confidence"
 
     Returns
     -------
@@ -24,8 +27,14 @@ def basic_stats(data, confidence=0.95):
     """
     data = np.array(data,np.float)
     se = np.std(data)/np.sqrt(len(data))
+    if error_type == "standard_error":
+        tmp = se
+    elif error_type == "confidence":
+        tmp = se * scipy.stats.t.ppf((1 + confidence) / 2., len(data)-1)
+    else:
+        raise ValueError("error_type, {}, is not supported".format(error_type))
 
-    return np.mean(data), se
+    return np.mean(data), tmp
 
 def isiterable(array):
     """
