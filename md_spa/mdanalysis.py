@@ -5,17 +5,17 @@ import os
 import warnings
 
 import MDAnalysis as mda
-from MDAnalysis.analysis import polymer
+from MDAnalysis.analysis import polymer as mda_polymer
 from MDAnalysis.analysis import rdf as mda_rdf
 from MDAnalysis.transformations import unwrap
 from MDAnalysis.analysis.hydrogenbonds.hbond_analysis import HydrogenBondAnalysis as HBA
 from MDAnalysis.analysis.waterdynamics import SurvivalProbability as SP
-import MDAnalysis.analysis.msd as msd
+import MDAnalysis.analysis.msd as mda_msd
 from MDAnalysis import transformations as trans
 
 import md_spa_utils.data_manipulation as dm
 
-def center_universe_around_group(universe, select, verbose=False):
+def center_universe_around_group(universe, select, verbose=False, reference="initial"):
     """
 
     Parameters
@@ -26,6 +26,11 @@ def center_universe_around_group(universe, select, verbose=False):
         This string should align with ``MDAnalysis.universe.select_atoms(select)`` rules
     verbose : bool, Optional, default=False
         Set whether calculation will be run with comments
+    reference : str, Optional, default="intitial"
+        Options for how to transform the coordinates:
+        
+        - "initial": Move the center of mass for the group in the first frame to the center of the box and use that same transformation in all other frames. This will allow further dynamic analysis without interference of boundary conditions.
+        - "relative": Move the center of mass for a group to the center of the box for each respective frame. All dynamic movement will be distorted and lost, but the group will not migrate to the boundary for static property calculations.
 
     Returns
     -------
@@ -37,17 +42,26 @@ def center_universe_around_group(universe, select, verbose=False):
     group_target = universe.select_atoms(select)
     group_remaining = universe.select_atoms("all") - group_target
     
-    box_center = universe.trajectory[0].dimensions[:3] / 2
     if verbose:
         print("Polymer Center of Mass Before", group_target.center_of_mass())
-    transforms = [
-        trans.unwrap(group_target),
-        trans.center_in_box(group_target),
-        trans.wrap(group_remaining)
-    ]
-    universe.trajectory.add_transformations(*transforms)
+
+    if reference == "initial":
+        transforms = [
+            trans.unwrap(group_target),
+            trans.center_in_box(group_target),
+            trans.wrap(group_remaining)
+        ]
+        universe.trajectory.add_transformations(*transforms)
+    elif reference == "relative":
+        box_center = universe.trajectory[0].dimensions[:3] / 2
+        for ts in universe.trajectory:
+            universe.atoms.translate(box_center - group_target.center_of_mass(pbc=True))
+            group_remaining.wrap()
+    else:
+        raise ValueError("Transformation reference, {}, is not supported.".format(reference))
+
     if verbose:
-        print("Group Center of Mass After", group.center_of_mass())
+        print("Group Center of Mass After", group_target.center_of_mass())
 
     return universe
 
@@ -228,7 +242,7 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
     nongaussian_parameter = np.zeros((len(groups)+1,nbins))
     flag_bins = False
     for i, group in enumerate(groups):
-        MSD = msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=True)
+        MSD = mda_msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=True)
         MSD.run(verbose=verbose, **run_kwargs)
         if verbose:
             print("Generated MSD for group {}".format(group))
@@ -276,9 +290,9 @@ def calc_persistence_length(u, backbone_indices, save_plot=True, figure_name="pl
     tmp_indices = [x-1 for x in backbone_indices]
     #tmp_indices = backbone_indices
     backbone = mda.core.groups.AtomGroup(tmp_indices,u)
-    sorted_bb = polymer.sort_backbone(backbone) # Should be unnecessary if backbone_indices are in order
+    sorted_bb = mda_polymer.sort_backbone(backbone) # Should be unnecessary if backbone_indices are in order
     
-    plen = polymer.PersistenceLength([sorted_bb])
+    plen = mda_polymer.PersistenceLength([sorted_bb])
     plen.run(verbose=verbose)
     
     if verbose:
