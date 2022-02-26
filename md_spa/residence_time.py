@@ -142,10 +142,13 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
             tmp = kwargs_fit["plot_name"].split(".")
             tmp[0] += "_"+str(titles[i])
             kwargs_fit_tmp["plot_name"] = ".".join(tmp)
-        if not np.all(np.isnan(data[i][1:])):
-            output, _ = cfit.exponential(t_tmp, data[i], **kwargs_fit_tmp)
-        else:
+        if np.all(np.isnan(data[i][1:])):
             output = np.nan*np.ones(11)
+        elif np.all(data[i][1:] < np.finfo(np.float).eps):
+            output = np.zeros(11)
+        else:
+            output, _ = cfit.exponential(t_tmp, data[i], **kwargs_fit_tmp)
+
         tmp = [titles[i], output[0], output[1]*output[2]+output[3]*output[4], output[5]*output[6]+output[7]*output[8]+output[9]*output[10]]
         tmp_data.append(list(additional_entries)+tmp+list(output))
 
