@@ -4,7 +4,7 @@ import os
 import lmfit
 from lmfit import minimize, Parameters
 
-def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png"):
+def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}):
     """
     Provided data fit is fit to one, two, and three exponentials, where the sum of the prefactors equals unity. 
 
@@ -26,6 +26,8 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
         Plot filename and path
     show_plot : bool, Optional, default=False
         If true, the fits will be shown
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
 
     Returns
     -------
@@ -62,14 +64,14 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
     
     exp1 = Parameters()
     exp1.add("t1", min=0, max=1e+4, value=0.1)
-    Result1 = lmfit.minimize(exponential_res_1, exp1, method=minimizer)
+    Result1 = lmfit.minimize(exponential_res_1, exp1, method=minimizer, **kwargs_minimizer)
     
     exp2 = Parameters()
     exp2.add("a1", min=0, max=1, value=0.8)
     exp2.add("t1", min=0, max=1e+4, value=0.1)
     exp2.add("a2", min=0, max=1, value=0.2, expr="1 - a1")
     exp2.add("t2", min=0, max=1e+4, value=0.09)
-    Result2 = lmfit.minimize(exponential_res_2, exp2, method=minimizer)
+    Result2 = lmfit.minimize(exponential_res_2, exp2, method=minimizer, **kwargs_minimizer)
     
     exp3 = Parameters()
     exp3.add("a1", min=0, max=1, value=0.8)
@@ -78,7 +80,7 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
     exp3.add("t2", min=0, max=1e+4, value=0.09)
     exp3.add("a3", min=0, max=1, value=0.01, expr="1 - a1 - a2")
     exp3.add("t3", min=0, max=1e+4, value=0.02)
-    Result3 = lmfit.minimize(exponential_res_3, exp3, method=minimizer)
+    Result3 = lmfit.minimize(exponential_res_3, exp3, method=minimizer, **kwargs_minimizer)
 
     # Format output
     output = np.zeros(11)
@@ -93,6 +95,14 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
         uncertainties[i+5] = value.stderr
 
     if verbose:
+        if minimizer == "leastsq":
+            print("1 Exp. Termination: {}".format(Result1.lmdif_message))
+            print("2 Exp. Termination: {}".format(Result2.lmdif_message))
+            print("3 Exp. Termination: {}".format(Result3.lmdif_message))
+        else:
+            print("1 Exp. Termination: {}".format(Result1.message))
+            print("2 Exp. Termination: {}".format(Result2.message))
+            print("3 Exp. Termination: {}".format(Result3.message))
         lmfit.printfuncs.report_fit(Result1.params)
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
         print("Sum: {}".format(Result2.params["a1"]+Result2.params["a2"]))
