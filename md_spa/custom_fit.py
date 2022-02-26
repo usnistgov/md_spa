@@ -4,7 +4,7 @@ import os
 import lmfit
 from lmfit import minimize, Parameters
 
-def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png"):
+def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png"):
     """
     Provided data fit is fit to one, two, and three exponentials, where the sum of the prefactors equals unity. 
 
@@ -16,7 +16,7 @@ def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, 
         Path and filename of data set to be fit
     delimiter : str, Optional, default=","
         Delimiter between columns used in ``numpy.genfromtxt()``
-    minimizer : str, Optional, default="nelder"
+    minimizer : str, Optional, default="leastsq"
         Fitting method supported by ``lmfit.minimize``
     verbose : bool, Optional, default=False
         Output fitting statistics
@@ -38,6 +38,9 @@ def exponential(xdata, ydata, delimiter=",", minimizer="nelder", verbose=False, 
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
     def exponential_res_1(x):
         return np.exp(-xarray/x["t1"]) - yarray
@@ -161,6 +164,9 @@ def one_exponential(xdata, ydata, minimizer="nelder", verbose=False):
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
 
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
+
 
     def exponential_res_1(x):
         return np.exp(-xarray/x["t1"]) - yarray
@@ -209,6 +215,9 @@ def two_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
     def exponential_res_2(x):
         return x["a1"]*np.exp(-xarray/x["t1"]) + x["a2"]*np.exp(-xarray/x["t2"]) - yarray
@@ -264,6 +273,9 @@ def three_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
     def exponential_res_3(x):
         return x["a1"]*np.exp(-xarray/x["t1"]) + x["a2"]*np.exp(-xarray/x["t2"]) + x["a3"]*np.exp(-xarray/x["t3"]) - yarray
@@ -321,6 +333,9 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
 
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
+
     model = lmfit.models.GaussianModel(nan_policy="omit")
     for param, values in set_params.items():
         if param not in ["center", "amplitude", "height", "sigma", "fwhm"]:
@@ -371,6 +386,9 @@ def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=Fals
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
     if np.all(weighting != None):
         weighting = weighting[ydata>0]
@@ -435,6 +453,9 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, m
     
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
     if np.all(weighting != None):
         weighting = weighting[ydata>0]
