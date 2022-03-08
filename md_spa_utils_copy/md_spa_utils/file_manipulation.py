@@ -47,7 +47,7 @@ def find_header(filename, delimiter=",", comments="#"):
 
     return col_headers
 
-def find_csv_entries(filename, matching_entries=None, indices=None):
+def find_csv_entries(filename, matching_entries=None, indices=None, convert_float=True):
     """
     This function will find a specific line in a csv file, and return the requested indices. The lines are specified by the `matching_entries` variable, that uses an iterable structure to narrow the number of rows down to those with the initial columns matching this list. The remaining matrix is then returned according to the `indices`.
 
@@ -59,6 +59,8 @@ def find_csv_entries(filename, matching_entries=None, indices=None):
         This list indicates the criteria for narrowing the selection of rows. The first columns of each considered row must match these entries.
     indices : float/list, Optional, default=None
         The index of a column or a list of indices of the columns to extract from those rows that meet specification. A value of None returns all columns. WARNING! The indexing for this variable is ``np.shape(data)[1]-len(matching_entries)``, so the column after the columns that meet the matching criteria is specified with indices=0.
+    convert_float : bool, Optional, default=True
+        Convert all applicable entries into floats
 
     Returns
     -------
@@ -96,6 +98,10 @@ def find_csv_entries(filename, matching_entries=None, indices=None):
 
     if len(output) == 1:
         output = output[0]
+
+    if convert_float:
+        for i in range(len(output)):
+            output[i] = [float(x) for x in output[i] if dm.isfloat(x)]
 
     return output
 
@@ -188,8 +194,10 @@ def write_csv(filename, array, mode="a", header=None, header_comment="#", delimi
     if not dm.isiterable(array) or not dm.isiterable(array[0]):
         raise ValueError("Input `array` must be an iterable type containing iterable elements.")
 
+    flag = not os.path.isfile(filename)
+
     with open(filename,mode) as f:
-        if header != None:
+        if header != None and flag:
             f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")

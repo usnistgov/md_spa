@@ -66,6 +66,30 @@ def isiterable(array):
 
     return isiterable
 
+def isfloat(string):
+    """
+    Check if string variable is actually a float. This function allows exponential notation.
+
+    Parameters
+    ----------
+    string
+        String that may or may not be a float
+
+    Returns
+    -------
+    isfloat : bool
+        Will be True if the string can be converted into a float
+
+    """
+
+    try:
+        float(string)
+        flag = True
+    except:
+        flag = False
+
+    return flag
+
 def array2dict(array, keys):
     """
     Array to dict will group values into a dictionary
