@@ -55,7 +55,7 @@ def extract_csv(filename, extract_array=None):
                             weird_ind.append(ind)
 
     if weird_ind:
-        warnings.warn("Zeno frames: {}, output non-float values. Setting frame values to NaN".format(weird_ind))
+        warnings.warn("Zeno frames: {}, output non-float values in {}. Setting frame values to NaN".format(weird_ind,filename))
         for ind in weird_ind:
             for key in output:
                 output[key]["value"][ind] = np.nan
