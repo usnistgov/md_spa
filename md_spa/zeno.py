@@ -33,6 +33,7 @@ def extract_csv(filename, extract_array=None):
     if not np.all(extract_array == None):
         extract += extract_array
 
+    weird_ind = []
     output = {}
     with open(filename, "r+") as f:
         for line in f:
@@ -43,10 +44,22 @@ def extract_csv(filename, extract_array=None):
                 output[property_key]["units"] = line_array[2]
                 line_array = next(f).strip().split(",")
                 tmp = []
-                output[property_key]["value"] = [float(x) for x in line_array[2:] if dm.isfloat(x)]
+                output[property_key]["value"] = [float(x) if dm.isfloat(x) else np.nan for x in line_array[2:]]
                 line_array = next(f).strip().split(",")
-                output[property_key]["std_dev"] = [float(x) for x in line_array[2:] if dm.isfloat(x)]
+                output[property_key]["std_dev"] = [float(x) if dm.isfloat(x) else np.nan for x in line_array[2:]]
                 extract.remove(property_key)
+                if np.any(np.isnan(output[property_key]["value"])):
+                    inds = np.where(np.isnan(output[property_key]["value"]))[0]
+                    for ind in inds:
+                        if ind not in weird_ind:
+                            weird_ind.append(ind)
+
+    if weird_ind:
+        warnings.warn("Zeno frames: {}, output non-float values. Setting frame values to NaN".format(weird_ind))
+        for ind in weird_ind:
+            for key in output:
+                output[key]["value"][ind] = np.nan
+                output[key]["std_dev"][ind] = np.nan
 
     if "mass" in output and np.all(output["mass"]["value"]==1.0):
         warnings.warn("Provided mass equals unity for all cases. In post-processing be sure to scale: intrinsic_viscosity_mass_units, Sedimentation coefficient")
