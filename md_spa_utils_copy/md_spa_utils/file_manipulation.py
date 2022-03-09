@@ -96,12 +96,12 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
         else:
             output = [y[Nbuffer:] for y in data]
 
-    if len(output) == 1:
-        output = output[0]
-
     if convert_float:
         for i in range(len(output)):
             output[i] = [float(x) for x in output[i] if dm.isfloat(x)]
+
+    if len(output) == 1:
+        output = output[0]
 
     return output
 
