@@ -197,7 +197,7 @@ def write_csv(filename, array, mode="a", header=None, header_comment="#", delimi
     flag = not os.path.isfile(filename)
 
     with open(filename,mode) as f:
-        if header != None and flag:
+        if header != None and flag or "w" in mode:
             f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")

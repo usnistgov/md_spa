@@ -155,3 +155,33 @@ def autocorrelation(x, mode="fft"):
 
     return Cx/norm
 
+def remove_duplicate_pairs(array):
+    """
+    Given an iterable list return entries with unique values for the first two indices
+
+    Parameters
+    ----------
+    array : list
+        Iterable strucure with a second dimension of at least two
+
+    Returns
+    -------
+    new_array : list
+        Iterable strucure without repeating entries
+
+        
+    """
+
+    if not isiterable(array):
+        raise ValueError("Provided array should be iterable")
+    if array and (not isiterable(array[0]) or len(array[0]) < 2):
+        raise ValueError("Each element in the second dimension must be iterable and at least of length two.")
+
+    new_array = []
+    for tmp_set in array:
+        if tmp_set[0] not in [tmp[0] for tmp in new_array]:
+            new_array.append(tmp_set)
+        elif tmp_set[1] not in [tmp for tmp in [tmp2[1] for tmp2 in new_array if tmp2[0]==tmp_set[0]]]:
+            new_array.append(tmp_set)
+
+    return new_array
