@@ -621,7 +621,7 @@ def survival_probability(u, dt, type_reference=None, type_target=None, zones=[(2
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
 
-def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100):
+def debye_waller_by_zones(u, frames_per_tau, select_reference=None, select_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100):
     """
     Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -638,12 +638,12 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
 
     frames_per_tau : int
         Number of frames in the characteristic time, tau.
-    type_reference : int, Optional, default=None
+    select_reference : int, Optional, default=None
         This atom type must be provided unless ``select`` is provided. This atom type represents the core for the radial analysis. Note that with how this selection criteria is written, that if two atoms of this type are close together, a sort of iso-line is formed around the two atoms so that the DW parameter is not skewed by target atoms that are far from one reference type and close to another.
-    type_target : int, Optional, default=None
+    select_target : int, Optional, default=None
         This atom type must be provided unless ``select`` is provided. The DW parameter of this atom type is the output of this function. 
     select : str, Optional, default=None
-        A string to overwrite the default selection criteria: ``type {type_target} and around {r_start+i_zone*dr} type {type_reference}``
+        A string to overwrite the default selection criteria: ``({select_target}) and around {r_start} {r_start+i_zone*dr} ({select_reference})``
     stop_frame : int, Optional, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
     r_start : float, Optional, default=2.0
@@ -675,9 +675,9 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
     """
 
     if select == None:
-        if type_reference==None or type_target==None:
-            raise ValueError("Both type_reference and type_target must be defined, respectively given: {} and {}".format(type_reference,type_target))
-        select = "type {} and isolayer {} {} type {}".format(type_target, {}, {}, type_reference)
+        if select_reference==None or select_target==None:
+            raise ValueError("Both select_reference and select_target must be defined, respectively given: {} and {}".format(select_reference,select_target))
+        select = "({}) and isolayer {} {} ({})".format(select_target, {}, {}, select_reference)
     else:
         try:
             tmp = select.format(0)
@@ -724,10 +724,15 @@ def debye_waller_by_zones(u, frames_per_tau, type_reference=None, type_target=No
         for z in range(nzones):
             positions_start_finish[z].append(Zones[z].positions)
             tmp = positions_start_finish[z][1]-positions_start_finish[z][0]
-            tmp_check = [ii for ii, x in enumerate(tmp) if np.any(np.abs(x) > dimensions/2)]
-            if tmp_check:
-                warnings.warn("{} atoms have either traveled over half the box length, or through periodic boundary conditions. It has been excluded from the reported dataset.".format(len(tmp_check)))
-                tmp = np.delete(tmp, tmp_check, axis=0)
+            for ii in range(len(tmp)):
+                tmp_check = np.abs(tmp[ii]) > dimensions/2
+                if np.any(tmp_check):
+                    ind = np.where(tmp_check)[0]
+                    for jj in ind:
+                        if tmp[ii][jj] > 0:
+                            tmp[ii][jj] -= dimensions[jj]
+                        else:
+                            tmp[ii][jj] += dimensions[jj]
             msd_total[z].extend(list(np.sum(np.square(tmp),axis=1)))
 
             tmp_ind1 = [x.ix for x in Zones[z]]
