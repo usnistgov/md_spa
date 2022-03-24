@@ -333,12 +333,13 @@ def calc_gyration(u, select="all"):
         The radius of gyration is calculated for the provided dump file
     kappa : numpy.ndarray
         The anisotropy is calculated from the gyration tensor, where zero indicates a sphere and one indicates an infinitely long rod.
+    anisotropy : numpy.ndarray
+        Another form of anisotropy where the square of the largest eigenvalue in the gyration tensor is scales by the square of the smallest. A spherical cluster would then have a value of unity and an infinitely long rod would approach infinity.
 
     """
 
     u = check_universe(u)
     ag = u.atoms
-    u.trajectory.add_transformations(unwrap(ag))
     group = u.select_atoms(select)  # a selection (a AtomGroup)
     if not np.any(group._ix):
         raise ValueError("No atoms met the selection criteria")
@@ -354,7 +355,7 @@ def calc_gyration(u, select="all"):
 
 def calc_end2end(u, indices):
     """
-    Calculate the persistence length of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
+    Calculate the end to end distance of a polymer given a MDAnalysis universe and the atomIDs of the first and last particle in the backbone.
 
     Parameters
     ----------
@@ -383,8 +384,9 @@ def calc_end2end(u, indices):
         
 
     u = check_universe(u)
+    u = u.copy()
+    center_universe_around_group(u, "index {} or index {}".format(*indices), reference="relative")
     ag = u.atoms
-    u.trajectory.add_transformations(unwrap(ag))
     tmp_indices = [x-1 for x in indices]
 
     r_end2end = np.zeros(len(u.trajectory))
