@@ -27,8 +27,8 @@ Features
 Credits
 -------
 
-This package was created with Cookiecutter_ and the cookiecutter\-nist\-python_ project template.
+This package was created with Cookiecutter_ and the `cookiecutter-nist-python`_ project template.
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _cookiecutter\-nist\-python: https://gitlab.nist.gov/gitlab/jac16/cookiecutter-nist-python
+.. _`cookiecutter-nist-python`: https://gitlab.nist.gov/gitlab/jac16/cookiecutter-nist-python
 
