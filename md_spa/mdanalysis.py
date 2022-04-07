@@ -15,7 +15,7 @@ from MDAnalysis import transformations as trans
 
 import md_spa_utils.data_manipulation as dm
 
-def center_universe_around_group(universe, select, verbose=False, reference="initial"):
+def center_universe_around_group(universe, select, verbose=False, reference="initial", com_kwargs={"unwrap": True}):
     """
 
     Parameters
@@ -32,6 +32,9 @@ def center_universe_around_group(universe, select, verbose=False, reference="ini
         - "initial": Move the center of mass for the group in the first frame to the center of the box and use that same transformation in all other frames. This will allow further dynamic analysis without interference of boundary conditions.
         - "relative": Move the center of mass for a group to the center of the box for each respective frame. All dynamic movement will be distorted and lost, but the group will not migrate to the boundary for static property calculations.
 
+    com_kwargs : dict, Optional, default={"unwrap": True}
+        Keyword arguements for mdanalysis.core.topologyattrs.center_of_mass()
+
     Returns
     -------
     universe : obj 
@@ -39,29 +42,36 @@ def center_universe_around_group(universe, select, verbose=False, reference="ini
 
     """
 
+    universe.trajectory[0]
     group_target = universe.select_atoms(select)
     group_remaining = universe.select_atoms("all") - group_target
     
     if verbose:
-        print("Polymer Center of Mass Before", group_target.center_of_mass())
+        print("Polymer Center of Mass Before", group_target.center_of_mass(**com_kwargs))
 
     if reference == "initial":
+        box_center = universe.trajectory[0].dimensions[:3] / 2
+        com = group_target.center_of_mass(**com_kwargs)
+        transforms = [
+            trans.unwrap(group_target),
+            trans.translate(box_center-com),
+            trans.wrap(group_remaining)
+        ]
+        universe.trajectory.add_transformations(*transforms)
+    elif reference == "relative":
         transforms = [
             trans.unwrap(group_target),
             trans.center_in_box(group_target),
             trans.wrap(group_remaining)
         ]
         universe.trajectory.add_transformations(*transforms)
-    elif reference == "relative":
-        box_center = universe.trajectory[0].dimensions[:3] / 2
-        for ts in universe.trajectory:
-            universe.atoms.translate(box_center - group_target.center_of_mass(pbc=True))
-            group_remaining.wrap()
+
     else:
         raise ValueError("Transformation reference, {}, is not supported.".format(reference))
 
     if verbose:
         print("Group Center of Mass After", group_target.center_of_mass())
+    universe.trajectory[0]
 
     return universe
 
@@ -311,13 +321,13 @@ def calc_persistence_length(u, backbone_indices, save_plot=True, figure_name="pl
 
     return plen.results.lp
 
-def calc_gyration(u, select="all"):
+def calc_gyration(universe, select="all", pbc=False):
     """
     Calculate the radius of gyration and anisotropy of a polymer given a LAMMPS data file, dump file(s).
 
     Parameters
     ----------
-    u : obj/tuple
+    universe : obj/tuple
         Can either be:
         
         - MDAnalysis universe
@@ -326,6 +336,8 @@ def calc_gyration(u, select="all"):
 
     select : str, Optional, default="all"
         This string should align with MDAnalysis universe.select_atoms(select) rules
+    pbc : bool, Optional, default=True
+        If ``True``, move all atoms within the primary unit cell before calculation.
 
     Returns
     -------
@@ -338,18 +350,20 @@ def calc_gyration(u, select="all"):
 
     """
 
-    u = check_universe(u)
-    ag = u.atoms
-    group = u.select_atoms(select)  # a selection (a AtomGroup)
+    universe = check_universe(universe)
+    group = universe.select_atoms(select)  # a selection (a AtomGroup)
+    com = [[],[]]
+    center_universe_around_group(universe, select, reference="relative")
     if not np.any(group._ix):
         raise ValueError("No atoms met the selection criteria")
 
-    rgyr = np.zeros(len(u.trajectory))
-    kappa = np.zeros(len(u.trajectory))
-    anisotropy = np.zeros(len(u.trajectory))
-    for i,ts in enumerate(u.trajectory):  # iterate through all frames
-        rgyr[i] = group.radius_of_gyration()  # method of a AtomGroup; updates with each frame
-        kappa[i], anisotropy[i] = group.anisotropy()  # method of a AtomGroup; updates with each frame
+    lx = len(universe.trajectory)
+    rgyr = np.zeros(lx)
+    kappa = np.zeros(lx)
+    anisotropy = np.zeros(lx)
+    for i,ts in enumerate(universe.trajectory):  # iterate through all frames
+        rgyr[i] = group.radius_of_gyration(pbc=pbc)  # method of a AtomGroup; updates with each frame
+        kappa[i], anisotropy[i] = group.anisotropy(pbc=pbc)  # method of a AtomGroup; updates with each frame
     
     return rgyr, kappa, anisotropy
 
