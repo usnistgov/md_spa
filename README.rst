@@ -14,18 +14,10 @@ MD-SPA
 .. image:: https://img.shields.io/badge/License-BSD license-blue.svg
     :target: https://git@gitlab.nist.gov/jac16/md-spa/-/blob/master/LICENSE
 
-
-
-
-
 Molecular Dynamics Simulation Properties Analysis (MD-SPA) will ease the extraction of relevant property information.
-
 
 * Free software: BSD license
 * Documentation: ``python -m md_spa -d``
-
-
-
 
 Features
 --------
@@ -35,8 +27,8 @@ Features
 Credits
 -------
 
-This package was created with Cookiecutter_ and the ` cookiecutter-nist-python`_ project template.
+This package was created with Cookiecutter_ and the cookiecutter\-nist\-python_ project template.
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
-.. _` cookiecutter-nist-python`: https://gitlab.nist.gov/gitlab/jac16/cookiecutter-nist-python
+.. _cookiecutter\-nist\-python: https://gitlab.nist.gov/gitlab/jac16/cookiecutter-nist-python
 

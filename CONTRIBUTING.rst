@@ -36,14 +36,14 @@ MD-SPA could always use more documentation, whether as part of the official MD-S
 
 For docstrings, please use the `numpy docstring format <https://numpydoc.readthedocs.io/en/latest/format.html>`_.
 
+If a new module is added, be sure to add it to the appropriate .rst file in the docs directory.
+
 Working on issues
 ------------------
 
 After an issue is created, the progress of the issues is tracked on the `GitLab issue board <https://git@gitlab.nist.gov/jac16/md-spaboards>`_.
 The maintainers will update the state using `labels <https://git@gitlab.nist.gov/jac16/md-spalabels>`_ .
 Once an issue is ready for review a Merge Request can be opened.
-
-
 
 Merge Request Guidelines
 --------------------------
@@ -57,17 +57,15 @@ Before you submit a merge request, check that it meets these guidelines:
 3. The CI pipelines should pass for all merge requests.
 
    - Check the status of the pipelines, the status is also reported in the merge request.
-   - flake8 linter should pass.
+   - Check syntax with the linter, flake8 passes.
    - No degradation in code coverage.
    - Documentation should build.
+   
 4. Ensure your merge request contains a clear description of the changes made and how it addresses the issue. If useful, add a screenshot to showcase your work to facilitate an easier review.
 
 Congratulations! The maintainers will now review your work and suggest any necessary changes.
 If no changes are required, a maintainer will "approve" the review.
-If you are
-Thank you very much
-for your hard work in improving MD-SPA.
-
+Thank you very much for your hard work in improving MD-SPA.
 
 Setting up MD-SPA for local development
 ------------------------------------------------
@@ -77,7 +75,7 @@ Ready to contribute? Here's how to set up `MD-SPA` for local development.
 1. Fork the `md_spa` repo on GitLab.
 2. Clone your fork locally::
 
-    $ git clone git@gitlab.com:your_name_here/md_spa.git
+    $ git clone git@gitlab.nist.gov:your_username_here/md_spa.git
 
 3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development::
 
@@ -102,11 +100,7 @@ Ready to contribute? Here's how to set up `MD-SPA` for local development.
 
   .. code-block:: shell
 
-      $ cd docs
-      $ make html
-
-  The docs will be located in `md_spa/docs/_build`.
-
+      $ python -m md_spa -d --compile-docs
 
 6. Commit your changes and push your branch to GitLab::
 
