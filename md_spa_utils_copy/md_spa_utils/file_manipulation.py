@@ -98,7 +98,7 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
 
     if convert_float:
         for i in range(len(output)):
-            output[i] = [float(x) for x in output[i] if dm.isfloat(x)]
+            output[i] = [float(x) if dm.isfloat(x) else x for x in output[i]]
 
     if len(output) == 1:
         output = output[0]
