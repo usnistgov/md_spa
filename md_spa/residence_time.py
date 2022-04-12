@@ -138,14 +138,14 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
     tmp_data = []
     for i in range(1,len(data)):
         kwargs_fit_tmp = copy.deepcopy(kwargs_fit)
-        print(data[i][1:])
         if "plot_name" in kwargs_fit:
             tmp = kwargs_fit["plot_name"].split(".")
             tmp[0] += "_"+str(titles[i])
             kwargs_fit_tmp["plot_name"] = ".".join(tmp)
-        if len(np.where(np.isnan(data[i][1:]))[0]) < 6: # Least-squares fit will not function with number of points less than number of parameters for 3 exponentials
+
+        if len(np.where(np.isnan(data[i][1:7]))[0]) == 6: # Least-squares fit will not function with number of points less than number of parameters for 3 exponentials
             output = np.nan*np.ones(11)
-        elif len(np.where(data[i] < np.finfo(np.float).eps)[0]) < 6: # Least-squares fit will not function with number of points less than number of parameters for 3 exponentials
+        elif len(np.where(data[i][1:7] < np.finfo(np.float).eps)[0]) != 0: # Least-squares fit will not function with number of points less than number of parameters for 3 exponentials
             output = np.zeros(11)
         else:
             output, _ = cfit.exponential(t_tmp, data[i], **kwargs_fit_tmp)
