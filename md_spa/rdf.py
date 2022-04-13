@@ -292,7 +292,13 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
         if (len(roots) == 1 and r_peaks[0] != None) and roots[0] > r_peaks[0]:
                 r_clust = roots[0]
         else:
-            warnings.warn("This RDF has not decayed to unity. Consider regenerating data with a larger cutoff.")
+            if title != "Pair-RDF":
+                tmp = title
+            elif plot_name != "rdf.png":
+                tmp = plot_name.split(".")[0]
+            else:
+                tmp = ""
+            warnings.warn("{} RDF has not decayed to unity. Consider regenerating data with a larger cutoff.".format(tmp))
             r_clust = None
     else:
         r_clust = roots[1]

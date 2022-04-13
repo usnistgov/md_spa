@@ -547,7 +547,106 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         for tmp in np.transpose(np.array(output)):
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
-def survival_probability(u, dt, type_reference=None, type_target=None, zones=[(2, 5)], select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
+def survival_probability(u, indices, dt, zones=[(0, 3)], stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
+    """
+    Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
+
+    This method requires a characteristic time, generally on the order of a picosecond. This time is equal to the beta relaxation time and is generally temperature independent, and so can be determined from the minimum of the logarithmic derivative of the MSD, and low temperature may be necessary.
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    indices : list
+        A list of lists containing the type for the (reference_atom_type, target_atom_type)
+    dt : float
+        Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
+    zones : list[tuple], Optional, default=[(0, 3.0)*len(indices)]
+        List of tuples containing minimum and maximum zones to evaluate the survival probability for each interaction pair in ``indices``. Must be the same length as ``indices``
+    select : str, Optional, default=None
+        A string to overwrite the default selection criteria: ``type {type_target} and isolayer {zones[i][0]} {zones[i][1]} type {type_reference}``
+    stop_frame : int, Optional, default=None
+        Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
+    tau_max : int, Optional, default=100
+        Number of timesteps to calculate the decay to, this value times dt is the maximum time. See mdanalysis ``waterdynamics.SurvivalProbability``
+    intermittency : int, Optional, default=0
+        The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
+    verbose : bool, Optional, default=False
+        If true, progress will be printed
+    show_plot : bool, Optional, default=False
+        In a debugging mode, this option allows the time autocorrelation function to be viewed
+    path : str, Optional, default=""
+        Path to save files
+    filename : str, Optional, default="survival.csv"
+        Prefix on filename to further differentiate
+
+    Returns
+    -------
+    Writes out .csv file
+
+    """
+
+    if dm.isiterable(indices):
+        if not dm.isiterable(indices[0]):
+            indices = [indices]
+    else:
+        raise ValueError("Input, indices, but be a list of iterables of length three")
+
+    if verbose:
+        for ind in indices:
+            print("Lifetime stastistics of donor type {}, hydrogen type {}, and acceptor type {}".format(*ind))
+
+    u = check_universe(u)
+    if verbose:
+        print("Imported trajectory")
+
+    if not dm.isiterable(zones) or not np.all([dm.isiterable(x) and len(x)==2 for x in zones]):
+        raise ValueError("The input, zones, but be an list of lists containing pairs of atom types")
+
+    if len(zones) == 1:
+        zones = [zones[0] for x in range(len(indices))]
+    else:
+        if len(zones) != len(indices):
+            raise ValueError("Length of zones and indices must be equivalent.")
+
+    output = []
+    titles = []
+    for i,ind in enumerate(indices):
+        if verbose:
+            print("Analyzing Survival Time of Type {} within {} to {} Units of Type {}".format(ind[0], zones[i][0], zones[i][1], ind[1]))
+
+        sp = SP(u, select.format(zones[i][0], zones[i][1]), verbose=verbose)
+        sp.run(stop=stop_frame, tau_max=tau_max, intermittency=intermittency, verbose=verbose)
+
+        tau = np.array(sp.tau_timeseries)
+        timeseries = np.array(sp.sp_timeseries)
+        time = tau*dt
+        if not output:
+            output.append(time)
+        output.append(timeseries)
+        titles.append("{}-{}".format(*ind))
+
+        if verbose:
+            print("    Finished residence time analysis")
+
+        if show_plot:
+            plt.plot(time,timeseries,".-")
+            plt.xlabel("Time")
+            plt.ylabel("Probability")
+            plt.title("Reference Type {}, Interacting Type {}".format(*ind))
+            plt.show()
+
+    with open(os.path.join(path,filename),"w") as f:
+        f.write("# time, {}\n".format(", ".join(titles)))
+        for tmp in np.transpose(np.array(output)):
+            f.write("{}\n".format(", ".join([str(x) for x in tmp])))
+
+def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, zones=[(2, 5)], select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
     """
     Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -575,7 +674,7 @@ def survival_probability(u, dt, type_reference=None, type_target=None, zones=[(2
     stop_frame : int, Optional, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
     tau_max : int, Optional, default=100
-        Number of timesteps to calculate the decay to, this value times dt is the maximum time.
+        Number of timesteps to calculate the decay to, this value times dt is the maximum time. See mdanalysis ``waterdynamics.SurvivalProbability``
     intermittency : int, Optional, default=0
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
     verbose : bool, Optional, default=False
