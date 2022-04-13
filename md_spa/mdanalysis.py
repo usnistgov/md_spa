@@ -547,7 +547,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         for tmp in np.transpose(np.array(output)):
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
-def survival_probability(u, indices, dt, zones=[(0, 3)], stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
+def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
     """
     Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -614,13 +614,21 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], stop_frame=None, tau_ma
         if len(zones) != len(indices):
             raise ValueError("Length of zones and indices must be equivalent.")
 
+    if select == None:
+        select = "type {} and isolayer {} {} type {}"
+    else:
+        try:
+            tmp = select.format(0, 0, 0, 0)
+        except:
+            raise ValueError("Provided select string must take four values to define (1) the target atom type, (2,3) zone boundaries, and (4) the reference atom type")
+
     output = []
     titles = []
     for i,ind in enumerate(indices):
         if verbose:
             print("Analyzing Survival Time of Type {} within {} to {} Units of Type {}".format(ind[0], zones[i][0], zones[i][1], ind[1]))
 
-        sp = SP(u, select.format(zones[i][0], zones[i][1]), verbose=verbose)
+        sp = SP(u, select.format(ind[1], zones[i][0], zones[i][1], ind[0]), verbose=verbose)
         sp.run(stop=stop_frame, tau_max=tau_max, intermittency=intermittency, verbose=verbose)
 
         tau = np.array(sp.tau_timeseries)
