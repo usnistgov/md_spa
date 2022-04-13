@@ -599,7 +599,7 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], stop_frame=None, tau_ma
 
     if verbose:
         for ind in indices:
-            print("Lifetime stastistics of donor type {}, hydrogen type {}, and acceptor type {}".format(*ind))
+            print("Lifetime stastistics of reference type {}, and target type {}".format(*ind))
 
     u = check_universe(u)
     if verbose:
