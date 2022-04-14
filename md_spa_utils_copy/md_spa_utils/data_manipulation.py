@@ -6,6 +6,8 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
     """
     Given a set of data, calculate the mean and standard error
 
+    Valued of NaN are removed from the data set.
+
     Parameters
     ----------
     data : numpy.ndarray
@@ -26,15 +28,16 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
         
     """
     data = np.array(data,np.float)
-    se = np.std(data)/np.sqrt(len(data))
+    lx = len(data) - len(np.where(np.isnan(data))[0])
+    se = np.nanstd(data)/np.sqrt(lx)
     if error_type == "standard_error":
         tmp = se
     elif error_type == "confidence":
-        tmp = se * scipy.stats.t.ppf((1 + confidence) / 2., len(data)-1)
+        tmp = se * scipy.stats.t.ppf((1 + confidence) / 2., lx-1)
     else:
         raise ValueError("error_type, {}, is not supported".format(error_type))
 
-    return np.mean(data), tmp
+    return np.nanmean(data), tmp
 
 def isiterable(array):
     """

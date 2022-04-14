@@ -56,7 +56,7 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
     filename : str
         The filename and path to the target csv file.
     matching_entries : list, Optional, default=None
-        This list indicates the criteria for narrowing the selection of rows. The first columns of each considered row must match these entries.
+        This list indicates the criteria for narrowing the selection of rows. The first columns of each considered row must match these entries. If ``None`` the column is skipped, and the value added to the resulting row.
     indices : float/list, Optional, default=None
         The index of a column or a list of indices of the columns to extract from those rows that meet specification. A value of None returns all columns. WARNING! The indexing for this variable is ``np.shape(data)[1]-len(matching_entries)``, so the column after the columns that meet the matching criteria is specified with indices=0.
     convert_float : bool, Optional, default=True
@@ -80,7 +80,7 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
     for j,match in enumerate(matching_entries):
         row_indices = []
         for i,row in enumerate(data):
-            if row[j] == match:
+            if row[j] == match or match == None:
                 row_indices.append(i)
         if not row_indices:
             raise ValueError("Rows that meet your critera, {}, could not be found".format(matching_entries[:j+1]))
@@ -99,6 +99,11 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
     if convert_float:
         for i in range(len(output)):
             output[i] = [float(x) if dm.isfloat(x) else x for x in output[i]]
+
+    # Add skipped matching entries to output
+    ind_None = [i for i,x in enumerate(matching_entries) if x == None]
+    for i, line in enumerate(data):
+        output[i] = [line[x] for x in ind_None] + output[i]
 
     if len(output) == 1:
         output = output[0]
