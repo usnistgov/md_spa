@@ -166,7 +166,7 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
         raise ValueError("y-axis data is NaN")
 
     if yarray[-1] > ydata_min:
-        warnings.warn("Exponential decays to {}, above threshold {}. Run for a longer period of time or increase the keyword value of ydata_min.".format(yarray[-1],ydata_min))
+        warnings.warn("Exponential decays to {}, above threshold {}. Maximum tau value to evaluate the residence time, or increase the keyword value of ydata_min.".format(yarray[-1],ydata_min))
         flag_long = True
         params, _ = spo.curve_fit(lambda x, t: -x/t, xarray, np.log(yarray), bounds=(0, 1e+4))
         prefactors = np.array([0.9,0.1])

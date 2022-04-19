@@ -529,6 +529,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         time = tau*dt
         if not output:
             output.append(time)
+
         output.append(timeseries)
         titles.append("{}-{}-{}".format(*ind))
 
