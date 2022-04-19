@@ -27,17 +27,22 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
         When added and subtracted from the mean, forms the confidence interval
         
     """
-    data = np.array(data,np.float)
-    lx = len(data) - len(np.where(np.isnan(data))[0])
-    se = np.nanstd(data)/np.sqrt(lx)
-    if error_type == "standard_error":
-        tmp = se
-    elif error_type == "confidence":
-        tmp = se * scipy.stats.t.ppf((1 + confidence) / 2., lx-1)
+    if data:
+        data = np.array(data,np.float)
+        lx = len(data) - len(np.where(np.isnan(data))[0])
+        se = np.nanstd(data)/np.sqrt(lx)
+        if error_type == "standard_error":
+            std = se
+        elif error_type == "confidence":
+            std = se * scipy.stats.t.ppf((1 + confidence) / 2., lx-1)
+        else:
+            raise ValueError("error_type, {}, is not supported".format(error_type))
+        mean = np.nanmean(data)
     else:
-        raise ValueError("error_type, {}, is not supported".format(error_type))
+        mean = np.nan
+        std = np.nan
 
-    return np.nanmean(data), tmp
+    return mean, std
 
 def isiterable(array):
     """
