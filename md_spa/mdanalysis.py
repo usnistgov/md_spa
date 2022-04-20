@@ -411,7 +411,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=5, d_h_a_angle_cutoff=180):
+def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=5, d_h_a_angle_cutoff=180):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
@@ -428,7 +428,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         A list of lists containing the type for the hydrogen bond donor, hydrogen, and acceptor. If an atom type is unknown or more than one is desired, put None instead.
     dt : float
         Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
-    tau_max : int, Optional, default=100
+    tau_max : int, Optional, default=200
         Number of timesteps to calculate the decay to, this value times dt is the maximum time.
     verbose : bool, Optional, default=False
         Print intermediate updates on progress
@@ -446,6 +446,12 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_donors()``
     hydrogen_kwargs : dict, Optional, default={}
         Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_hydrogens()``
+    d_h_cutoff : float, Optional, default=1.2
+        Cutoff distance between hydrogen bond donor and hydrogen
+    d_a_cutoff : float, Optional, default=5
+        Cutoff distance between hydrogen bond donor and acceptor
+    d_h_a_angle_cutoff : float, Optional, default=180
+        Cutoff angle for hydrogen bonding. Assumed to be 180 to eliminate this constraint, since MD isn't constrained by orbitals.
 
     Returns
     -------
