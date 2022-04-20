@@ -411,7 +411,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}):
+def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=5, d_h_a_angle_cutoff=180):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
@@ -519,7 +519,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=100, verbose=False, show_plot=False
         else:
             acceptor_list = HBA(universe=u)
             acceptor = None
-        Hbonds = HBA(universe=u, donors_sel=donor, hydrogens_sel=hydrogen, acceptors_sel=acceptor)
+        Hbonds = HBA(universe=u, donors_sel=donor, hydrogens_sel=hydrogen, acceptors_sel=acceptor, d_h_cutoff=d_h_cutoff, d_a_cutoff=d_a_cutoff, d_h_a_angle_cutoff=d_h_a_angle_cutoff)
         Hbonds.run()
         if verbose:
             print("    Primary analysis complete")
