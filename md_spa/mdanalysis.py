@@ -408,7 +408,6 @@ def calc_end2end(u, indices):
         r = u.atoms.positions[indices[0]] - u.atoms.positions[indices[1]]  # end-to-end vector from atom positions
         r_end2end[i] = np.linalg.norm(r)   # end-to-end distance
 
-
     return r_end2end
 
 def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=5, d_h_a_angle_cutoff=180):
@@ -554,7 +553,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         for tmp in np.transpose(np.array(output)):
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
-def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
+def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame=None, tau_max=200, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
     """
     Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -576,10 +575,10 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame
     zones : list[tuple], Optional, default=[(0, 3.0)*len(indices)]
         List of tuples containing minimum and maximum zones to evaluate the survival probability for each interaction pair in ``indices``. Must be the same length as ``indices``
     select : str, Optional, default=None
-        A string to overwrite the default selection criteria: ``type {type_target} and isolayer {zones[i][0]} {zones[i][1]} type {type_reference}``
+        A string to overwrite the default selection criteria: ``type {select_target} and isolayer {zones[i][0]} {zones[i][1]} type {select_reference}``
     stop_frame : int, Optional, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
-    tau_max : int, Optional, default=100
+    tau_max : int, Optional, default=200
         Number of timesteps to calculate the decay to, this value times dt is the maximum time. See mdanalysis ``waterdynamics.SurvivalProbability``
     intermittency : int, Optional, default=0
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
@@ -751,7 +750,7 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
 
-def debye_waller_by_zones(u, frames_per_tau, select_reference=None, select_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100):
+def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, select_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100, select_recenter=None):
     """
     Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -786,6 +785,8 @@ def debye_waller_by_zones(u, frames_per_tau, select_reference=None, select_targe
         If true, progress will be printed
     write_increment : int, Optional, default=100
         If ``verbose`` write out progress every, this many frames.
+    select_recenter : str, Optional, default=None
+        If not None, the trajectory will be centered around the select_atom() group in a relative sense. The center of mass will be extracted first to correct the difference in positions.
 
     Returns
     -------
@@ -814,16 +815,25 @@ def debye_waller_by_zones(u, frames_per_tau, select_reference=None, select_targe
         except:
             raise ValueError("Provided select string must take one value to define the zones")
 
-    u = check_universe(u)
+    universe = check_universe(universe)
+    group = universe.select_atoms(select_recenter)
+    lx = len(universe.trajectory)
+    com = np.zeros((lx,3))
+    if select_recenter != None:
+        for i, ts in enumerate(universe.trajectory):
+            com[i,:] = group.center_of_mass()
+        universe.trajectory[0]
+        center_universe_around_group(universe, select_recenter, reference="relative")
+        print("Recentered trajectory")
     if verbose:
         print("Imported trajectory")
-    dimensions = u.trajectory[0].dimensions[:3]
+    dimensions = universe.trajectory[0].dimensions[:3]
 
     frames_per_tau = int(frames_per_tau)
     if stop_frame == None:
-        stop_frame = len(u.trajectory)-frames_per_tau
-    elif len(u.trajectory)-frames_per_tau < stop_frame:
-        stop_frame = len(u.trajectory)-frames_per_tau
+        stop_frame = lx-frames_per_tau
+    elif lx-frames_per_tau < stop_frame:
+        stop_frame = lx-frames_per_tau
         if verbose:
             print("`stop_frame` has been reset to align with the trajectory length") 
 
@@ -836,23 +846,26 @@ def debye_waller_by_zones(u, frames_per_tau, select_reference=None, select_targe
         positions_start_finish = [[] for x in range(nzones)]
 
         # Calculate initial positions of atoms that start in respective zones
-        u.trajectory[i]
-        Zones = [u.select_atoms(select.format(0, r_start))]
+        universe.trajectory[i]
+        Zones = [universe.select_atoms(select.format(0, r_start))]
         for z in range(1,nzones):
-            Zones.append(u.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
+            Zones.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for z in range(nzones):
             positions_start_finish[z].append(Zones[z].positions)
 
         # Calculate final positions of atoms that started in each respective zone,
         # and find atoms that are currently in respective zones (i.e. Zone2)
-        u.trajectory[i+frames_per_tau]
-        Zones2 = [u.select_atoms(select.format(0, r_start))]
+        universe.trajectory[i+frames_per_tau]
+        Zones2 = [universe.select_atoms(select.format(0, r_start))]
         for z in range(1,nzones):
-            Zones2.append(u.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
+            Zones2.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for z in range(nzones):
-            positions_start_finish[z].append(Zones[z].positions)
+            if select_recenter != None:
+                positions_start_finish[z].append(Zones[z].positions - com[i+frames_per_tau] + com[i])
+            else:
+                positions_start_finish[z].append(Zones[z].positions)
             tmp = positions_start_finish[z][1]-positions_start_finish[z][0]
             for ii in range(len(tmp)):
                 tmp_check = np.abs(tmp[ii]) > dimensions/2
