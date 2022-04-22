@@ -428,7 +428,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
     dt : float
         Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
     tau_max : int, Optional, default=200
-        Number of timesteps to calculate the decay to, this value times dt is the maximum time.
+        Number of timesteps to calculate the decay to, this value times dt is the maximum time. Cannot be greater than the number of frames,
     verbose : bool, Optional, default=False
         Print intermediate updates on progress
     show_plot : bool, Optional, default=False
@@ -479,6 +479,10 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
     for hyd_type in hydrogen_list:
         Hbonds = HBA(universe=u, hydrogens_sel="type {}".format(hyd_type))
         donor_list_per_hydrogen[hyd_type] = [x for x in Hbonds.guess_donors(**donor_kwargs).split() if x not in ["type", "or"]]
+
+    if tau_max > len(u.trajectory):
+        tau_max = len(u.trajectory)
+        warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
     new_indices = []
     for i in range(len(indices)):
