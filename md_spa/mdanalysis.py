@@ -765,6 +765,8 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
 
     This method requires a characteristic time, generally on the order of a picosecond. This time is equal to the beta relaxation time and is generally temperature independent, and so can be determined from the minimum of the logarithmic derivative of the MSD, and low temperature may be necessary.
 
+    Note that this method should not be used for distances expected to be close to half the box length.
+
     Parameters
     ----------
     u : obj/tuple
@@ -885,7 +887,7 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
             tmp = positions_start_finish[z][1]-positions_start_finish[z][0]
 
             for ii in range(len(tmp)):
-                tmp_check = np.abs(tmp[ii]) > dimensions
+                tmp_check = np.abs(tmp[ii]) > dimensions/2 
                 if np.any(tmp_check):
                     ind = np.where(tmp_check)[0]
                     for jj in ind:
@@ -901,7 +903,7 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
             for atom in RetainedFraction:
                 ind = tmp_ind1.index(atom.ix)
                 tmp = positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
-                jjnd = np.where(np.abs(tmp) > dimensions)[0]
+                jjnd = np.where(np.abs(tmp) > dimensions/2)[0]
                 for jj in jjnd:
                     if tmp[jj] > 0:
                         tmp[jj] -= dimensions[jj]
