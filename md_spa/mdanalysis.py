@@ -45,12 +45,13 @@ def center_universe_around_group(universe, select, verbose=False, reference="ini
     universe.trajectory[0]
     group_target = universe.select_atoms(select)
     group_remaining = universe.select_atoms("all") - group_target
+    dimensions = universe.trajectory[0].dimensions[:3]
     
     if verbose:
         print("Polymer Center of Mass Before", group_target.center_of_mass(**com_kwargs))
 
     if reference == "initial":
-        box_center = universe.trajectory[0].dimensions[:3] / 2
+        box_center = dimensions / 2
         com = group_target.center_of_mass(**com_kwargs)
         transforms = [
             trans.unwrap(group_target),
@@ -61,7 +62,7 @@ def center_universe_around_group(universe, select, verbose=False, reference="ini
     elif reference == "relative":
         transforms = [
             trans.unwrap(group_target),
-            trans.center_in_box(group_target),
+            trans.center_in_box(group_target, center="mass"),
             trans.wrap(group_remaining)
         ]
         universe.trajectory.add_transformations(*transforms)
@@ -71,6 +72,7 @@ def center_universe_around_group(universe, select, verbose=False, reference="ini
 
     if verbose:
         print("Group Center of Mass After", group_target.center_of_mass())
+
     universe.trajectory[0]
 
     return universe
@@ -124,7 +126,7 @@ def generate_universe(package, args, kwargs={}):
 
     args : tuple
         Arguments for ``MDAnalysis.Universe``
-    kwargs : dict, Optional, default={"format": package_identifier}
+    kwargs : dict, Optional, default={"format": package_identifier, "continuous": True}
         Keyword arguments for ``MDAnalysis.Universe``. Note that the ``format`` will be added internally.
                  
     Returns
@@ -135,14 +137,17 @@ def generate_universe(package, args, kwargs={}):
     """
 
     supported_packages = ["LAMMPS"]
+    tmp_kwargs = {"continuous": True}
+    tmp_kwargs.update(kwargs)
 
     if package == "LAMMPS":
-        kwargs["format"] = "LAMMPSDUMP"
-        u = mda.Universe(*args, **kwargs)
+        if "format" not in tmp_kwargs:
+            tmp_kwargs.update({"format": "LAMMPSDUMP"})
+        universe = mda.Universe(*args, **tmp_kwargs)
     else:
         raise ValueError("The package, {}, is not supported, choose one of the following: {}".format(package,", ".join(supported_packages)))
 
-    return u
+    return universe
         
 def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, exclusion_block=(1,1), exclusion_mode="block", exclude=True, run_kwargs={}):
     """
@@ -410,7 +415,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=5, d_h_a_angle_cutoff=180):
+def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=5.0, d_h_a_angle_cutoff=90.0):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
@@ -449,8 +454,8 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         Cutoff distance between hydrogen bond donor and hydrogen
     d_a_cutoff : float, Optional, default=5
         Cutoff distance between hydrogen bond donor and acceptor
-    d_h_a_angle_cutoff : float, Optional, default=180
-        Cutoff angle for hydrogen bonding. Assumed to be 180 to eliminate this constraint, since MD isn't constrained by orbitals.
+    d_h_a_angle_cutoff : float, Optional, default=90
+        Cutoff angle for hydrogen bonding. Assumed to be 90 to eliminate the constraint imposed in MDAnalysis, since MD isn't constrained by orbitals.
 
     Returns
     -------
@@ -754,7 +759,7 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
 
-def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, select_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100, select_recenter=None):
+def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, select_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100, select_recenter=None, flag_com=False):
     """
     Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -791,6 +796,8 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
         If ``verbose`` write out progress every, this many frames.
     select_recenter : str, Optional, default=None
         If not None, the trajectory will be centered around the select_atom() group in a relative sense. The center of mass will be extracted first to correct the difference in positions.
+    flag_com : bool, Optional, default=False
+        If true, the trajectory is centered around the group specified with ``select_recenter`` for every frame, and in calculating the displacement, a correction between the frame centers of mass is applied. With this option, the effect of periodic boundary conditions is ensureed to be removed for calculations sufficiently far from the boundary. 
 
     Returns
     -------
@@ -824,11 +831,15 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
     lx = len(universe.trajectory)
     com = np.zeros((lx,3))
     if select_recenter != None:
-        for i, ts in enumerate(universe.trajectory):
-            com[i,:] = group.center_of_mass()
-        universe.trajectory[0]
-        center_universe_around_group(universe, select_recenter, reference="relative")
+        if flag_com:
+            for i, ts in enumerate(universe.trajectory):
+                com[i,:] = group.center_of_mass()
+            universe.trajectory[0] 
+            center_universe_around_group(universe, select_recenter, reference="relative")
+        else:
+            center_universe_around_group(universe, select_recenter, reference="initial")
         print("Recentered trajectory")
+    
     if verbose:
         print("Imported trajectory")
     dimensions = universe.trajectory[0].dimensions[:3]
@@ -844,6 +855,7 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
     msd_total = [[] for x in range(nzones)]
     msd_retained = [[] for x in range(nzones)]
     fraction_retained = [[] for x in range(nzones)]
+
     for i in range(int(stop_frame)):
         if verbose and i%write_increment == 0:
             print("Calculating Frame {} out of {}".format(i,stop_frame))
@@ -866,13 +878,14 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
             Zones2.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for z in range(nzones):
-            if select_recenter != None:
-                positions_start_finish[z].append(Zones[z].positions - com[i+frames_per_tau] + com[i])
+            if flag_com:
+                positions_start_finish[z].append(Zones[z].positions + (+com[i+frames_per_tau] - com[i]))
             else:
                 positions_start_finish[z].append(Zones[z].positions)
             tmp = positions_start_finish[z][1]-positions_start_finish[z][0]
+
             for ii in range(len(tmp)):
-                tmp_check = np.abs(tmp[ii]) > dimensions/2
+                tmp_check = np.abs(tmp[ii]) > dimensions
                 if np.any(tmp_check):
                     ind = np.where(tmp_check)[0]
                     for jj in ind:
@@ -880,12 +893,21 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
                             tmp[ii][jj] -= dimensions[jj]
                         else:
                             tmp[ii][jj] += dimensions[jj]
+
             msd_total[z].extend(list(np.sum(np.square(tmp),axis=1)))
 
             tmp_ind1 = [x.ix for x in Zones[z]]
             RetainedFraction = Zones[z] - Zones[z].difference(Zones2[z])
             for atom in RetainedFraction:
                 ind = tmp_ind1.index(atom.ix)
+                tmp = positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
+                ind = np.where(np.abs(tmp[ii]) > dimensions)[0]
+                for jj in ind:
+                    if tmp[jj] > 0:
+                        tmp[jj] -= dimensions[jj]
+                    else:
+                        tmp[jj] += dimensions[jj]
+
                 msd_retained[z].append(np.sum(np.square(
                     positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
                 )))
