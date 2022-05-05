@@ -901,16 +901,14 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
             for atom in RetainedFraction:
                 ind = tmp_ind1.index(atom.ix)
                 tmp = positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
-                ind = np.where(np.abs(tmp[ii]) > dimensions)[0]
-                for jj in ind:
+                jjnd = np.where(np.abs(tmp) > dimensions)[0]
+                for jj in jjnd:
                     if tmp[jj] > 0:
                         tmp[jj] -= dimensions[jj]
                     else:
                         tmp[jj] += dimensions[jj]
 
-                msd_retained[z].append(np.sum(np.square(
-                    positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
-                )))
+                msd_retained[z].append(np.sum(np.square(tmp)))
 
             try: 
                 fraction_retained[z].append(len(RetainedFraction)/len(Zones[z]))
