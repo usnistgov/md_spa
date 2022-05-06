@@ -649,6 +649,10 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame
     if verbose:
         print("Imported trajectory")
 
+    if tau_max > len(u.trajectory):
+        tau_max = len(u.trajectory)
+        warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
+
     if not dm.isiterable(zones) or not np.all([dm.isiterable(x) and len(x)==2 for x in zones]):
         raise ValueError("The input, zones, but be an list of lists containing pairs of atom types")
 
@@ -747,6 +751,10 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
     u = check_universe(u)
     if verbose:
         print("Imported trajectory")
+
+    if tau_max > len(u.trajectory):
+        tau_max = len(u.trajectory)
+        warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
     if select == None:
         if type_reference==None or type_target==None:
