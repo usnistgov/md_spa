@@ -450,12 +450,12 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_donors()``
     hydrogen_kwargs : dict, Optional, default={}
         Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_hydrogens()``
-    d_h_cutoff : float, Optional, default=1.2
-        Cutoff distance between hydrogen bond donor and hydrogen
-    d_a_cutoff : float, Optional, default=5
-        Cutoff distance between hydrogen bond donor and acceptor
-    d_h_a_angle_cutoff : float, Optional, default=90
-        Cutoff angle for hydrogen bonding. Assumed to be 90 to eliminate the constraint imposed in MDAnalysis, since MD isn't constrained by orbitals.
+    d_h_cutoff : float/numpy.ndarray, Optional, default=1.2
+        Cutoff distance between hydrogen bond donor and hydrogen. If an array, it must be of the same length as ``indices``.
+    d_a_cutoff : float/numpy.ndarray, Optional, default=5
+        Cutoff distance between hydrogen bond donor and acceptor. If an array, it must be of the same length as ``indices``.
+    d_h_a_angle_cutoff : float/numpy.ndarray, Optional, default=80
+        Cutoff angle for hydrogen bonding. Assumed to be 80 to eliminate the constraint imposed in MDAnalysis, since MD isn't constrained by orbitals. If an array, it must be of the same length as ``indices``. This value was chosen from a lower limit determined in our MD simulations.
 
     Returns
     -------
@@ -468,6 +468,18 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
             indices = [indices]
     else:
         raise ValueError("Input, indices, but be a list of iterables of length three")
+
+    if dm.isiterable(d_h_cutoff):
+        if len(d_h_cutoff) != len(indices):
+            raise ValueError("If multiple values for `d_h_cutoff` are given, the array must be of the same length as `indices`")
+
+    if dm.isiterable(d_a_cutoff):
+        if len(d_a_cutoff) != len(indices):
+            raise ValueError("If multiple values for `d_a_cutoff` are given, the array must be of the same length as `indices`")
+
+    if dm.isiterable(d_h_a_angle_cutoff):
+        if len(d_h_a_angle_cutoff) != len(indices):
+            raise ValueError("If multiple values for `d_h_a_angle_cutoff` are given, the array must be of the same length as `indices`")
 
     if verbose:
         for ind in indices:
@@ -490,6 +502,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
     new_indices = []
+    d_h_cutoff_array, d_a_cutoff_array, d_h_a_angle_cutoff_array = [],[],[] 
     for i in range(len(indices)):
         if len(indices[i]) != 3:
             raise ValueError("Index set: {}, must be of length three containing the atoms types or None for [donor, hydrogen, acceptor]")
@@ -514,10 +527,22 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
             for d in donor_list_per_hydrogen[h]:
                 for a in acceptors:
                     new_indices.append([d,h,a])
+                    if dm.isiterable(d_h_cutoff):
+                        d_h_cutoff_array.append(d_h_cutoff[i])
+                    else:
+                        d_h_cutoff_array.append(d_h_cutoff)
+                    if dm.isiterable(d_a_cutoff):
+                        d_a_cutoff_array.append(d_a_cutoff[i])
+                    else:
+                        d_a_cutoff_array.append(d_a_cutoff)
+                    if dm.isiterable(d_h_a_angle_cutoff):
+                        d_h_a_angle_cutoff_array.append(d_h_a_angle_cutoff[i])
+                    else:
+                        d_h_a_angle_cutoff_array.append(d_h_a_angle_cutoff)
 
     output = []
     titles = []
-    for ind in new_indices:
+    for i,ind in enumerate(new_indices):
         if verbose:
             print("Analyzing Donor Type {}, Hydrogen Type {}, Acceptor Type {}".format(*ind))
         if ind[0] != None:
@@ -533,7 +558,11 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         else:
             acceptor_list = HBA(universe=u)
             acceptor = None
-        Hbonds = HBA(universe=u, donors_sel=donor, hydrogens_sel=hydrogen, acceptors_sel=acceptor, d_h_cutoff=d_h_cutoff, d_a_cutoff=d_a_cutoff, d_h_a_angle_cutoff=d_h_a_angle_cutoff)
+        Hbonds = HBA(universe=u, donors_sel=donor, hydrogens_sel=hydrogen, acceptors_sel=acceptor,
+                     d_h_cutoff=d_h_cutoff_array[i],
+                     d_a_cutoff=d_a_cutoff_array[i],
+                     d_h_a_angle_cutoff=d_h_a_angle_cutoff_array[i],
+                    )
         Hbonds.run()
         if verbose:
             print("    Primary analysis complete")

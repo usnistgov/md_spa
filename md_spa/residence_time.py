@@ -3,73 +3,158 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import copy
+import warnings
 
 import md_spa_utils.file_manipulation as fm
 import md_spa_utils.data_manipulation as dm
 
 from . import custom_fit as cfit
 
-def characteristic_time(filename, delimiter=",", save_plots=None, show_plots=False, verbose=False, kwargs_fit={}):
+def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, tau_max=1e+8):
     """
     Extract the characteristic times fit and weighted with one, two, and three exponential functions for a total of three fits. Because the prefactors sum to unity, the total characteristic time is equal to a sum weighted by the prefactors. See ``custom_fit.exponential`` for more details.
 
     Parameters
     ----------
-    filename : str
-        Path and filename of data set to be fit
-    delimiter : str, Optional, default=","
-        Delimiter between columns used in ``numpy.genfromtxt()``
-    save_plots : str, Optional, default=None
-        If not None, plots comparing the exponential fits will be saved to this filename 
-    show_plots : bool, Optional, default=False
-        If true, the fits will be shown
+    xdata : numpy.ndarray
+        Independent data set ranging from 0 to some quantity
+    ydata : numpy.ndarray
+        Dependent data set, starting at unity and decaying exponentially 
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
     verbose : bool, Optional, default=False
         Output fitting statistics
-    kwargs_fit : dict, Optional, default={}
-        Keyword arguements for exponential functions in ``custom_fit``
+    save_plots : bool, Optional, default=False
+        If not None, plots comparing the exponential fits will be saved to this filename 
+    plot_name : str, Optional, default=None
+        Plot filename and path
+    show_plot : bool, Optional, default=False
+        If true, the fits will be shown
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_matrix_lsq : dict, Optional, default={}
+        Kwayword arguments for ``matrix_least_squares``
+    ydata_min : float, Optional, default=0.1
+        Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
+    tau_max : float, Optional, default=1e+5
+        Maximum allowed value of characteristic time
 
     Returns
     -------
+    parameters : numpy.ndarray
+        Array containing parameters: ['1: t1', '2: a1', '2: t1', '2: a2', '2: t2', '3: a1', '3: t1', '3: a2', '3: t2', '3: a3', '3: t3']
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: ['1: t1', '2: a1', '2: t1', '2: a2', '2: t2', '3: a1', '3: t1', '3: a2', '3: t2', '3: a3', '3: t3']
+
     """
 
-    data = np.transpose(np.genfromtxt(filename,delimiter=","))
-    output1, error1 = cfit.exponential(data[0],data[1], verbose=verbose, **kwargs_fit)
-    output1, error1 = cfit.two_exponentials(data[0],data[1], verbose=verbose, **kwargs_fit)
-    output1, error1 = cfit.three_exponentials(data[0],data[1], verbose=verbose, **kwargs_fit)
+    ydata_min = 0.5 # NoteHere
 
-    #if save_plots != None or show_plots:
-    #    yfit1 = exponential_res_1(Result1.params) + yarray
-    #    yfit2 = exponential_res_2(Result2.params) + yarray
-    #    yfit3 = exponential_res_3(Result3.params) + yarray
-    #    plt.plot(xarray,yarray,".",label="Data")
-    #    plt.plot(xarray,yfit1,label="1 Gauss",linewidth=1)
-    #    plt.plot(xarray,yfit2,label="2 Gauss",linewidth=1)
-    #    plt.plot(xarray,yfit3,label="3 Gauss",linewidth=1)
-    #    plt.ylabel("Probability")
-    #    plt.xlabel("Time")
-    #    plt.tight_layout()
-    #    plt.legend(loc="best")
-    #    if save_plots != None:
-    #        plt.savefig(save_plots,dpi=300)
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
 
-    #    plt.figure(2)
-    #    plt.plot(xarray,yarray,".",label="Data")
-    #    plt.plot(xarray,yfit1,label="1 Gauss",linewidth=1)
-    #    plt.plot(xarray,yfit2,label="2 Gauss",linewidth=1)
-    #    plt.plot(xarray,yfit3,label="3 Gauss",linewidth=1)
-    #    plt.ylabel("log Probability")
-    #    plt.xlabel("Time")
-    #    plt.tight_layout()
-    #    plt.yscale('log')
-    #    plt.legend(loc="best")
-    #    if save_plots != None:
-    #        tmp_save_plot = list(os.path.split(save_plots))
-    #        tmp_save_plot[1] = "log_"+tmp_save_plot[1]
-    #        plt.savefig(os.path.join(*tmp_save_plot),dpi=300)
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
-    #    if show_plots:
-    #        plt.show()
-    #    plt.close("all")
+    if yarray[-1] > ydata_min:
+        warnings.warn("Exponential decays to {}, above threshold {}. Maximum tau value to evaluate the residence time, or increase the keyword value of ydata_min.".format(yarray[-1],ydata_min))
+        flag_long = True
+    else:
+        flag_long = False
+
+    output = np.zeros(12)
+    uncertainties = np.zeros(12)
+    # One Exp
+    tmp_output1, tmp_error1 = cfit.exponential_decay(xarray, yarray,
+                                                     verbose=verbose,
+                                                     kwargs_minimizer=kwargs_minimizer,
+                                                    )
+    output[:2] = tmp_output1
+    uncertainties[:2] = tmp_error1
+    # Two Exp
+    tmp_output2a, _ = cfit.two_exponential_decays(xarray, yarray,
+                                                  verbose=verbose,
+                                                  kwargs_minimizer=kwargs_minimizer,
+                                                  kwargs_parameters={
+                                                                     "t1": {"value": tmp_output1[1], "vary": False},
+                                                                    }
+                                                 )
+    tmp_output2, tmp_error2 = cfit.two_exponential_decays(xarray, yarray, 
+                                                     verbose=verbose,
+                                                     kwargs_minimizer=kwargs_minimizer,
+                                                     kwargs_parameters={
+                                                                        "a1": {"value": tmp_output2a[0]},
+                                                                        "t1": {"value": tmp_output2a[1]},
+                                                                        "t2": {"value": tmp_output2a[3]},
+                                                                       }
+                                                    )
+    output[2:6] = tmp_output2
+    uncertainties[2:6] = tmp_error2
+
+    # Three Exp
+    if flag_long:
+        output[6:] = np.ones(6)*np.nan
+        uncertainties[6:] = np.ones(6)*np.nan
+    else:
+        tmp_output3a, _ = cfit.three_exponential_decays(xarray, yarray,
+                                                      verbose=verbose,
+                                                      kwargs_minimizer=kwargs_minimizer,
+                                                      kwargs_parameters={
+                                                                         "t1": {"value": tmp_output2[1], "vary": False},
+                                                                         "t2": {"value": tmp_output2[3], "vary": False},
+                                                                        }  
+                                                     )  
+        tmp_output3, tmp_error3 = cfit.three_exponential_decays(xarray, yarray,
+                                                         verbose=verbose,
+                                                         kwargs_minimizer=kwargs_minimizer,
+                                                         kwargs_parameters={
+                                                                            "a1": {"value": tmp_output3a[0]},
+                                                                            "t1": {"value": tmp_output3a[1]},
+                                                                            "a2": {"value": tmp_output3a[2]},
+                                                                            "t2": {"value": tmp_output3a[3]},
+                                                                            "t3": {"value": tmp_output3a[5]},
+                                                                           }
+                                                        )
+        output[6:] = tmp_output3
+        uncertainties[6:] = tmp_error3
+
+    if save_plot or show_plot:
+        yfit1 = tmp_output1[0]*np.exp(-xarray/tmp_output1[1])
+        plt.plot(xarray,yarray,".",label="Data")
+        plt.plot(xarray,yfit1,label="1 Exp.",linewidth=1)
+        params = {key: value for key, value in zip(["a1","t1","a2","t2"],tmp_output2)}
+        yfit2 = cfit._res_two_exponential_decays(params, xarray, 0.0)
+        plt.plot(xarray,yfit2,label="2 Exp.",linewidth=1)
+        if not flag_long:
+            params = {key: value for key, value in zip(["a1","t1","a2","t2", "a3", "t3"],tmp_output3)}
+            yfit3 = cfit._res_three_exponential_decays(params, xarray, 0.0)
+            plt.plot(xarray,yfit3,label="3 Exp.",linewidth=1)
+        plt.ylabel("Probability")
+        plt.xlabel("Time")
+        plt.tight_layout()
+        plt.legend(loc="best")
+        if save_plot:
+            plt.savefig(plot_name,dpi=300)
+
+        plt.figure(2)
+        plt.plot(xarray,yarray,".",label="Data")
+        plt.plot(xarray,yfit1,label="1 Exp.",linewidth=1)
+        plt.plot(xarray,yfit2,label="2 Exp.",linewidth=1)
+        if not flag_long:
+            plt.plot(xarray,yfit3,label="3 Exp.",linewidth=1)
+        plt.ylabel("log Probability")
+        plt.xlabel("Time")
+        plt.tight_layout()
+        plt.yscale('log')
+        plt.legend(loc="best")
+        if save_plot:
+            tmp_save_plot = list(os.path.split(plot_name))
+            tmp_save_plot[1] = "log_"+tmp_save_plot[1]
+            plt.savefig(os.path.join(*tmp_save_plot),dpi=300)
+
+        if show_plot:
+            plt.show()
+        plt.close("all")
 
     return output, uncertainties
 
@@ -144,16 +229,15 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
             kwargs_fit_tmp["plot_name"] = ".".join(tmp)
 
         if len(np.where(np.isnan(data[i][1:7]))[0]) == 6: # Least-squares fit will not function with number of points less than number of parameters for 3 exponentials
-            output = np.nan*np.ones(11)
+            output = np.nan*np.ones(12)
         elif len(np.where(data[i][1:7] < np.finfo(np.float).eps)[0]) != 0: # Least-squares fit will not function with number of points less than number of parameters for 3 exponentials
-            output = np.zeros(11)
+            output = np.zeros(12)
         else:
-            output, _ = cfit.exponential(t_tmp, data[i], **kwargs_fit_tmp)
-
-        tmp = [titles[i], output[0], output[1]*output[2]+output[3]*output[4], output[5]*output[6]+output[7]*output[8]+output[9]*output[10]]
+            output, _ = characteristic_time(t_tmp, data[i], **kwargs_fit_tmp)
+        tmp = [titles[i], output[1], output[2]*output[3]+output[4]*output[5], output[6]*output[7]+output[8]*output[9]+output[10]*output[11]]
         tmp_data.append(list(additional_entries)+tmp+list(output))
 
-    file_headers = ["Types", "1 Exp: tau", "2 Exp: tau", "3 Exp: tau", "1 Exp: t1", "2 Exp a1", "2 Exp t1", "2 Exp a2", "2 Exp t2", "3 Exp a1", "3 Exp t1", "3 Exp a2", "3 Exp t2", "3 Exp a3", "3 Exp t3"]
+    file_headers = ["Types", "1 Exp: tau", "2 Exp: tau", "3 Exp: tau", "1 Exp: a1", "1 Exp: t1", "2 Exp a1", "2 Exp t1", "2 Exp a2", "2 Exp t2", "3 Exp a1", "3 Exp t1", "3 Exp a2", "3 Exp t2", "3 Exp a3", "3 Exp t3"]
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
             file_headers = list(additional_header) + file_headers

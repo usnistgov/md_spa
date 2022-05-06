@@ -117,8 +117,10 @@ def matrix_least_squares(xdata, ydata, sample_array={}, method="nnls", method_kw
 
     return final_prefactors, final_tau
 
-def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, kwargs_matrix_lsq={}, ydata_min=0.1, tau_max=1e+8):
+def exponential(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, kwargs_matrix_lsq={}, ydata_min=0.1, tau_max=1e+8):
     """
+
+    CONSIDER: Use residence_time.characteristic_time instead
     Provided data fit is fit to one, two, and three exponentials, where the sum of the prefactors equals unity. 
 
     Values of zero and NaN are ignored in the fit.
@@ -129,8 +131,6 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    delimiter : str, Optional, default=","
-        Delimiter between columns used in ``numpy.genfromtxt()``
     minimizer : str, Optional, default="leastsq"
         Fitting method supported by ``lmfit.minimize``
     verbose : bool, Optional, default=False
@@ -158,6 +158,8 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
         Array containing parameter standard errors: ['1: t1', '2: a1', '2: t1', '2: a2', '2: t2', '3: a1', '3: t1', '3: a2', '3: t2', '3: a3', '3: t3']
         
     """
+
+    warnings.warn("Consider using residence_time.characteristic_time instead.")
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
@@ -271,15 +273,6 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
             output[i+5] = value.value
             uncertainties[i+5] = value.stderr
 
-       # if output[5] < np.finfo(float).eps or output[7] < np.finfo(float).eps or output[9] < np.finfo(float).eps: # NoteHere
-       #     print("\n", plot_name)
-       #     params, _ = spo.curve_fit(lambda x, t: -x/t, xarray, np.log(yarray), bounds=(0, 1e+4))
-       #     print(params[0])
-       #     print(matrix_least_squares(xdata, ydata, **kwargs_matrix_lsq))
-       #     print(prefactors, tau)
-       #     print(output[5:])
-       #     sys.exit()
-
     if verbose:
         if minimizer == "leastsq":
             print("1 Exp. Termination: {}".format(Result1.lmdif_message))
@@ -336,7 +329,7 @@ def exponential(xdata, ydata, delimiter=",", minimizer="leastsq", verbose=False,
 
     return output, uncertainties
 
-def one_exponential(xdata, ydata, minimizer="nelder", verbose=False):
+def exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
     Provided data fit to:
 
@@ -348,8 +341,16 @@ def one_exponential(xdata, ydata, minimizer="nelder", verbose=False):
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
+    minimizer : str, Optional, default="leastsq"
         Fitting method supported by ``lmfit.minimize``
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+
+        - ``"a1" = {"value": 1.0, "vary": False}``
+        - ``"t1" = {"value": 0.1, "min": 0, "max":1e+4}``
+
     verbose : bool, Optional, default=False
         Output fitting statistics
 
@@ -368,27 +369,65 @@ def one_exponential(xdata, ydata, minimizer="nelder", verbose=False):
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
 
+    param_kwargs = {
+                    "a1": {"value": 1.0, "vary": False},
+                    "t1": {"value": 0.1, "min": 0, "max":1e+4},
+                   }
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'a1' and 't1'".format(key))
 
-    def exponential_res_1(x):
-        return np.exp(-xarray/x["t1"]) - yarray
-
-    def exponential_fit_1(x, array):
-        return np.exp(-xarray/x["t1"])
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
 
     exp1 = Parameters()
-    exp1.add("t1", min=0, max=1e+4, value=0.1)
-    Result1 = lmfit.minimize(exponential_res_1, exp1, method=minimizer)
+    exp1.add("a1", **param_kwargs["a1"])
+    exp1.add("t1", **param_kwargs["t1"])
+    if minimizer in ["leastsq"]:
+        kwargs_minimizer["Dfun"] = _d_exponential_decay
+    Result1 = lmfit.minimize(_res_exponential_decay, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
 
     # Format output
-    output = Result1.params["t1"].value
-    uncertainties = Result1.params["t1"].stderr
+    output = np.zeros(2)
+    uncertainties = np.zeros(2)
+    for i,(param, value) in enumerate(Result1.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
 
     if verbose:
+        if minimizer == "leastsq":
+            print("1 Exp. Termination: {}".format(Result1.lmdif_message))
+        else:
+            print("1 Exp. Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return np.array([output]), np.array([uncertainties])
+    return output, uncertainties
 
-def two_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
+def _res_exponential_decay(params, xarray, yarray, switch=None):
+    return np.log(params["a1"])-xarray/params["t1"] - np.log(yarray)
+
+def _d_exponential_decay(params, xarray, yarray, switch=None):
+    #return np.array([xarray/params["t1"]**2*np.exp(-xarray/params["t1"])])
+
+    tmp_output = []
+    tmp_output.append([1/params["a1"] for x in range(len(xarray))]) # a1
+    tmp_output.append(xarray/params["t1"]**2) # t1
+
+    output = []
+    if np.all(switch != None):
+        for i, tf in enumerate(switch):
+            if tf:
+                output.append(tmp_output[i])
+
+    return np.transpose(np.array(output))
+
+def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
     Provided data fit to:
 
@@ -400,8 +439,19 @@ def two_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
+    minimizer : str, Optional, default="leastsq"
         Fitting method supported by ``lmfit.minimize``
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
+
+        - ``"a1" = {"value": 0.8, "min": 0, "max":1}``
+        - ``"t1" = {"value": 0.1, "min": 0, "max":1e+4}``
+        - ``"a2" = {"value": 0.2, "min": 0, "max":1, "expr":"1 - a1"}``
+        - ``"t2" = {"value": 0.05, "min": 0, "max":1e+4}``
+
     verbose : bool, Optional, default=False
         Output fitting statistics
 
@@ -420,18 +470,33 @@ def two_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
 
-    def exponential_res_2(x):
-        return x["a1"]*np.exp(-xarray/x["t1"]) + x["a2"]*np.exp(-xarray/x["t2"]) - yarray
+    param_kwargs = {
+                    "a1": {"value": 0.8, "min": 0, "max":1},
+                    "t1": {"value": 0.1, "min": 0, "max":1e+4},
+                    "a2": {"value": 0.2, "min": 0, "max":1, "expr":"1 - a1"},
+                    "t2": {"value": 0.05, "min": 0, "max":1e+4},
+                   }
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'a1', 't1', 'a2', and 't2'".format(key))
 
-    def exponential_fit_2(x, array):
-        return x["a1"]*np.exp(-xarray/x["t1"]) + x["a2"]*np.exp(-xarray/x["t2"])
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
 
-    exp2 = Parameters()
-    exp2.add("a1", min=0, max=1, value=0.8)
-    exp2.add("t1", min=0, max=1e+4, value=0.1)
-    exp2.add("a2", min=0, max=1, value=0.2, expr="1 - a1")
-    exp2.add("t2", min=0, max=1e+4, value=0.09)
-    Result2 = lmfit.minimize(exponential_res_2, exp2, method=minimizer)
+    exp1 = Parameters()
+    exp1.add("a1", **param_kwargs["a1"])
+    exp1.add("t1", **param_kwargs["t1"])
+    exp1.add("a2", **param_kwargs["a2"])
+    exp1.add("t2", **param_kwargs["t2"])
+    if minimizer in ["leastsq"]:
+        kwargs_minimizer["Dfun"] = _d_two_exponential_decays
+    Result2 = lmfit.minimize(_res_two_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
 
     # Format output
     output = np.zeros(4)
@@ -441,12 +506,43 @@ def two_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
         uncertainties[i] = value.stderr
 
     if verbose:
+        if minimizer == "leastsq":
+            print("2 Exp. Termination: {}".format(Result2.lmdif_message))
+        else:
+            print("2 Exp. Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
         print("Sum: {}".format(Result2.params["a1"]+Result2.params["a2"]))
 
     return output, uncertainties
 
-def three_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
+def _res_two_exponential_decays(params, xarray, yarray, switch=None):
+    return params["a1"]*np.exp(-xarray/params["t1"]) + params["a2"]*np.exp(-xarray/params["t2"]) - yarray
+
+def _d_two_exponential_decays(params, xarray, yarray, switch=None):
+
+    tmp_output = []
+    tmp_exp1 = np.exp(-xarray/params["t1"])
+    tmp_exp2 = np.exp(-xarray/params["t2"])
+    if not switch[2]: 
+        tmp_output.append(tmp_exp1 - tmp_exp2) #a1
+    else:
+        tmp_output.append(tmp_exp1) #a1
+    tmp_output.append(params["a1"]*xarray/params["t1"]**2*tmp_exp1) # t1
+    tmp_output.append(tmp_exp2) #a2
+    if not switch[2]:
+        tmp_output.append((1-params["a1"])*xarray/params["t2"]**2*tmp_exp2) # t2
+    else:
+        tmp_output.append(params["a2"]*xarray/params["t2"]**2*tmp_exp2) # t2
+
+    output = []
+    if np.all(switch != None):
+        for i, tf in enumerate(switch):
+            if tf:
+                output.append(tmp_output[i])
+
+    return np.transpose(np.array(output))
+
+def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
     Provided data fit to:
 
@@ -458,8 +554,21 @@ def three_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
+    minimizer : str, Optional, default="leastsq"
         Fitting method supported by ``lmfit.minimize``
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
+
+        - ``"a1" = {"value": 0.8, "min": 0, "max":1}``
+        - ``"t1" = {"value": 0.1, "min": 0, "max":1e+4}``
+        - ``"a2" = {"value": 0.19, "min": 0, "max":1}``
+        - ``"t2" = {"value": 0.09, "min": 0, "max":1e+4}``
+        - ``"a3" = {"value": 0.01, "min": 0, "max":1, "expr":"1 - a1 - a2"}``
+        - ``"t3" = {"value": 0.02, "min": 0, "max":1e+4}``
+
     verbose : bool, Optional, default=False
         Output fitting statistics
 
@@ -478,20 +587,37 @@ def three_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
 
-    def exponential_res_3(x):
-        return x["a1"]*np.exp(-xarray/x["t1"]) + x["a2"]*np.exp(-xarray/x["t2"]) + x["a3"]*np.exp(-xarray/x["t3"]) - yarray
+    param_kwargs = {
+                    "a1": {"value": 0.8, "min": 0, "max":1},
+                    "t1": {"value": 0.1, "min": 0, "max":1e+4},
+                    "a2": {"value": 0.19, "min": 0, "max":1},
+                    "t2": {"value": 0.09, "min": 0, "max":1e+4},
+                    "a3": {"value": 0.01, "min": 0, "max": 1, "expr":"1 - a1 - a2"},
+                    "t3": {"value": 0.02, "min": 0, "max":1e+4},
+                   }
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'a1', 't1', 'a2', 't2', 'a3' and 't3'".format(key))
 
-    def exponential_fit_3(x, array):
-        return x["a1"]*np.exp(-xarray/x["t1"]) + x["a2"]*np.exp(-xarray/x["t2"]) + x["a3"]*np.exp(-xarray/x["t3"])
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
 
-    exp3 = Parameters()
-    exp3.add("a1", min=0, max=1, value=0.8)
-    exp3.add("t1", min=0, max=1e+4, value=0.1)
-    exp3.add("a2", min=0, max=1, value=0.19)
-    exp3.add("t2", min=0, max=1e+4, value=0.09)
-    exp3.add("a3", min=0, max=1, value=0.01, expr="1 - a1 - a2")
-    exp3.add("t3", min=0, max=1e+4, value=0.02)
-    Result3 = lmfit.minimize(exponential_res_3, exp3, method=minimizer)
+    exp1 = Parameters()
+    exp1.add("a1", **param_kwargs["a1"])
+    exp1.add("t1", **param_kwargs["t1"])
+    exp1.add("a2", **param_kwargs["a2"])
+    exp1.add("t2", **param_kwargs["t2"])
+    exp1.add("a3", **param_kwargs["a3"])
+    exp1.add("t3", **param_kwargs["t3"])
+    if minimizer in ["leastsq"]:
+        kwargs_minimizer["Dfun"] = _d_three_exponential_decays
+    Result3 = lmfit.minimize(_res_three_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
 
     # Format output
     output = np.zeros(6)
@@ -501,10 +627,50 @@ def three_exponentials(xdata, ydata, minimizer="nelder", verbose=False):
         uncertainties[i] = value.stderr
 
     if verbose:
+        if minimizer == "leastsq":
+            print("3 Exp. Termination: {}".format(Result3.lmdif_message))
+        else:
+            print("3 Exp. Termination: {}".format(Result3.message))
         lmfit.printfuncs.report_fit(Result3.params, min_correl=0.5)
         print("Sum: {}".format(Result3.params["a1"]+Result3.params["a2"]+Result3.params["a3"]))
 
     return output, uncertainties
+
+def _res_three_exponential_decays(params, xarray, yarray, switch=None):
+    tmp1 = params["a1"]*np.exp(-xarray/params["t1"])
+    tmp2 = params["a2"]*np.exp(-xarray/params["t2"])
+    tmp3 = params["a3"]*np.exp(-xarray/params["t3"])
+    return tmp1 + tmp2 + tmp3 - yarray
+
+def _d_three_exponential_decays(params, xarray, yarray, switch=None):
+    tmp_output = []
+    tmp_exp1 = np.exp(-xarray/params["t1"])
+    tmp_exp2 = np.exp(-xarray/params["t2"])
+    tmp_exp3 = np.exp(-xarray/params["t3"])
+    if not switch[4]: 
+        tmp_output.append(tmp_exp1 - tmp_exp3) #a1
+    else:
+        tmp_output.append(tmp_exp1) #a1
+    tmp_output.append(params["a1"]*xarray/params["t1"]**2*tmp_exp1) # t1
+    if not switch[4]:
+        tmp_output.append(tmp_exp2 - tmp_exp3) #a2
+    else:
+        tmp_output.append(tmp_exp2) #a2
+    tmp_output.append(params["a2"]*xarray/params["t2"]**2*tmp_exp2) # t2
+    tmp_output.append(tmp_exp3) #a3
+
+    if not switch[4]:
+        tmp_output.append((1-params["a1"])-params["a2"]*xarray/params["t3"]**2*tmp_exp3) # t3
+    else:
+        tmp_output.append(params["a3"]*xarray/params["t3"]**2*tmp_exp3) # t3
+
+    output = []
+    if np.all(switch != None):
+        for i, tf in enumerate(switch):
+            if tf:
+                output.append(tmp_output[i])
+
+    return np.transpose(np.array(output))
 
 def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
     """
