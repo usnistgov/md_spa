@@ -1,6 +1,7 @@
 
 import numpy as np
 import scipy.stats
+import warnings
 
 def basic_stats(data, confidence=0.95, error_type="standard_error"):
     """
@@ -27,9 +28,13 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
         When added and subtracted from the mean, forms the confidence interval
         
     """
-    if data:
+
+    if not isiterable(data):
+        raise ValueError("Input data is not iterable")
+ 
+    if len(data) != 0 or len(data) != np.isnan(data).sum():
         data = np.array(data,np.float)
-        lx = len(data) - len(np.where(np.isnan(data))[0])
+        lx = len(data) - np.isnan(data).sum()
         se = np.nanstd(data)/np.sqrt(lx)
         if error_type == "standard_error":
             std = se
@@ -38,11 +43,54 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
         else:
             raise ValueError("error_type, {}, is not supported".format(error_type))
         mean = np.nanmean(data)
+        tmp = scipy.stats.normaltest(data).pvalue
+        if tmp < 0.05:
+            warning.warn("This dataset is not normal according to scipy.normaltest() with a pvalue={}".format(tmp))
     else:
         mean = np.nan
         std = np.nan
 
     return mean, std
+
+def skewness(data, kwargs={}):
+    """
+    Given a set of data, calculate the skewness and its standard error. If skewness/SE is greater than 1.96 then the distribution is not in the 95% confidence interval of normality. By default the adjusted Fisher-Pearson standardized moment coefficient to correct for sample bias with the default kwargs.
+
+    Valued of NaN are removed from the data set.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        1D list or array of data
+    kwargs : dict, Optional, default={"bias": False, "nan_policy": "omit"}
+        Keyword arguments for ``scipy.stats.skew``
+
+    Returns
+    -------
+    skewness : float
+        By default the adjusted Fisher-Pearson skewness is calculated with ``scipy.stats.shew``
+    skew_se : float
+        Standard error of the skewness that is meaningful for the adjusted Fisher-Pearson skewness and is the square root of 6*n*(n-1)/((n-2)*(n+1)*(n+3)).
+        
+    """
+
+    tmp_kwargs = {"bias": False, "nan_policy": "omit"}
+    tmp_kwargs.update(kwargs)
+
+    if not isiterable(data):
+        raise ValueError("Input data is not iterable")
+ 
+    if len(data) != 0 or len(data) != np.isnan(data).sum():
+        data = np.array(data,np.float)
+        lx = len(data) - np.isnan(data).sum()
+        skewness = scipy.stats.skew(data, **tmp_kwargs)
+        skew_se = np.sqrt(6.*lx*(lx-1.)/((lx-2.)*(lx+1.)*(lx+3.)))
+
+    else:
+        skewness = np.nan
+        skew_se = np.nan
+
+    return skewness, skew_se
 
 def isiterable(array):
     """
