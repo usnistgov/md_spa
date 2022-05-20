@@ -16,7 +16,7 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
     confidence : float, Optional, default=0.95
         Confidence Interval certainty, used when ``error_type = "confidence"``
     error_type : str, Optional, default="standard_error"
-        Type of error to be output, can be "standard_error" or "confidence"
+        Type of error to be output, can be "standard_error" or "confidence", or "standard_dev"
 
     Returns
     -------
@@ -40,6 +40,8 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
             std = se
         elif error_type == "confidence":
             std = se * scipy.stats.t.ppf((1 + confidence) / 2., lx-1)
+        elif error_type == "standard_dev":
+            std = np.nanstd(data)
         else:
             raise ValueError("error_type, {}, is not supported".format(error_type))
         mean = np.nanmean(data)
