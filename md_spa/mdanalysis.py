@@ -17,6 +17,7 @@ import md_spa_utils.data_manipulation as dm
 
 def center_universe_around_group(universe, select, verbose=False, reference="initial", com_kwargs={"unwrap": True}):
     """
+    Recenter the universe around a specified group. This can be done from the initial center of mass of the group, or have each frame centered if only an ensemble average of some property in each frame in desired.
 
     Parameters
     ----------
