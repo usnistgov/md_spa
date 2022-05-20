@@ -30,7 +30,7 @@ def find_header(filename, delimiter=",", comments="#"):
     if not os.path.isfile(filename):
         raise ValueError("The given file could not be found: {}".format(filename))
 
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding='utf-8-sig') as f:
         while(True):
             line = f.readline()
 
