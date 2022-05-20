@@ -424,6 +424,8 @@ def _d_exponential_decay(params, xarray, yarray, switch=None):
         for i, tf in enumerate(switch):
             if tf:
                 output.append(tmp_output[i])
+    else:
+        output = tmp_output
 
     return np.transpose(np.array(output))
 
@@ -539,6 +541,8 @@ def _d_two_exponential_decays(params, xarray, yarray, switch=None):
         for i, tf in enumerate(switch):
             if tf:
                 output.append(tmp_output[i])
+    else:
+        output = tmp_output
 
     return np.transpose(np.array(output))
 
@@ -669,6 +673,8 @@ def _d_three_exponential_decays(params, xarray, yarray, switch=None):
         for i, tf in enumerate(switch):
             if tf:
                 output.append(tmp_output[i])
+    else:
+        output = tmp_output
 
     return np.transpose(np.array(output))
 
@@ -723,6 +729,117 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
         uncertainties[i] = value.stderr
 
     return output, uncertainties
+
+def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
+    """
+    Fit data to a flexible number of gaussian functions. Parameters are ``"a{}".format(n_gaussians)``, ``"b{}".format(n_gaussians)``, and ``"c{}".format(n_gaussians)``.
+
+    Values of zero and NaN are ignored in the fit.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ydata : numpy.ndarray
+        dependent data set
+    num : int
+        Number of Gaussian functions in model
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+
+        - ``"a{}".format(n_gaussian) = {"value": 1.0, "min": 0, "max":1e+4}``
+        - ``"b{}".format(n_gaussian) = {"value": 1.0}``
+        - ``"c{}".format(n_gaussian) = {"value": 0.1, "min": 0, "max":1e+4}``
+
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ['t1']
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: [t1']
+        
+    """
+
+    if np.all(np.isnan(yarray[1:])):
+        raise ValueError("y-axis data is NaN")
+
+    if not isinstance(kwargs_parameters, dict):
+        raise ValueError("kwargs_parameters must be a dictionary")
+
+    gaussian = Parameters()
+    param_kwargs = {}
+    for n in range(1,num+1):
+        param_kwargs["a{}".format(n)] = {"value": 1.0, "min": 0, "max":1e+4}
+        if "a{}".format(n) in kwargs_parameters:
+            param_kwargs["a{}".format(n)].update(kwargs_parameters["a{}".format(n)])
+            del kwargs_parameters["a{}".format(n)]
+        gaussian.add("a{}".format(n), **param_kwargs["a{}".format(n)])
+
+        param_kwargs["b{}".format(n)] = {"value": 1.0,}
+        if "b{}".format(n) in kwargs_parameters:
+            param_kwargs["b{}".format(n)].update(kwargs_parameters["b{}".format(n)])
+            del kwargs_parameters["b{}".format(n)]
+        gaussian.add("b{}".format(n), **param_kwargs["b{}".format(n)])
+
+        param_kwargs["c{}".format(n)] = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4}
+        if "c{}".format(n) in kwargs_parameters:
+            param_kwargs["c{}".format(n)].update(kwargs_parameters["c{}".format(n)])
+            del kwargs_parameters["c{}".format(n)]
+        gaussian.add("c{}".format(n), **param_kwargs["c{}".format(n)])
+
+    if len(kwargs_parameters) > 0:
+        raise ValueError("The following parameters were given to custom_fit.num but are not used: {}".format(", ".join(list(kwargs_parameters.keys()))))
+
+    if minimizer in ["leastsq"]:
+        kwargs_minimizer["Dfun"] = _d_n_gaussians
+    elif minimizer in ["trust-exact"]:
+        kwargs_minimizer["jac"] = _d_n_gaussians
+    Result1 = lmfit.minimize(_res_n_gaussians, gaussian, method=minimizer, args=(xarray, yarray, num), **kwargs_minimizer)
+
+    # Format output
+    output = np.zeros(3*num)
+    uncertainties = np.zeros(3*num)
+    for i,(param, value) in enumerate(Result1.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        if minimizer == "leastsq":
+            print("N-Gaussians. Termination: {}".format(Result1.lmdif_message))
+        else:
+            print("N-Gaussians. Termination: {}".format(Result1.message))
+        lmfit.printfuncs.report_fit(Result1.params)
+
+    return output, uncertainties
+
+def _res_n_gaussians(params, xarray, yarray, num):
+
+    out = np.zeros(len(xarray))
+    for n in range(1,num+1):
+        out += params["a{}".format(n)]*np.exp(-( xarray - params["b{}".format(n)] )**2/(2*params["c{}".format(n)]**2))
+        tmp = params["a{}".format(n)]*np.exp(-( xarray - params["b{}".format(n)] )**2/(2*params["c{}".format(n)]**2))
+
+    return out - yarray
+
+def _d_n_gaussians(params, xarray, yarray, num):
+
+    out = []
+    for n in range(1,num+1):
+        tmp = ( xarray - params["b{}".format(n)] )/params["c{}".format(n)]
+        out.append((np.exp(-np.square(tmp)/2))[np.newaxis,:]) # derivative of a_n 
+        out.append((params["a{}".format(n)]*tmp*np.exp(-np.square(tmp)/2))[np.newaxis,:]) # derivative of b_n
+        out.append((np.square(tmp)/2*np.exp(-np.square(tmp)/2))[np.newaxis,:])
+
+    output = np.concatenate(out, axis=0)
+
+    return np.transpose(np.array(output))
 
 def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, minimizer_kwargs={}):
     """

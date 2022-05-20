@@ -3,11 +3,14 @@
 .. autosummary::
    :toctree: _autosummary
 
-    read_lammps
     conversions
     coordination_number
     custom_fit
-    mdanalysis_lammps
+    mdanalysis
     msd
     rdf
+    read_lammps
+    residence_time
+    viscosity
+    zeno
     
