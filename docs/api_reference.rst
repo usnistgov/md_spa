@@ -6,6 +6,7 @@
     conversions
     coordination_number
     custom_fit
+    fit_data
     mdanalysis
     msd
     rdf
