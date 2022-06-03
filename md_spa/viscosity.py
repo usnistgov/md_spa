@@ -451,7 +451,7 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
     if "verbose" not in tmp_kwargs:
         tmp_kwargs["verbose"] = verbose
 
-    parameters, uncertainties = cfit.double_cumulative_exponential(time, cumulative_integral, **tmp_kwargs)
+    parameters, uncertainties = cfit.double_viscosity_cumulative_exponential(time, cumulative_integral, **tmp_kwargs)
     # Assuming parameters = [A, alpha, 1, tau2]
     viscosity =  parameters[0]*parameters[1]*parameters[2] + parameters[0]*(1-parameters[1])*parameters[3]
     # Propagation of error
