@@ -32,7 +32,7 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
     if not isiterable(data):
         raise ValueError("Input data is not iterable")
  
-    if len(data) != 0 or len(data) != np.isnan(data).sum():
+    if len(data) != 0 and len(data) != np.isnan(data).sum():
         data = np.array(data,np.float)
         lx = len(data) - np.isnan(data).sum()
         se = np.nanstd(data)/np.sqrt(lx)
@@ -45,9 +45,10 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
         else:
             raise ValueError("error_type, {}, is not supported".format(error_type))
         mean = np.nanmean(data)
-        tmp = scipy.stats.normaltest(data).pvalue
-        if tmp < 0.05:
-            warning.warn("This dataset is not normal according to scipy.normaltest() with a pvalue={}".format(tmp))
+        if lx > 8:
+            tmp = scipy.stats.normaltest(data).pvalue
+            if tmp < 0.05:
+                warning.warn("This dataset is not normal according to scipy.normaltest() with a pvalue={}".format(tmp))
     else:
         mean = np.nan
         std = np.nan
