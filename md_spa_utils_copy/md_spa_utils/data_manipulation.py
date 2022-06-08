@@ -48,7 +48,7 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
         if lx > 8:
             tmp = scipy.stats.normaltest(data).pvalue
             if tmp < 0.05:
-                warning.warn("This dataset is not normal according to scipy.normaltest() with a pvalue={}".format(tmp))
+                warnings.warn("This dataset is not normal according to scipy.normaltest() with a pvalue={}".format(tmp))
     else:
         mean = np.nan
         std = np.nan
