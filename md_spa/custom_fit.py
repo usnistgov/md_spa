@@ -1,4 +1,5 @@
 import os
+import copy
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
@@ -217,7 +218,7 @@ def _d_exponential_decay(params, xarray, yarray, switch=None):
 
     return np.transpose(np.array(output))
 
-def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
+def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False):
     """
     Provided data fit to:
 
@@ -242,6 +243,8 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
         - ``"a2" = {"value": 0.2, "min": 0, "max":1, "expr":"1 - a1"}``
         - ``"t2" = {"value": 0.05, "min": np.finfo(float).eps, "max":1e+4}``
 
+    tau_logscale : bool, Optional, default=False
+        Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
     verbose : bool, Optional, default=False
         Output fitting statistics
 
@@ -281,9 +284,28 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
 
     exp1 = Parameters()
     exp1.add("a1", **param_kwargs["a1"])
-    exp1.add("t1", **param_kwargs["t1"])
+    if tau_logscale:
+        param_kwargs["logt1"] = {}
+        for key, value in param_kwargs["t1"].items():
+            if key in ["min", "max", "value","brute_step"]:
+                param_kwargs["logt1"][key] = np.log(value)
+            elif key == "vary":
+                param_kwargs["logt1"][key] = value
+        exp1.add("logt1", **param_kwargs["logt1"])
+    else:
+        exp1.add("t1", **param_kwargs["t1"])
     exp1.add("a2", **param_kwargs["a2"])
-    exp1.add("t2", **param_kwargs["t2"])
+    if tau_logscale:
+        param_kwargs["logt2"] = {}
+        for key, value in param_kwargs["t2"].items():
+            if key in ["min", "max", "value","brute_step"]:
+                param_kwargs["logt2"][key] = np.log(value)
+            elif key == "vary":
+                param_kwargs["logt2"][key] = value
+        exp1.add("logt2", **param_kwargs["logt2"])
+    else:
+        exp1.add("t2", **param_kwargs["t2"])
+
     if minimizer in ["leastsq"]:
         kwargs_minimizer["Dfun"] = _d_two_exponential_decays
     Result2 = lmfit.minimize(_res_two_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
@@ -292,8 +314,15 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
     output = np.zeros(4)
     uncertainties = np.zeros(4)
     for i,(param, value) in enumerate(Result2.params.items()):
-        output[i] = value.value
-        uncertainties[i] = value.stderr
+        if "log" in param:
+            output[i] = np.exp(value.value)
+            try:
+                uncertainties[i] = value.value*value.stderr # Propagation of uncertainty           
+            except:
+                uncertainties[i] = value.stderr
+        else:
+            output[i] = value.value
+            uncertainties[i] = value.stderr
 
     if verbose:
         if minimizer == "leastsq":
@@ -305,11 +334,32 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
 
     return output, uncertainties
 
-def _res_two_exponential_decays(params, xarray, yarray, switch=None):
+def _res_two_exponential_decays(params0, xarray, yarray, switch=None):
+    params = copy.deepcopy(params0)
+    if "t1" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t1"] = np.exp(params["logt1"].value)
+        else:
+            params.add("t1",value=np.exp(params["logt1"].value))
+    if "t2" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t2"] = np.exp(params["logt2"].value)
+        else:
+            params.add("t2",value=np.exp(params["logt2"].value))
     return params["a1"]*np.exp(-xarray/params["t1"]) + params["a2"]*np.exp(-xarray/params["t2"]) - yarray
 
-def _d_two_exponential_decays(params, xarray, yarray, switch=None):
-
+def _d_two_exponential_decays(params0, xarray, yarray, switch=None):
+    params = copy.deepcopy(params0)
+    if "t1" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t1"] = np.exp(params["logt1"].value)
+        else:
+            params.add("t1",value=np.exp(params["logt1"].value))
+    if "t2" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t2"] = np.exp(params["logt2"].value)
+        else:
+            params.add("t2",value=np.exp(params["logt2"].value))
     tmp_output = []
     tmp_exp1 = np.exp(-xarray/params["t1"])
     tmp_exp2 = np.exp(-xarray/params["t2"])
@@ -317,12 +367,21 @@ def _d_two_exponential_decays(params, xarray, yarray, switch=None):
         tmp_output.append(tmp_exp1 - tmp_exp2) #a1
     else:
         tmp_output.append(tmp_exp1) #a1
-    tmp_output.append(params["a1"]*xarray/params["t1"]**2*tmp_exp1) # t1
+    if "logt1" in params:
+        tmp_output.append(params["a1"]*xarray*np.exp(-np.exp(-params["logt1"])*xarray-params["logt1"])) # logt1
+    else:
+        tmp_output.append(params["a1"]*xarray/params["t1"]**2*tmp_exp1) # t1
     tmp_output.append(tmp_exp2) #a2
     if not switch[2]:
-        tmp_output.append((1-params["a1"])*xarray/params["t2"]**2*tmp_exp2) # t2
+        if "logt2" in params:
+            tmp_output.append((1-params["a1"])*xarray*np.exp(-np.exp(-params["logt2"])*xarray-params["logt2"])) # logt1
+        else:
+            tmp_output.append((1-params["a1"])*xarray/params["t2"]**2*tmp_exp2) # t2
     else:
-        tmp_output.append(params["a2"]*xarray/params["t2"]**2*tmp_exp2) # t2
+        if "logt2" in params:
+            tmp_output.append(params["a2"]*xarray*np.exp(-np.exp(-params["logt2"])*xarray-params["logt2"])) # logt1
+        else:
+            tmp_output.append(params["a2"]*xarray/params["t2"]**2*tmp_exp2) # t2
 
     output = []
     if np.all(switch != None):
@@ -334,7 +393,7 @@ def _d_two_exponential_decays(params, xarray, yarray, switch=None):
 
     return np.transpose(np.array(output))
 
-def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
+def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False):
     """
     Provided data fit to:
 
@@ -361,6 +420,8 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
         - ``"a3" = {"value": 0.01, "min": 0, "max":1, "expr":"1 - a1 - a2"}``
         - ``"t3" = {"value": 0.02, "min": np.finfo(float).eps, "max":1e+4}``
 
+    tau_logscale : bool, Optional, default=False
+        Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
     verbose : bool, Optional, default=False
         Output fitting statistics
 
@@ -402,11 +463,39 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
 
     exp1 = Parameters()
     exp1.add("a1", **param_kwargs["a1"])
-    exp1.add("t1", **param_kwargs["t1"])
+    if tau_logscale:
+        param_kwargs["logt1"] = {}
+        for key, value in param_kwargs["t1"].items():
+            if key in ["min", "max", "value","brute_step"]:
+                param_kwargs["logt1"][key] = np.log(value)
+            elif key == "vary":
+                param_kwargs["logt1"][key] = value
+        exp1.add("logt1", **param_kwargs["logt1"])
+    else:
+        exp1.add("t1", **param_kwargs["t1"])
     exp1.add("a2", **param_kwargs["a2"])
-    exp1.add("t2", **param_kwargs["t2"])
+    if tau_logscale:
+        param_kwargs["logt2"] = {}
+        for key, value in param_kwargs["t2"].items():
+            if key in ["min", "max", "value","brute_step"]:
+                param_kwargs["logt2"][key] = np.log(value)
+            elif key == "vary":
+                param_kwargs["logt2"][key] = value
+        exp1.add("logt2", **param_kwargs["logt2"])
+    else:
+        exp1.add("t2", **param_kwargs["t2"])
     exp1.add("a3", **param_kwargs["a3"])
-    exp1.add("t3", **param_kwargs["t3"])
+    if tau_logscale:
+        param_kwargs["logt3"] = {}
+        for key, value in param_kwargs["t3"].items():
+            if key in ["min", "max", "value","brute_step"]:
+                param_kwargs["logt3"][key] = np.log(value)
+            elif key == "vary":
+                param_kwargs["logt3"][key] = value
+        exp1.add("logt3", **param_kwargs["logt3"])
+    else:
+        exp1.add("t3", **param_kwargs["t3"])
+
     if minimizer in ["leastsq"]:
         kwargs_minimizer["Dfun"] = _d_three_exponential_decays
     Result3 = lmfit.minimize(_res_three_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
@@ -415,8 +504,15 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
     output = np.zeros(6)
     uncertainties = np.zeros(6)
     for i,(param, value) in enumerate(Result3.params.items()):
-        output[i] = value.value
-        uncertainties[i] = value.stderr
+        if "log" in param:
+            output[i] = np.exp(value.value)
+            try:
+                uncertainties[i] = value.value*value.stderr # Propagation of uncertainty           
+            except:
+                uncertainties[i] = value.stderr
+        else:
+            output[i] = value.value
+            uncertainties[i] = value.stderr
 
     if verbose:
         if minimizer == "leastsq":
@@ -428,14 +524,46 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
 
     return output, uncertainties
 
-def _res_three_exponential_decays(params, xarray, yarray, switch=None):
+def _res_three_exponential_decays(params0, xarray, yarray, switch=None):
+    params = copy.deepcopy(params0)
+    if "t1" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t1"] = np.exp(params["logt1"].value)
+        else:
+            params.add("t1",value=np.exp(params["logt1"].value))
+    if "t2" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t2"] = np.exp(params["logt2"].value)
+        else:
+            params.add("t2",value=np.exp(params["logt2"].value))
+    if "t3" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t3"] = np.exp(params["logt3"].value)
+        else:
+            params.add("t3",value=np.exp(params["logt3"].value))
     tmp1 = params["a1"]*np.exp(-xarray/params["t1"])
     tmp2 = params["a2"]*np.exp(-xarray/params["t2"])
     tmp3 = params["a3"]*np.exp(-xarray/params["t3"])
 
     return tmp1 + tmp2 + tmp3 - yarray
 
-def _d_three_exponential_decays(params, xarray, yarray, switch=None):
+def _d_three_exponential_decays(params0, xarray, yarray, switch=None):
+    params = copy.deepcopy(params0)
+    if "t1" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t1"] = np.exp(params["logt1"].value)
+        else:
+            params.add("t1",value=np.exp(params["logt1"].value))
+    if "t2" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t2"] = np.exp(params["logt2"].value)
+        else:
+            params.add("t2",value=np.exp(params["logt2"].value))
+    if "t3" not in params:
+        if not isinstance(params, lmfit.parameter.Parameters):
+            params["t3"] = np.exp(params["logt3"].value)
+        else:
+            params.add("t3",value=np.exp(params["logt3"].value))
     tmp_output = []
     tmp_exp1 = np.exp(-xarray/params["t1"])
     tmp_exp2 = np.exp(-xarray/params["t2"])
@@ -444,18 +572,30 @@ def _d_three_exponential_decays(params, xarray, yarray, switch=None):
         tmp_output.append(tmp_exp1 - tmp_exp3) #a1
     else:
         tmp_output.append(tmp_exp1) #a1
-    tmp_output.append(params["a1"]*xarray/params["t1"]**2*tmp_exp1) # t1
+    if "logt1" in params:
+        tmp_output.append(params["a1"]*xarray*np.exp(-np.exp(-params["logt1"])*xarray-params["logt1"])) # logt1
+    else:
+        tmp_output.append(params["a1"]*xarray/params["t1"]**2*tmp_exp1) # t1
     if not switch[4]:
         tmp_output.append(tmp_exp2 - tmp_exp3) #a2
     else:
         tmp_output.append(tmp_exp2) #a2
-    tmp_output.append(params["a2"]*xarray/params["t2"]**2*tmp_exp2) # t2
+    if "logt2" in params:
+        tmp_output.append(params["a2"]*xarray*np.exp(-np.exp(-params["logt2"])*xarray-params["logt2"])) # logt2
+    else:
+        tmp_output.append(params["a2"]*xarray/params["t2"]**2*tmp_exp2) # t2
     tmp_output.append(tmp_exp3) #a3
 
     if not switch[4]:
-        tmp_output.append((1-params["a1"])-params["a2"]*xarray/params["t3"]**2*tmp_exp3) # t3
+        if "logt3" in params:
+            tmp_output.append((1-params["a1"]-params["a2"])*xarray*np.exp(-np.exp(-params["logt3"])*xarray-params["logt3"])) # logt3
+        else:
+            tmp_output.append((1-params["a1"]-params["a2"])*xarray/params["t3"]**2*tmp_exp3) # t3
     else:
-        tmp_output.append(params["a3"]*xarray/params["t3"]**2*tmp_exp3) # t3
+        if "logt3" in params:
+            tmp_output.append(params["a3"]*xarray*np.exp(-np.exp(-params["logt3"])*xarray-params["logt3"])) # logt3
+        else:
+            tmp_output.append(params["a3"]*xarray/params["t3"]**2*tmp_exp3) # t3
 
     output = []
     if np.all(switch != None):
