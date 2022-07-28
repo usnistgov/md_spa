@@ -974,3 +974,102 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
     return zone_boundaries, debye_waller_total, debye_waller_total_std, debye_waller_retained, debye_waller_retained_std, survival_fraction, survival_fraction_std
 
 
+def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=None, verbose=False, write_increment=100):
+    """
+    Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
+
+    This method requires a characteristic time, generally on the order of a picosecond. This time is equal to the beta relaxation time and is generally temperature independent, and so can be determined from the minimum of the logarithmic derivative of the MSD, and low temperature may be necessary.
+
+    Note that this method should not be used for distances expected to be close to half the box length.
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    frames_per_tau : int
+        Number of frames in the characteristic time, tau.
+    select_list : list
+        List of atom selection strings according to the MDAnalysis selection string format. 
+    stop_frame : int, Optional, default=None
+        Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
+    verbose : bool, Optional, default=False
+        If true, progress will be printed
+    write_increment : int, Optional, default=100
+        If ``verbose`` write out progress every, this many frames.
+
+    Returns
+    -------
+    debye_waller_total : numpy.ndarray
+        The mean squared displacement of the atoms that initially start in their respective zones after ``frames_per_tau``
+    debye_waller_total_std : numpy.ndarray
+        Standard deviation of ``debye_waller_total``. Note that the number of data points would make the standard trivial.
+        
+    """
+
+    universe = check_universe(universe)
+    lx = len(universe.trajectory)
+
+    if not dm.isiterable(select_list):
+        select_list = [select_list]
+    ngroups = len(select_list)
+    groups = []
+    for select in select_list:
+        try:
+            groups.append(universe.select_atoms(select))
+        except:
+            raise ValueError("The provided selection string, {}, resulted in an error for the provided universe.".format(select))
+
+    if verbose:
+        print("Imported trajectory")
+    dimensions = universe.trajectory[0].dimensions[:3]
+
+    frames_per_tau = int(frames_per_tau)
+    if stop_frame == None:
+        stop_frame = lx-frames_per_tau
+    elif lx-frames_per_tau < stop_frame:
+        stop_frame = lx-frames_per_tau
+        if verbose:
+            print("`stop_frame` has been reset to align with the trajectory length")
+
+    msd_total = [[] for x in range(ngroups)]
+    for i in range(int(stop_frame)):
+        if verbose and i%write_increment == 0:
+            print("Calculating Frame {} out of {}".format(i,stop_frame))
+        positions_start_finish = [[] for x in range(ngroups)]
+
+        # Calculate initial positions of atoms
+        universe.trajectory[i]
+        for j, group in enumerate(groups):
+            positions_start_finish[j].append(group.positions)
+
+        # Calculate final positions of atoms
+        universe.trajectory[i+frames_per_tau]
+        for j, group in enumerate(groups):
+            tmp = group.positions-positions_start_finish[j][0]
+
+            for ii in range(len(tmp)):
+                tmp_check = np.abs(tmp[ii]) > dimensions/2
+                if np.any(tmp_check):
+                    ind = np.where(tmp_check)[0]
+                    for jj in ind:
+                        if tmp[ii][jj] > 0:
+                            tmp[ii][jj] -= dimensions[jj]
+                        else:
+                            tmp[ii][jj] += dimensions[jj]
+
+            msd_total[j].extend(list(np.sum(np.square(tmp),axis=1)))
+
+    debye_waller_total = np.zeros(ngroups)
+    debye_waller_total_std = np.zeros(ngroups)
+    for i in range(ngroups):
+        debye_waller_total[i] = np.nanmean(msd_total[i])
+        debye_waller_total_std[i] = np.nanstd(msd_total[i])
+
+    return debye_waller_total, debye_waller_total_std
+
+
