@@ -10,7 +10,7 @@ import md_spa_utils.data_manipulation as dm
 
 from . import custom_fit as cfit
 
-def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, tau_max=1e+8):
+def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, tau_max=1e+8, tau_logscale=False):
     """
     Extract the characteristic times fit and weighted with one, two, and three exponential functions for a total of three fits. Because the prefactors sum to unity, the total characteristic time is equal to a sum weighted by the prefactors. See ``custom_fit.exponential`` for more details.
 
@@ -38,6 +38,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
     tau_max : float, Optional, default=1e+5
         Maximum allowed value of characteristic time
+    tau_logscale : bool, Optional, default=False
+        Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
 
     Returns
     -------
@@ -68,6 +70,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     tmp_output1, tmp_error1 = cfit.exponential_decay(xarray, yarray,
                                                      verbose=verbose,
                                                      kwargs_minimizer=kwargs_minimizer,
+
                                                     )
     output[:2] = tmp_output1
     uncertainties[:2] = tmp_error1
@@ -75,6 +78,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     tmp_output2a, _ = cfit.two_exponential_decays(xarray, yarray,
                                                   verbose=verbose,
                                                   kwargs_minimizer=kwargs_minimizer,
+                                                  tau_logscale=tau_logscale,
                                                   kwargs_parameters={
                                                                      "t1": {"value": tmp_output1[1], "vary": False},
                                                                     }
@@ -82,6 +86,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     tmp_output2, tmp_error2 = cfit.two_exponential_decays(xarray, yarray, 
                                                      verbose=verbose,
                                                      kwargs_minimizer=kwargs_minimizer,
+                                                     tau_logscale=tau_logscale,
                                                      kwargs_parameters={
                                                                         "a1": {"value": tmp_output2a[0]},
                                                                         "t1": {"value": tmp_output2a[1]},
@@ -99,14 +104,17 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         tmp_output3a, _ = cfit.three_exponential_decays(xarray, yarray,
                                                       verbose=verbose,
                                                       kwargs_minimizer=kwargs_minimizer,
+                                                      tau_logscale=tau_logscale,
                                                       kwargs_parameters={
                                                                          "t1": {"value": tmp_output2[1], "vary": False},
                                                                          "t2": {"value": tmp_output2[3], "vary": False},
+                                                                         "t3": {"value": np.exp((np.log(tmp_output2[1])+np.log(tmp_output2[3]))/2)},
                                                                         }  
                                                      )  
         tmp_output3, tmp_error3 = cfit.three_exponential_decays(xarray, yarray,
                                                          verbose=verbose,
                                                          kwargs_minimizer=kwargs_minimizer,
+                                                         tau_logscale=tau_logscale,
                                                          kwargs_parameters={
                                                                             "a1": {"value": tmp_output3a[0]},
                                                                             "t1": {"value": tmp_output3a[1]},
