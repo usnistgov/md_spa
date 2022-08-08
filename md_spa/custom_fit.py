@@ -138,7 +138,7 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kw
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
 
         - ``"a1" = {"value": 1.0, "vary": False}``
-        - ``"t1" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"t1" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
 
     verbose : bool, Optional, default=False
         Output fitting statistics
@@ -160,7 +160,7 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kw
 
     param_kwargs = {
                     "a1": {"value": 1.0, "vary": False},
-                    "t1": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+4},
+                    "t1": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3},
                    }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
@@ -239,9 +239,9 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
 
         - ``"a1" = {"value": 0.8, "min": 0, "max":1}``
-        - ``"t1" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"t1" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
         - ``"a2" = {"value": 0.2, "min": 0, "max":1, "expr":"1 - a1"}``
-        - ``"t2" = {"value": 0.05, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"t2" = {"value": 0.05, "min": np.finfo(float).eps, "max":1e+3}``
 
     tau_logscale : bool, Optional, default=False
         Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
@@ -265,9 +265,9 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
 
     param_kwargs = {
                     "a1": {"value": 0.8, "min": 0, "max":1},
-                    "t1": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+4},
+                    "t1": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3},
                     "a2": {"value": 0.2, "min": 0, "max":1, "expr":"1 - a1"},
-                    "t2": {"value": 0.05, "min": np.finfo(float).eps, "max":1e+4},
+                    "t2": {"value": 0.05, "min": np.finfo(float).eps, "max":1e+3},
                    }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
@@ -414,11 +414,11 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
 
         - ``"a1" = {"value": 0.8, "min": 0, "max":1}``
-        - ``"t1" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"t1" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
         - ``"a2" = {"value": 0.19, "min": 0, "max":1}``
-        - ``"t2" = {"value": 0.09, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"t2" = {"value": 0.09, "min": np.finfo(float).eps, "max":1e+3}``
         - ``"a3" = {"value": 0.01, "min": 0, "max":1, "expr":"1 - a1 - a2"}``
-        - ``"t3" = {"value": 0.02, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"t3" = {"value": 0.02, "min": np.finfo(float).eps, "max":1e+3}``
 
     tau_logscale : bool, Optional, default=False
         Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
@@ -442,11 +442,11 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
 
     param_kwargs = {
                     "a1": {"value": 0.8, "min": 0, "max":1},
-                    "t1": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+4},
+                    "t1": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3},
                     "a2": {"value": 0.19, "min": 0, "max":1},
-                    "t2": {"value": 0.09, "min": np.finfo(float).eps, "max":1e+4},
+                    "t2": {"value": 0.09, "min": np.finfo(float).eps, "max":1e+3},
                     "a3": {"value": 0.01, "min": 0, "max": 1, "expr":"1 - a1 - a2"},
-                    "t3": {"value": 0.02, "min": np.finfo(float).eps, "max":1e+4},
+                    "t3": {"value": 0.02, "min": np.finfo(float).eps, "max":1e+3},
                    }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
