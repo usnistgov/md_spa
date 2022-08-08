@@ -524,22 +524,23 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
             else:
                 acceptors = [indices[i][2]]
 
-        for h in hydrogens:
-            for d in donor_list_per_hydrogen[h]:
-                for a in acceptors:
-                    new_indices.append([d,h,a])
-                    if dm.isiterable(d_h_cutoff):
-                        d_h_cutoff_array.append(d_h_cutoff[i])
-                    else:
-                        d_h_cutoff_array.append(d_h_cutoff)
-                    if dm.isiterable(d_a_cutoff):
-                        d_a_cutoff_array.append(d_a_cutoff[i])
-                    else:
-                        d_a_cutoff_array.append(d_a_cutoff)
-                    if dm.isiterable(d_h_a_angle_cutoff):
-                        d_h_a_angle_cutoff_array.append(d_h_a_angle_cutoff[i])
-                    else:
-                        d_h_a_angle_cutoff_array.append(d_h_a_angle_cutoff)
+        if indices[i][0] == None:
+            for h in hydrogens:
+                for d in donor_list_per_hydrogen[h]:
+                    for a in acceptors:
+                        new_indices.append([d,h,a])
+                        if dm.isiterable(d_h_cutoff):
+                            d_h_cutoff_array.append(d_h_cutoff[i])
+                        else:
+                            d_h_cutoff_array.append(d_h_cutoff)
+                        if dm.isiterable(d_a_cutoff):
+                            d_a_cutoff_array.append(d_a_cutoff[i])
+                        else:
+                            d_a_cutoff_array.append(d_a_cutoff)
+                        if dm.isiterable(d_h_a_angle_cutoff):
+                            d_h_a_angle_cutoff_array.append(d_h_a_angle_cutoff[i])
+                        else:
+                            d_h_a_angle_cutoff_array.append(d_h_a_angle_cutoff)
 
     output = []
     titles = []
@@ -576,6 +577,13 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
 
         output.append(timeseries)
         titles.append("{}-{}-{}".format(*ind))
+        tmp_filename, ext = os.path.split(filename)[1].split(".")
+        tmp_filename += "_{}-{}-{}".format(*ind) + ext
+        with open(os.path.join(path,tmp_filename), "w") as f:
+            f.write("# time, {}-{}-{}\n".format(*ind))
+            for tmp in np.transpose(np.array([time, timeseries])):
+                f.write("{}\n".format(", ".join([str(x) for x in tmp])))
+            
 
         if verbose:
             print("    Finished lifetime analysis")
