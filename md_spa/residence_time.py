@@ -10,7 +10,7 @@ import md_spa_utils.data_manipulation as dm
 
 from . import custom_fit as cfit
 
-def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, tau_max=1e+8, tau_logscale=False):
+def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, tau_logscale=False):
     """
     Extract the characteristic times fit and weighted with one, two, and three exponential functions for a total of three fits. Because the prefactors sum to unity, the total characteristic time is equal to a sum weighted by the prefactors. See ``custom_fit.exponential`` for more details.
 
@@ -36,8 +36,6 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         Kwayword arguments for ``matrix_least_squares``
     ydata_min : float, Optional, default=0.1
         Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
-    tau_max : float, Optional, default=1e+5
-        Maximum allowed value of characteristic time
     tau_logscale : bool, Optional, default=False
         Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
 
