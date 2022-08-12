@@ -600,7 +600,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         for tmp in np.transpose(np.array(output)):
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
-def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame=None, tau_max=200, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
+def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", stop_frame=None, tau_max=200, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
     """
     Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -620,9 +620,13 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame
     dt : float
         Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
     zones : list[tuple], Optional, default=[(0, 3.0)*len(indices)]
-        List of tuples containing minimum and maximum zones to evaluate the survival probability for each interaction pair in ``indices``. Must be the same length as ``indices``
-    select : str, Optional, default=None
-        A string to overwrite the default selection criteria: ``type {select_target} and isolayer {zones[i][0]} {zones[i][1]} type {select_reference}``
+        List of tuples containing zones boundary information to evaluate the survival probability for each interaction pair in ``indices``. Must be the same length as ``indices``, and each sublist the same length as the number of format placeholders minus two (e.g. min max values for ``select="isolayer"`` and a max value for ``select="around"``.
+    select : str, Optional, default="isosurface"
+        Can be "isosurface", "around", or a string to overwrite one of the previous two selection criteria where the number of placeholders must be ``2+len(zones[0])``.
+
+        - "isolayer": ``type {select_target} and isolayer {zones[i][0]} {zones[i][1]} type {select_reference}``. This option will make "one" region, even if parts of it are fragmented (in this case the "around" is probably what you want). Consider this option where the backbone of a polymer is the reference and a uniform "shell" is desired.
+        - "around": ``type {select_target} and around {zones[i][0]} type {select_reference}``. Useful for obtaining the residence time of ions around specific groups (https://nms.kcl.ac.uk/lorenz.lab/wp/?p=1045).
+
     stop_frame : int, Optional, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
     tau_max : int, Optional, default=200
@@ -662,8 +666,8 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame
         tau_max = len(u.trajectory)
         warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
-    if not dm.isiterable(zones) or not np.all([dm.isiterable(x) and len(x)==2 for x in zones]):
-        raise ValueError("The input, zones, but be an list of lists containing pairs of atom types")
+    if not dm.isiterable(zones) or not np.all([dm.isiterable(x) for x in zones]):
+        raise ValueError("The input, zones, but be an list (or other iterable) of lists (or other iterable)")
 
     if len(zones) == 1:
         zones = [zones[0] for x in range(len(indices))]
@@ -671,21 +675,27 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select=None, stop_frame
         if len(zones) != len(indices):
             raise ValueError("Length of zones and indices must be equivalent.")
 
-    if select == None:
+    if select == "isolayer":
         select = "type {} and isolayer {} {} type {}"
+        if not all([len(x)==2 for x in zones]):
+            raise ValueError("All sublists in `zones` must be of length two")
+    elif select == "around":
+        select = "type {} and around {} type {}"
+        if not all([len(x)==1 for x in zones]):
+            raise ValueError("All sublists in `zones` must be of length one")
     else:
         try:
-            tmp = select.format(0, 0, 0, 0)
+            tmp = select.format(indices[0][1], *zones[i], indices[0][0])
         except:
-            raise ValueError("Provided select string must take four values to define (1) the target atom type, (2,3) zone boundaries, and (4) the reference atom type")
+            raise ValueError("Provided select string must take 2+len(zones[0]) values to define (1) the target atom type, (2) zone boundaries, and (3) the reference atom type")
 
     output = []
     titles = []
     for i,ind in enumerate(indices):
         if verbose:
-            print("Analyzing Survival Time of Type {} within {} to {} Units of Type {}".format(ind[0], zones[i][0], zones[i][1], ind[1]))
+            print("Analyzing Survival Time of Type {} within {} Units of Type {}".format(ind[0], zones[i], ind[1]))
 
-        sp = SP(u, select.format(ind[1], zones[i][0], zones[i][1], ind[0]), verbose=verbose)
+        sp = SP(u, select.format(ind[1], *zones[i], ind[0]), verbose=verbose)
         sp.run(stop=stop_frame, tau_max=tau_max, intermittency=intermittency, verbose=verbose)
 
         tau = np.array(sp.tau_timeseries)
