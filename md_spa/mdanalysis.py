@@ -416,7 +416,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=5.0, d_h_a_angle_cutoff=90.0):
+def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=3.3, d_h_a_angle_cutoff=55.0):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
