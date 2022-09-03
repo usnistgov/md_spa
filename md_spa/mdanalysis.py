@@ -1196,8 +1196,6 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
 
 
     for i in range(nzones):
-#        if not np.all(np.isnan(q_array[i])):
-#            print(i, np.min(q_array[i]), np.max(q_array[i]), np.histogram(q_array[i], bins=10))
         hist, bin_edges = np.histogram(q_array[i], bins=bins, range=(0.,1.))
         hist_interface, bin_edges = np.histogram(q_array_interface[i], bins=bins, range=(0.,1.))
         if i == 0:
@@ -1283,6 +1281,8 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, step=None, r_c
             atm_pos = universe.select_atoms("index {}".format(atm.ix))[0].position
             atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} index {}".format(r_cut, atm.ix))
             if len(atoms) < 3:
+                q_tmp[k] = np.nan
+                q_tmp_interface[k] = np.nan
                 continue
 
             positions = atoms.positions - atm_pos
@@ -1308,8 +1308,6 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, step=None, r_c
             positions /= np.sqrt(np.sum(np.square(positions),axis=1))[:,np.newaxis]
             tmp_cos = [(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)]
             tmp = 1.0 - 3.0/8.0*np.sum([(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx-1) for y in range(x+1,lx)])
-#            if tmp < 0. or tmp > 1.:
-#                print(tmp, len(atoms), [np.arccos(np.dot(positions[x],positions[y]))*180./np.pi for x in range(lx) for y in range(x+1,lx)])
 
             if lx < 4:
                 q_tmp[k] = np.nan
@@ -1318,8 +1316,8 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, step=None, r_c
                 q_tmp[k] = tmp
                 q_tmp_interface[k] = np.nan
 
-            q_array.extend([x for x in q_tmp if not np.isnan(x)])
-            q_array_interface.extend([x for x in q_tmp_interface if not np.isnan(x)])
+        q_array.extend([x for x in q_tmp if not np.isnan(x)])
+        q_array_interface.extend([x for x in q_tmp_interface if not np.isnan(x)])
 
     return q_array, q_array_interface
 
