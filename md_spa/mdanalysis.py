@@ -1063,6 +1063,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
         # Calculate initial positions of atoms
         universe.trajectory[i]
         for j, group in enumerate(groups):
+            groups[j] = universe.select_atoms(select_list[j])
             positions_start_finish[j].append(group.positions)
 
         # Calculate final positions of atoms
@@ -1090,4 +1091,146 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
 
     return debye_waller_total, debye_waller_total_std
 
+
+def tetrahedral_order_parameter_by_selection(universe, select_target, select_reference, select_neighbor, select=None, r_cut=3.0, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100):
+    """
+    Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
+
+    Notice that if more than four atoms are found, a warning is issued and the closest four are used. In the case that there are less than four atoms within the cutoff, the metric is still computed for n==3, but reported in a separate matrix.
+
+    Note that the reference select should encompass atom types, and not regions for this function to be meaningful.
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    select_target : list
+        Atom type selection string according to the MDAnalysis selection string format. 
+    select_reference : int, Optional, default=None
+        This atom type must be provided unless ``select`` is provided. This atom type represents the core for the radial analysis. Note that with how this selection criteria is written, that if two atoms of this type are close together, a sort of iso-line is formed around the two atoms so that the DW parameter is not skewed by target atoms that are far from one reference type and close to another.
+    select_neighbor : str
+        Selection string restricting the atom types to be included. For example, ``reference_select="type 2 and type 4"``, although one atom type is probably recommended.
+    select : str, Optional, default=None
+        A string to overwrite the default selection criteria: ``({select_target}) and around {r_start} {r_start+i_zone*dr} ({select_reference})``
+    r_cut : float, Optional, default=3.0
+        Cutoff used to determine ``reference_atoms`` used in calculation.
+    r_start : float, Optional, default=2.0
+        Inner most radius to define the core sphere, this is Zone 0
+    dr : float, Optional, default=1.0
+        Thickness of the radial zones, for LAMMPS this is in angstroms
+    nzones : int, Optional, default=5.0
+        Number of zones, counting the central Zone 0
+    stop_frame : int, Optional, default=None
+        Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
+    skip_frame : int, Optional, default=1
+        Interval of frames to skip. Advised if given universe frames are not independent.
+    verbose : bool, Optional, default=False
+        If true, progress will be printed
+    write_increment : int, Optional, default=100
+        If ``verbose`` write out progress every, this many frames.
+    bins = int, Optional, default=100
+        Number of binds used in histogram. Can be any valid input for ``numpy.histogram(x, bins=bins)``
+
+    Returns
+    -------
+    q_hist : numpy.ndarray
+        The tetrahedral order parameter histogram for a given selection criteria, matrix where the number of rows equals the number of selection strings plus one, by the number of bins.
+    q_hist_interface : numpy.ndarray
+        The tetrahedral order parameter histogram for a given selection criteria, matrix where the number of rows equals the number of selection strings plus one, by the number of bins. Computed from values that do not have up to four adjacent atoms. This is most likely at an interface.
+        
+    """
+
+    if select == None:
+        if select_reference==None or select_target==None:
+            raise ValueError("Both select_reference and select_target must be defined, respectively given: {} and {}".format(select_reference,select_target))
+        select = "({}) and isolayer {} {} ({})".format(select_target, {}, {}, select_reference)
+    else:
+        try:
+            tmp = select.format(0)
+        except:
+            raise ValueError("Provided select string must take one value to define the zones")
+
+    universe = check_universe(universe)
+    lx = len(universe.trajectory)
+
+    if verbose:
+        print("Imported trajectory")
+    dimensions = universe.trajectory[0].dimensions[:3]
+
+    if stop_frame == None or lx < stop_frame:
+        stop_frame = lx
+        if verbose:
+            print("`stop_frame` has been reset to align with the trajectory length, {}".format(lx))
+
+    q_array = [[] for x in range(nzones)]
+    q_array_interface = [[] for x in range(nzones)]
+    for i in range(0,int(stop_frame),int(skip_frame)):
+        if verbose and i%write_increment == 0:
+            print("Calculating Frame {} out of {}".format(i,stop_frame))
+
+        universe.trajectory[i]
+        groups = [universe.select_atoms(select.format(0, r_start))]
+        for z in range(1,nzones):
+            groups.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
+
+        for j, group in enumerate(groups):
+            q_tmp = np.zeros(len(group))
+            q_tmp_interface = np.zeros(len(group))
+            for k, atm in enumerate(group):
+                atm_pos = universe.select_atoms("id {}".format(atm.ix))[0].position
+                atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} id {}".format(r_cut, atm.ix))
+                if len(atoms) < 3:
+                    continue
+
+                positions = atoms.positions - atm_pos
+                for ii in range(len(positions)):
+                    tmp_check = np.abs(positions[ii]) > dimensions/2
+                    if np.any(tmp_check):
+                        ind = np.where(tmp_check)[0]
+                        for jj in ind:
+                            if positions[ii][jj] > 0:
+                                positions[ii][jj] -= dimensions[jj]
+                            else:
+                                positions[ii][jj] += dimensions[jj]
+
+                if len(atoms) > 4:
+                    warnings.warn("tetrahedral order parameter: cutoff produced more than four adjacent atoms.")
+                    dist = np.sum(positions**2, axis=1)
+                    ind = sorted([x for _, x in sorted(zip(dist,list(range(len(atoms)))))][:4])
+                    positions = positions[ind]
+                lx = len(positions)
+
+                positions /= np.sqrt(np.sum(np.square(positions),axis=1))[:,np.newaxis]
+                tmp_cos = [(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)]
+                tmp = 1.0 - 3.0/8.0*np.sum([(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)])
+
+                if lx < 4:
+                    q_tmp[k] = np.nan
+                    q_tmp_interface[k] = tmp
+                else:
+                    q_tmp[k] = tmp
+                    q_tmp_interface[k] = np.nan
+                
+                q_array[j].extend([x for x in q_tmp if not np.isnan(x)])
+                q_array_interface[j].extend([x for x in q_tmp_interface if not np.isnan(x)])
+
+
+    for i in range(nzones):
+        hist, bin_edges = np.histogram(q_array[i], bins=bins, range=(0.,1.))
+        hist_interface, bin_edges = np.histogram(q_array_interface[i], bins=bins, range=(0.,1.))
+        if i == 0:
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            q_hist = np.zeros((len(bin_centers),nzones+1))
+            q_hist[:,0] = bin_centers
+            q_hist_interface = np.zeros((len(bin_centers),nzones+1))
+            q_hist_interface[:,0] = bin_centers
+        q_hist[:,i+1] = hist
+        q_hist_interface[:,i+1] = hist_interface
+
+    return q_hist, q_hist_interface
 
