@@ -416,7 +416,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=3.3, d_h_a_angle_cutoff=55.0):
+def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=3.5, d_h_a_angle_cutoff=125.0):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
@@ -453,10 +453,10 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_hydrogens()``
     d_h_cutoff : float/numpy.ndarray, Optional, default=1.2
         Cutoff distance between hydrogen bond donor and hydrogen. If an array, it must be of the same length as ``indices``.
-    d_a_cutoff : float/numpy.ndarray, Optional, default=5
+    d_a_cutoff : float/numpy.ndarray, Optional, default=3.5
         Cutoff distance between hydrogen bond donor and acceptor. If an array, it must be of the same length as ``indices``.
-    d_h_a_angle_cutoff : float/numpy.ndarray, Optional, default=80
-        Cutoff angle for hydrogen bonding. Assumed to be 80 to eliminate the constraint imposed in MDAnalysis, since MD isn't constrained by orbitals. If an array, it must be of the same length as ``indices``. This value was chosen from a lower limit determined in our MD simulations.
+    d_h_a_angle_cutoff : float/numpy.ndarray, Optional, default=125.0
+        Cutoff angle for hydrogen bonding. Assumed to be 125.0 to eliminate the constraint imposed in MDAnalysis, since MD isn't constrained by orbitals. If an array, it must be of the same length as ``indices``. This value was chosen from a lower limit determined in our MD simulations.
 
     Returns
     -------
@@ -524,10 +524,15 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
             else:
                 acceptors = [indices[i][2]]
 
-        if indices[i][0] == None:
-            for h in hydrogens:
-                for d in donor_list_per_hydrogen[h]:
-                    for a in acceptors:
+        for h in hydrogens:
+            for a in acceptors:
+                donor_list = donor_list_per_hydrogen[h]
+                if indices[i][0] != None and str(indices[i][0]) in donor_list:
+                    donor_list = [str(indices[i][0])]
+                else:
+                    raise ValueError("The given donor, {}, does not bond to hydrogen, {}. Choose one of the following donors: {}".format(indices[i][0]), h, donor_list)
+
+                for d in donor_list:
                         new_indices.append([d,h,a])
                         if dm.isiterable(d_h_cutoff):
                             d_h_cutoff_array.append(d_h_cutoff[i])
@@ -565,6 +570,8 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
                      d_a_cutoff=d_a_cutoff_array[i],
                      d_h_a_angle_cutoff=d_h_a_angle_cutoff_array[i],
                     )
+        if verbose:
+            print("    Primary initialization complete")
         Hbonds.run()
         if verbose:
             print("    Primary analysis complete")
@@ -577,9 +584,13 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
 
         output.append(timeseries)
         titles.append("{}-{}-{}".format(*ind))
-        tmp_filename, ext = os.path.split(filename)[1].split(".")
+
+        tmp_path, tmp_filename = os.path.split(filename)
+        tmp_filename, ext = tmp_filename.split(".")
         tmp_filename += "_{}-{}-{}".format(*ind) + ext
-        with open(os.path.join(path,tmp_filename), "w") as f:
+        if not tmp_path:
+            tmp_path = path
+        with open(os.path.join(tmp_path,tmp_filename), "w") as f:
             f.write("# time, {}-{}-{}\n".format(*ind))
             for tmp in np.transpose(np.array([time, timeseries])):
                 f.write("{}\n".format(", ".join([str(x) for x in tmp])))
