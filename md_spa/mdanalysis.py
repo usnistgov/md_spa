@@ -1280,8 +1280,8 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, step=None, r_c
         q_tmp = np.zeros(len(group))
         q_tmp_interface = np.zeros(len(group))
         for k, atm in enumerate(group):
-            atm_pos = universe.select_atoms("id {}".format(atm.ix))[0].position
-            atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} id {}".format(r_cut, atm.ix))
+            atm_pos = universe.select_atoms("index {}".format(atm.ix))[0].position
+            atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} index {}".format(r_cut, atm.ix))
             if len(atoms) < 3:
                 continue
 
