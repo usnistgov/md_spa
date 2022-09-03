@@ -1092,7 +1092,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
     return debye_waller_total, debye_waller_total_std
 
 
-def tetrahedral_order_parameter_by_selection(universe, select_target, select_reference, select_neighbor, select=None, r_cut=3.0, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100):
+def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, select=None, r_cut=3.0, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100):
     """
     Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
 
@@ -1179,48 +1179,14 @@ def tetrahedral_order_parameter_by_selection(universe, select_target, select_ref
             groups.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for j, group in enumerate(groups):
-            q_tmp = np.zeros(len(group))
-            q_tmp_interface = np.zeros(len(group))
-            for k, atm in enumerate(group):
-                atm_pos = universe.select_atoms("id {}".format(atm.ix))[0].position
-                atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} id {}".format(r_cut, atm.ix))
-                if len(atoms) < 3:
-                    continue
-
-                positions = atoms.positions - atm_pos
-                for ii in range(len(positions)):
-                    tmp_check = np.abs(positions[ii]) > dimensions/2
-                    if np.any(tmp_check):
-                        ind = np.where(tmp_check)[0]
-                        for jj in ind:
-                            if positions[ii][jj] > 0:
-                                positions[ii][jj] -= dimensions[jj]
-                            else:
-                                positions[ii][jj] += dimensions[jj]
-
-                if len(atoms) > 4:
-                    warnings.warn("tetrahedral order parameter: cutoff produced more than four adjacent atoms.")
-                    dist = np.sum(positions**2, axis=1)
-                    ind = sorted([x for _, x in sorted(zip(dist,list(range(len(atoms)))))][:4])
-                    positions = positions[ind]
-                lx = len(positions)
-
-                positions /= np.sqrt(np.sum(np.square(positions),axis=1))[:,np.newaxis]
-                tmp_cos = [(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)]
-                tmp = 1.0 - 3.0/8.0*np.sum([(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)])
-
-                if lx < 4:
-                    q_tmp[k] = np.nan
-                    q_tmp_interface[k] = tmp
-                else:
-                    q_tmp[k] = tmp
-                    q_tmp_interface[k] = np.nan
-                
-                q_array[j].extend([x for x in q_tmp if not np.isnan(x)])
-                q_array_interface[j].extend([x for x in q_tmp_interface if not np.isnan(x)])
+            q_tmp, q_tmp_interface = tetrahedral_order_parameter(universe, group, select_neighbor, step=i, r_cut=r_cut, verbose=verbose)
+            q_array[j].extend(q_tmp)
+            q_array_interface[j].extend(q_tmp_interface)
 
 
     for i in range(nzones):
+#        if not np.all(np.isnan(q_array[i])):
+#            print(i, np.min(q_array[i]), np.max(q_array[i]), np.histogram(q_array[i], bins=10))
         hist, bin_edges = np.histogram(q_array[i], bins=bins, range=(0.,1.))
         hist_interface, bin_edges = np.histogram(q_array_interface[i], bins=bins, range=(0.,1.))
         if i == 0:
@@ -1233,4 +1199,117 @@ def tetrahedral_order_parameter_by_selection(universe, select_target, select_ref
         q_hist_interface[:,i+1] = hist_interface
 
     return q_hist, q_hist_interface
+
+def tetrahedral_order_parameter(universe, group, select_neighbor, step=None, r_cut=3.0, stop_frame=None, skip_frame=1, verbose=False, write_increment=100):
+    """
+    Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
+
+    Notice that if more than four atoms are found, a warning is issued and the closest four are used. In the case that there are less than four atoms within the cutoff, the metric is still computed for n==3, but reported in a separate matrix.
+
+    Note that the reference select should encompass atom types, and not regions for this function to be meaningful.
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    group : list
+        Atom group to be analyzed 
+    select_neighbor : str
+        Selection string restricting the atom types to be included. For example, ``reference_select="type 2 and type 4"``, although one atom type is probably recommended.
+    step : int, Optional, default=None
+        Optionally evaulate for a single step, this will overwrite ``r_cut, stop_frame, skip_frame``
+    r_cut : float, Optional, default=3.0
+        Cutoff used to determine ``reference_atoms`` used in calculation.
+    stop_frame : int, Optional, default=None
+        Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
+    skip_frame : int, Optional, default=1
+        Interval of frames to skip. Advised if given universe frames are not independent.
+    verbose : bool, Optional, default=False
+        If true, progress will be printed
+    write_increment : int, Optional, default=100
+        If ``verbose`` write out progress every, this many frames.
+
+    Returns
+    -------
+    q_array : numpy.ndarray
+        The tetrahedral order parameter array of values
+    q_array_interface : numpy.ndarray
+        The tetrahedral order parameter array of values for 3 neighbors, assuming that there is an interface preventing the full tetrahedral
+        
+    """
+
+    universe = check_universe(universe)
+    lx = len(universe.trajectory)
+
+    if verbose:
+        print("Imported trajectory")
+    dimensions = universe.trajectory[0].dimensions[:3]
+
+    if step == None:
+        if stop_frame == None or lx < stop_frame:
+            stop_frame = lx
+            if verbose:
+                print("`stop_frame` has been reset to align with the trajectory length, {}".format(lx))
+        timesteps = range(0,int(stop_frame),int(skip_frame))
+    else:
+        timesteps = [step]
+
+    q_array = []
+    q_array_interface = []
+    for i in timesteps:
+        if verbose and i%write_increment == 0:
+            print("Calculating Frame {} out of {}".format(i,stop_frame))
+
+        universe.trajectory[i]
+        q_tmp = np.zeros(len(group))
+        q_tmp_interface = np.zeros(len(group))
+        for k, atm in enumerate(group):
+            atm_pos = universe.select_atoms("id {}".format(atm.ix))[0].position
+            atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} id {}".format(r_cut, atm.ix))
+            if len(atoms) < 3:
+                continue
+
+            positions = atoms.positions - atm_pos
+            for ii in range(len(positions)):
+                tmp_check = np.abs(positions[ii]) > dimensions/2
+                if np.any(tmp_check):
+                    ind = np.where(tmp_check)[0]
+                    for jj in ind:
+                        if positions[ii][jj] > 0:
+                            positions[ii][jj] -= dimensions[jj]
+                        else:
+                            positions[ii][jj] += dimensions[jj]
+            if np.any(np.sqrt(np.sum(np.square(positions), axis=1)) > r_cut):
+                raise ValueError("Neighbor atoms are not within cutoff")
+
+            if len(atoms) > 4:
+                warnings.warn("tetrahedral order parameter: cutoff produced more than four adjacent atoms.")
+                dist = np.sum(positions**2, axis=1)
+                ind = sorted([x for _, x in sorted(zip(dist,list(range(len(atoms)))))][:4])
+                positions = positions[ind]
+            lx = len(positions)
+
+            positions /= np.sqrt(np.sum(np.square(positions),axis=1))[:,np.newaxis]
+            tmp_cos = [(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)]
+            tmp = 1.0 - 3.0/8.0*np.sum([(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx-1) for y in range(x+1,lx)])
+#            if tmp < 0. or tmp > 1.:
+#                print(tmp, len(atoms), [np.arccos(np.dot(positions[x],positions[y]))*180./np.pi for x in range(lx) for y in range(x+1,lx)])
+
+            if lx < 4:
+                q_tmp[k] = np.nan
+                q_tmp_interface[k] = tmp
+            else:
+                q_tmp[k] = tmp
+                q_tmp_interface[k] = np.nan
+
+            q_array.extend([x for x in q_tmp if not np.isnan(x)])
+            q_array_interface.extend([x for x in q_tmp_interface if not np.isnan(x)])
+
+    return q_array, q_array_interface
+
 
