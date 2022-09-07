@@ -416,7 +416,7 @@ def calc_end2end(u, indices):
 
     return r_end2end
 
-def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=3.5, d_h_a_angle_cutoff=125.0):
+def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False, intermittency=0, path="", filename="lifetime.csv", acceptor_kwargs={}, donor_kwargs={}, hydrogen_kwargs={}, d_h_cutoff=1.2, d_a_cutoff=3.5, d_h_a_angle_cutoff=125.0, kwargs_run={}):
     """
     Calculation the hydrogen bonding statistics for the given type interactions.
 
@@ -457,6 +457,8 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         Cutoff distance between hydrogen bond donor and acceptor. If an array, it must be of the same length as ``indices``.
     d_h_a_angle_cutoff : float/numpy.ndarray, Optional, default=125.0
         Cutoff angle for hydrogen bonding. Assumed to be 125.0 to eliminate the constraint imposed in MDAnalysis, since MD isn't constrained by orbitals. If an array, it must be of the same length as ``indices``. This value was chosen from a lower limit determined in our MD simulations.
+    kwargs_run : dict, Optional, default={}
+        Keyword arguments for ``MDAnalysis.analysis.base.AnalysisBase.run()``
 
     Returns
     -------
@@ -572,7 +574,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
                     )
         if verbose:
             print("    Primary initialization complete")
-        Hbonds.run()
+        Hbonds.run(**kwargs_run)
         if verbose:
             print("    Primary analysis complete")
 
