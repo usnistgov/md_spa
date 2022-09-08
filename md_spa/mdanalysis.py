@@ -589,7 +589,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
 
         tmp_path, tmp_filename = os.path.split(filename)
         tmp_filename, ext = tmp_filename.split(".")
-        tmp_filename += "_{}-{}-{}".format(*ind) + ext
+        tmp_filename += "_{}-{}-{}.".format(*ind) + ext
         if not tmp_path:
             tmp_path = path
         with open(os.path.join(tmp_path,tmp_filename), "w") as f:
