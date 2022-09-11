@@ -4,6 +4,7 @@ import os
 import csv
 import numpy as np
 import ast
+import warnings
 
 from . import data_manipulation as dm
 
@@ -142,9 +143,11 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_sta
     if len(np.shape(data_in)) != 3:
         raise ValueError("Data in given files are not equivalent in size: {}".format(", ".join([str(np.shape(x)) for x in data_in])))
 
-    data = np.mean(data_in, axis=0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        data = np.nanmean(data_in, axis=0)
     if calc_standard_error:
-        data_se = np.std(data_in, axis=0)/np.sqrt(len(data_in))
+        data_se = np.nanstd(data_in, axis=0)/np.sqrt(len(data_in))
     
     if headers == None:
         with open(filenames[0],"r") as f:
@@ -202,7 +205,7 @@ def write_csv(filename, array, mode="a", header=None, header_comment="#", delimi
     flag = not os.path.isfile(filename)
 
     with open(filename,mode) as f:
-        if header != None and flag or "w" in mode:
+        if (header != None and flag) or ( header != None and "w" in mode):
             f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")
