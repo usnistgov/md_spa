@@ -154,6 +154,7 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kw
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
@@ -179,8 +180,8 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kw
     exp1.add("a1", **param_kwargs["a1"])
     exp1.add("t1", **param_kwargs["t1"])
     if minimizer in ["leastsq"]:
-        kwargs_minimizer["Dfun"] = _d_exponential_decay
-    Result1 = lmfit.minimize(_res_exponential_decay, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
+        kwargs_min["Dfun"] = _d_exponential_decay
+    Result1 = lmfit.minimize(_res_exponential_decay, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
 
     # Format output
     output = np.zeros(2)
@@ -259,6 +260,7 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
@@ -307,8 +309,8 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={
         exp1.add("t2", **param_kwargs["t2"])
 
     if minimizer in ["leastsq"]:
-        kwargs_minimizer["Dfun"] = _d_two_exponential_decays
-    Result2 = lmfit.minimize(_res_two_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
+        kwargs_min["Dfun"] = _d_two_exponential_decays
+    Result2 = lmfit.minimize(_res_two_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
 
     # Format output
     output = np.zeros(4)
@@ -436,6 +438,7 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
@@ -497,8 +500,8 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
         exp1.add("t3", **param_kwargs["t3"])
 
     if minimizer in ["leastsq"]:
-        kwargs_minimizer["Dfun"] = _d_three_exponential_decays
-    Result3 = lmfit.minimize(_res_three_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_minimizer)
+        kwargs_min["Dfun"] = _d_three_exponential_decays
+    Result3 = lmfit.minimize(_res_three_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
 
     # Format output
     output = np.zeros(6)
@@ -544,7 +547,6 @@ def _res_three_exponential_decays(params0, xarray, yarray, switch=None):
     tmp1 = params["a1"]*np.exp(-xarray/params["t1"])
     tmp2 = params["a2"]*np.exp(-xarray/params["t2"])
     tmp3 = params["a3"]*np.exp(-xarray/params["t3"])
-
     return tmp1 + tmp2 + tmp3 - yarray
 
 def _d_three_exponential_decays(params0, xarray, yarray, switch=None):
@@ -696,6 +698,8 @@ def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, k
         
     """
 
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
+
     if np.all(np.isnan(yarray[1:])):
         raise ValueError("y-axis data is NaN")
 
@@ -727,10 +731,10 @@ def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, k
         raise ValueError("The following parameters were given to custom_fit.num but are not used: {}".format(", ".join(list(kwargs_parameters.keys()))))
 
     if minimizer in ["leastsq"]:
-        kwargs_minimizer["Dfun"] = _d_n_gaussians
+        kwargs_min["Dfun"] = _d_n_gaussians
     elif minimizer in ["trust-exact"]:
-        kwargs_minimizer["jac"] = _d_n_gaussians
-    Result1 = lmfit.minimize(_res_n_gaussians, gaussian, method=minimizer, args=(xarray, yarray, num), **kwargs_minimizer)
+        kwargs_min["jac"] = _d_n_gaussians
+    Result1 = lmfit.minimize(_res_n_gaussians, gaussian, method=minimizer, args=(xarray, yarray, num), **kwargs_min)
 
     # Format output
     output = np.zeros(3*num)
@@ -808,6 +812,7 @@ def stretched_cumulative_exponential(xarray, yarray, minimizer="leastsq", weight
         Array containing parameter standard errors: ['A', 'lc_beta', 'beta', 'C']
         
     """
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(np.isnan(yarray[1:])):
         raise ValueError("y-axis data is NaN")
@@ -817,10 +822,10 @@ def stretched_cumulative_exponential(xarray, yarray, minimizer="leastsq", weight
 
     if np.all(weighting != None):
         if minimizer == "emcee":
-            kwargs_minimizer["is_weighted"] = True
+            kwargs_min["is_weighted"] = True
     elif minimizer == "emcee":
-        kwargs_minimizer["is_weighted"] = False
-    kwargs_minimizer.update({"nan_policy": "omit"})
+        kwargs_min["is_weighted"] = False
+    kwargs_min.update({"nan_policy": "omit"})
 
     tmp_tau = xarray[np.where(np.abs(yarray-np.nanmax(yarray))>0.80*np.nanmax(yarray))[0]]
     if len(tmp_tau) > 0:
@@ -852,10 +857,10 @@ def stretched_cumulative_exponential(xarray, yarray, minimizer="leastsq", weight
         stretched_exp.add(key, **value)
 
     if minimizer in ["leastsq"]:
-        kwargs_minimizer["Dfun"] = _d_stretched_cumulative_exponential
+        kwargs_min["Dfun"] = _d_stretched_cumulative_exponential
     elif minimizer in ["trust-exact"]:
-        kwargs_minimizer["jac"] = _d_stretched_cumulative_exponential
-    Result1 = lmfit.minimize(_res_stretched_cumulative_exponential, stretched_exp, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting, "switch": switch}, **kwargs_minimizer)
+        kwargs_min["jac"] = _d_stretched_cumulative_exponential
+    Result1 = lmfit.minimize(_res_stretched_cumulative_exponential, stretched_exp, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting, "switch": switch}, **kwargs_min)
 
     # Format output
     output = np.zeros(4)
@@ -955,6 +960,7 @@ def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=Fals
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
@@ -962,9 +968,9 @@ def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=Fals
     if np.all(weighting != None):
         weighting = weighting[ydata>0]
         if minimizer == "emcee":
-            kwargs_minimizer["is_weighted"] = True
+            kwargs_min["is_weighted"] = True
     elif minimizer == "emcee":
-        kwargs_minimizer["is_weighted"] = False
+        kwargs_min["is_weighted"] = False
 
     tmp_tau = xarray[np.where(np.abs(yarray-np.nanmax(yarray))>0.80*np.nanmax(yarray))[0]]
     if len(tmp_tau) > 0:
@@ -989,7 +995,7 @@ def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=Fals
     if len(kwargs_parameters) != 0:
         raise ValueError("The parameter(s), {}, was/were given to custom_fit.double_cumulative_exponential, which requires parameters: 'A', 'alpha', 'tau1', 'tau2'".format(list(kwargs_parameters.keys())))
 
-    result = lmfit.minimize(_res_double_cumulative_exponential, exp1, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting}, **kwargs_minimizer)
+    result = lmfit.minimize(_res_double_cumulative_exponential, exp1, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting}, **kwargs_min)
 
     # Format output
     lx = len(result.params)
@@ -1055,6 +1061,7 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", ve
 
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
@@ -1062,9 +1069,9 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", ve
     if np.all(weighting != None):
         weighting = weighting[ydata>0]
         if minimizer == "emcee":
-            kwargs_minimizer["is_weighted"] = True
+            kwargs_min["is_weighted"] = True
     elif minimizer == "emcee":
-        kwargs_minimizer["is_weighted"] = False
+        kwargs_min["is_weighted"] = False
 
     tmp_tau = xarray[np.where(np.abs(yarray-np.nanmax(yarray))>0.80*np.nanmax(yarray))[0]]
     if len(tmp_tau) > 0:
@@ -1087,7 +1094,7 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", ve
     if len(kwargs_parameters) != 0:
         raise ValueError("The parameter(s), {}, was/were given to custom_fit.double_cumulative_exponential, which requires parameters: 'A', 'alpha', 'tau1', 'tau2'".format(list(kwargs_parameters.keys())))
 
-    result = lmfit.minimize(_res_double_cumulative_exponential, exp1, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting}, **kwargs_minimizer)
+    result = lmfit.minimize(_res_double_cumulative_exponential, exp1, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting}, **kwargs_min)
 
     # Format output
     lx = len(result.params)
@@ -1139,6 +1146,7 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
     
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
@@ -1146,9 +1154,9 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
     if np.all(weighting != None):
         weighting = weighting[ydata>0]
         if minimizer == "emcee":
-            kwargs_minimizer["is_weighted"] = True
+            kwargs_min["is_weighted"] = True
     elif minimizer == "emcee":
-        kwargs_minimizer["is_weighted"] = False
+        kwargs_min["is_weighted"] = False
 
     def power_law(x):
         return x["A"]*xarray**x["b"] - yarray
@@ -1161,7 +1169,7 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
     exp1 = Parameters()
     exp1.add("A", min=0, max=1e+4, value=1.0)
     exp1.add("b", min=0, max=100, value=2)
-    result = lmfit.minimize(power_law, exp1, method=minimizer, **kwargs_minimizer)
+    result = lmfit.minimize(power_law, exp1, method=minimizer, **kwargs_min)
 
     # Format output
     output = np.zeros(2)
