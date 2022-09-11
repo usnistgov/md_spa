@@ -48,8 +48,6 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
 
     """
 
-    ydata_min = 0.5 # NoteHere
-
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
 
@@ -67,6 +65,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     # One Exp
     tmp_output1, tmp_error1 = cfit.exponential_decay(xarray, yarray,
                                                      verbose=verbose,
+                                                     minimizer=minimizer,
                                                      kwargs_minimizer=kwargs_minimizer,
 
                                                     )
@@ -75,6 +74,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     # Two Exp
     tmp_output2a, _ = cfit.two_exponential_decays(xarray, yarray,
                                                   verbose=verbose,
+                                                  minimizer=minimizer,
                                                   kwargs_minimizer=kwargs_minimizer,
                                                   tau_logscale=tau_logscale,
                                                   kwargs_parameters={
@@ -83,6 +83,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                  )
     tmp_output2, tmp_error2 = cfit.two_exponential_decays(xarray, yarray, 
                                                      verbose=verbose,
+                                                     minimizer=minimizer,
                                                      kwargs_minimizer=kwargs_minimizer,
                                                      tau_logscale=tau_logscale,
                                                      kwargs_parameters={
@@ -101,6 +102,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     else:
         tmp_output3a, _ = cfit.three_exponential_decays(xarray, yarray,
                                                       verbose=verbose,
+                                                      minimizer=minimizer,
                                                       kwargs_minimizer=kwargs_minimizer,
                                                       tau_logscale=tau_logscale,
                                                       kwargs_parameters={
@@ -111,6 +113,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                      )  
         tmp_output3, tmp_error3 = cfit.three_exponential_decays(xarray, yarray,
                                                          verbose=verbose,
+                                                         minimizer=minimizer,
                                                          kwargs_minimizer=kwargs_minimizer,
                                                          tau_logscale=tau_logscale,
                                                          kwargs_parameters={
@@ -239,7 +242,8 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
         elif len(np.where(data[i][1:7] < np.finfo(np.float).eps)[0]) != 0: # Least-squares fit will not function with number of points less than number of parameters for 3 exponentials
             output = np.zeros(12)
         else:
-            output, _ = characteristic_time(t_tmp, data[i], **kwargs_fit_tmp)
+            tmp_in = np.array([0. if np.isnan(x) else x for x in data[i]])
+            output, _ = characteristic_time(t_tmp, tmp_in, **kwargs_fit_tmp)
         tmp = [titles[i], output[1], output[2]*output[3]+output[4]*output[5], output[6]*output[7]+output[8]*output[9]+output[10]*output[11]]
         tmp_data.append(list(additional_entries)+tmp+list(output))
 
