@@ -504,6 +504,10 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         tau_max = len(u.trajectory)
         warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
+    if "stop" in kwargs_run and kwargs_run["stop"] < tau_max:
+        tau_max = tau_stop
+        warnings.warn("tau_max is longer than hbond.run(stop=stop), resetting to {}".format(tau_stop)))
+
     new_indices = []
     d_h_cutoff_array, d_a_cutoff_array, d_h_a_angle_cutoff_array = [],[],[] 
     for i in range(len(indices)):
