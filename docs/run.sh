@@ -12,6 +12,7 @@ then
     rm -rf _build
     rm -rf _autosummary
     make clean html
+    make latexpdf
 fi
 
 if [ $1 == "True" ];
@@ -19,6 +20,7 @@ then
     if [ ! -f "_build/html/index.html"  ];
     then
         make clean html
+        make latexpdf
     fi
     if [ -f "_build/html/index.html"  ];
     then
