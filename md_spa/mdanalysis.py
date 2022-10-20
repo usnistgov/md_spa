@@ -1255,20 +1255,24 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, ang
         atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} index {}".format(r_cut, atm.ix))
 
         remove = []
-        for atm2 in atoms:
-            pos = np.zeros((4,3,3))
-            pos[:2,0,:] = atm.bonded_atoms.positions
-            pos[:2,1,:] = atm2.position
-            pos[:2,2,:] = atm.position
-            pos[2:,0,:] = atm2.bonded_atoms.positions
-            pos[2:,1,:] = atm.position
-            pos[2:,2,:] = atm2.position
-            angles = np.array([mf.angle(x[2],x[0],x[1]) for x in pos])
-            dist = np.array([[mf.check_wrap([x[0]-x[2]], dimensions)[0], mf.check_wrap([x[1]-x[2]], dimensions)[0]] for x in pos])
-            dist = np.array([np.sqrt(np.sum(np.square(x), axis=1)) for x in dist])
-            if np.all([ dist[x][0] < dist[x][1] and angles[x] >= 30 for x in range(len(angles))]):
-                remove.append(atm2)
-        atoms -= mda.AtomGroup([x.ix for x in remove],universe)
+        if atm.bonded_atoms:
+            for atm2 in atoms:
+                if atm.bonded_atoms and atm2.bonded_atoms:
+                if len(atm.bonded_atoms) != 2 or len(atm2.bonded_atoms) != 2:
+                    raise ValueError("This function has been written for use with water. Feel free to contribute changes to generalize this function.")
+                pos = np.zeros((4,3,3))
+                pos[:2,0,:] = atm.bonded_atoms.positions
+                pos[:2,1,:] = atm2.position
+                pos[:2,2,:] = atm.position
+                pos[2:,0,:] = atm2.bonded_atoms.positions
+                pos[2:,1,:] = atm.position
+                pos[2:,2,:] = atm2.position
+                angles = np.array([mf.angle(x[2],x[0],x[1]) for x in pos])
+                dist = np.array([[mf.check_wrap([x[0]-x[2]], dimensions)[0], mf.check_wrap([x[1]-x[2]], dimensions)[0]] for x in pos])
+                dist = np.array([np.sqrt(np.sum(np.square(x), axis=1)) for x in dist])
+                if np.all([ dist[x][0] < dist[x][1] and angles[x] >= 30 for x in range(len(angles))]):
+                    remove.append(atm2)
+            atoms -= mda.AtomGroup([x.ix for x in remove],universe)
 
         positions = mf.check_wrap(atoms.positions - atm_pos, dimensions)
         if np.any(np.sqrt(np.sum(np.square(positions), axis=1)) > r_cut):
