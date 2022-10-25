@@ -509,7 +509,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
 
     if "stop" in kwargs_run and kwargs_run["stop"] < tau_max:
         tau_max = tau_stop
-        warnings.warn("tau_max is longer than hbond.run(stop=stop), resetting to {}".format(tau_stop)))
+        warnings.warn("tau_max is longer than hbond.run(stop=stop), resetting to {}".format(tau_stop))
 
     new_indices = []
     d_h_cutoff_array, d_a_cutoff_array, d_h_a_angle_cutoff_array = [],[],[] 
@@ -1093,7 +1093,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
     return debye_waller_total, debye_waller_total_std
 
 
-def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, step=None, select=None, r_cut=3.0, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100):
+def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, step=None, select=None, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100, kwargs_metric={}):
     """
     Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
 
@@ -1120,8 +1120,6 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
         Optionally evaulate for a single step, this will overwrite ``r_cut, stop_frame, skip_frame``
     select : str, Optional, default=None
         A string to overwrite the default selection criteria: ``({select_target}) and around {r_start} {r_start+i_zone*dr} ({select_reference})``
-    r_cut : float, Optional, default=3.0
-        Cutoff used to determine ``reference_atoms`` used in calculation.
     r_start : float, Optional, default=2.0
         Inner most radius to define the core sphere, this is Zone 0
     dr : float, Optional, default=1.0
@@ -1138,6 +1136,8 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
         If ``verbose`` write out progress every, this many frames.
     bins = int, Optional, default=100
         Number of binds used in histogram. Can be any valid input for ``numpy.histogram(x, bins=bins)``
+    kwargs_metric : dict, Optional, default={}
+        Keyword arguments for execution of `tetrahedral_order_parameter`
 
     Returns
     -------
@@ -1184,7 +1184,7 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
             groups.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for j, group in enumerate(groups):
-            q_tmp = tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=r_cut)
+            q_tmp = tetrahedral_order_parameter(universe, group, select_neighbor, **kwargs_metric)
             for key, values in q_tmp.items():
                 if key not in q_dict[j]:
                     q_dict[j][key] = [] 
@@ -1236,7 +1236,7 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, ang
     r_cut : float, Optional, default=3.4
         Cutoff used to determine ``reference_atoms`` used in calculation.
     angle_cut :float, Optional, default=30 
-        Cutoff for angle between interacting hydrogen, its donor, and the acceptor oxygen in the tetrahedral.
+        Cutoff for angle between interacting hydrogen, its donor, and the acceptor oxygen in the tetrahedral. A value of None will remove this contraint.
 
     Returns
     -------
@@ -1257,7 +1257,6 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, ang
         remove = []
         if atm.bonded_atoms:
             for atm2 in atoms:
-                if atm.bonded_atoms and atm2.bonded_atoms:
                 if len(atm.bonded_atoms) != 2 or len(atm2.bonded_atoms) != 2:
                     raise ValueError("This function has been written for use with water. Feel free to contribute changes to generalize this function.")
                 pos = np.zeros((4,3,3))
@@ -1270,8 +1269,12 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, ang
                 angles = np.array([mf.angle(x[2],x[0],x[1]) for x in pos])
                 dist = np.array([[mf.check_wrap([x[0]-x[2]], dimensions)[0], mf.check_wrap([x[1]-x[2]], dimensions)[0]] for x in pos])
                 dist = np.array([np.sqrt(np.sum(np.square(x), axis=1)) for x in dist])
-                if np.all([ dist[x][0] < dist[x][1] and angles[x] >= 30 for x in range(len(angles))]):
-                    remove.append(atm2)
+                if angle_cut is None:
+                    if np.all([ dist[x][0] > dist[x][1] for x in range(len(angles))]):
+                        remove.append(atm2)
+                else:
+                    if np.all([ dist[x][0] > dist[x][1] or angles[x] >= angle_cut for x in range(len(angles))]):
+                        remove.append(atm2)
             atoms -= mda.AtomGroup([x.ix for x in remove],universe)
 
         positions = mf.check_wrap(atoms.positions - atm_pos, dimensions)
