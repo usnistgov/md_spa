@@ -119,6 +119,8 @@ def generate_universe(package, args, kwargs={}):
     """
     Generate MDAnalysis universe
 
+    e.g., ``universe = spa_mda.generate_universe("LAMMPS",(data_file, dump_files), {"dt":dt})``, where data_file is a filename and path, and dump_files is a list of filenames and paths.
+
     Parameters
     ----------
     package : str
@@ -1305,5 +1307,57 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, ang
         q_dict[l_atoms].append(tmp)
 
     return q_dict
+
+def create_ndx(groups=[], names=None, separate_by=None, filename="index.ndx", kwargs_writer={}):
+    """ Write a Gromacs style ndx file from a list of atom groups.
+
+    This function can be used to prepare a calculation in the scattering function package, `dynasor <https://dynasor.materialsmodeling.org/index.html>`_
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    groups : list, Optional, default=[]
+        List of ``AtomGroups`` to be included in the index file.
+    names : list, Optional, default=None
+        List of equal length to ``groups`` to separate different "molecules" (i.e., groups) to call in gromacs
+    separate_by : str, Optional, default=None
+        Subdivide groups with this mdanalysis `selection string <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_. Could be any value used in AtomGroup.groupby method.
+    kwargs_writer : dict, Optional, default={}
+        Keyword arguments used in the `Gromacs writer <https://docs.mdanalysis.org/documentation_pages/selections/gromacs.html>`_ 
+
+    Returns
+    -------
+    Saved index file in gromacs style.
+
+    """
+    if not groups:
+        raise ValueError("No groups were provided for writing an index file.")
+    if len(groups) > 1 and names is None:
+        warnings.warn("More than one AtomGroup is provided without differentiating `names`.")
+    elif names is not None and len(groups) != len(names):
+        raise ValueError("The number of `AtomGroups` must equal the number of `names`")
+
+    with mda.selections.gromacs.SelectionWriter(filename, **kwargs_writer) as ndx:
+        for i, group in enumerate(groups):
+            if separate_by is None:
+                if names is not None:
+                    ndx.write(group, name=names[i])
+                else:
+                    ndx.write(group)
+            else:
+                subgroups = group.groupby(separate_by)
+                for sel, subgroup in subgroups.items():
+                    name = "{}_{}".format(separate_by[:-1], sel)
+                    if names is not None:
+                        ndx.write(subgroup, name=names[i]+"_"+name)
+                    else:
+                        ndx.write(subgroup, name=name)
+
 
 
