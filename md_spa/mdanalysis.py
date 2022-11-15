@@ -271,7 +271,7 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
             msd_output[0] = np.arange(MSD.n_frames)*dt # ps
             nongaussian_parameter[0] = np.arange(MSD.n_frames)*dt # ps
         msd_output[i+1] = MSD.results.timeseries # angstroms^2
-        nongaussian_parameter[i+1] = MSD.results.second_order_nongaussian_parameter
+        nongaussian_parameter[i+1] = MSD.results.nongaussian_parameter
 
     return msd_output, nongaussian_parameter
 
@@ -1093,7 +1093,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
     return debye_waller_total, debye_waller_total_std
 
 
-def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, step=None, select=None, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100, kwargs_metric={}):
+def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, step=None, select=None, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100, kwargs_metric={}, include_center=True):
     """
     Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
 
@@ -1138,6 +1138,8 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
         Number of binds used in histogram. Can be any valid input for ``numpy.histogram(x, bins=bins)``
     kwargs_metric : dict, Optional, default={}
         Keyword arguments for execution of `tetrahedral_order_parameter`
+    include_center : bool, Optional, default=True
+        If True, the first shell will be a sphere from zero to ``r_start`` and the second shell will be ``r_start`` to ``r_start+dr``. If ``include_center==False``, the first shell is ``r_start+dr``
 
     Returns
     -------
@@ -1179,8 +1181,13 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
             print("Calculating Frame {} out of {}".format(i,stop_frame))
 
         universe.trajectory[i]
-        groups = [universe.select_atoms(select.format(0, r_start))]
-        for z in range(1,nzones):
+        if include_center:
+            groups = [universe.select_atoms(select.format(0, r_start))]
+            zone_min = 1
+        else:
+            groups = []
+            zone_min = 0
+        for z in range(zone_min,nzones):
             groups.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for j, group in enumerate(groups):
