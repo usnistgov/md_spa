@@ -13,6 +13,7 @@ from MDAnalysis.analysis.waterdynamics import SurvivalProbability as SP
 import MDAnalysis.analysis.msd as mda_msd
 from MDAnalysis import transformations as trans
 
+from . import misc_functions as mf
 import md_spa_utils.data_manipulation as dm
 
 def center_universe_around_group(universe, select, verbose=False, reference="initial", com_kwargs={"unwrap": True}):
@@ -118,6 +119,8 @@ def generate_universe(package, args, kwargs={}):
     """
     Generate MDAnalysis universe
 
+    e.g., ``universe = spa_mda.generate_universe("LAMMPS",(data_file, dump_files), {"dt":dt})``, where data_file is a filename and path, and dump_files is a list of filenames and paths.
+
     Parameters
     ----------
     package : str
@@ -150,7 +153,7 @@ def generate_universe(package, args, kwargs={}):
 
     return universe
         
-def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, exclusion_block=(1,1), exclusion_mode="block", exclude=True, run_kwargs={}):
+def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, exclusion_block=None, exclusion_mode="block", exclude=True, run_kwargs={}):
     """
     Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
@@ -173,10 +176,12 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
         Number of bins in the rdf
     verbose : bool, Optional, default=False
         Set whether calculation will be run with comments
-    exclusion_block : tuple, Optional, default=(1,1)
+    exclusion_block : tuple, Optional, default=None
         Allows the masking of pairs from within the same molecule.  For example, if there are 7 of each atom in each molecule, the exclusion mask `(7, 7)` can be used. The default removes self interaction.
     exclusion_mode : str, Optional, default="block"
         Set to "block" for traditional mdanalysis use, and use "relative" to remove ``exclusion_block[0]`` neighbors around reference atom.
+    exclude : str, Optional, default=None
+        Set the type of exclusion: ["include bound", "exclude bound", "explicit"]
     run_kwargs : dict, Optional, default={}
         Other keyword arguments from ``MDAnalysis.analysis.rdf.InterRDF.run()``
 
@@ -268,7 +273,7 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
             msd_output[0] = np.arange(MSD.n_frames)*dt # ps
             nongaussian_parameter[0] = np.arange(MSD.n_frames)*dt # ps
         msd_output[i+1] = MSD.results.timeseries # angstroms^2
-        nongaussian_parameter[i+1] = MSD.results.second_order_nongaussian_parameter
+        nongaussian_parameter[i+1] = MSD.results.nongaussian_parameter
 
     return msd_output, nongaussian_parameter
 
@@ -832,7 +837,7 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
 
-def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, select_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100, select_recenter=None, flag_com=False):
+def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, select_target=None, select=None, stop_frame=None, dr=1.0, r_start=2.0, nzones=5, verbose=False, write_increment=100, select_recenter=None, flag_com=False, include_center=True):
     """
     Calculate the per atom Debye-Waller (DW) parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -873,6 +878,8 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
         If not None, the trajectory will be centered around the select_atom() group in a relative sense. The center of mass will be extracted first to correct the difference in positions.
     flag_com : bool, Optional, default=False
         If true, the trajectory is centered around the group specified with ``select_recenter`` for every frame, and in calculating the displacement, a correction between the frame centers of mass is applied. With this option, the effect of periodic boundary conditions is ensureed to be removed for calculations sufficiently far from the boundary. 
+    include_center : bool, Optional, default=True
+        If True, the first shell will be a sphere from zero to ``r_start`` and the second shell will be ``r_start`` to ``r_start+dr``. If ``include_center==False``, the first shell is ``r_start+dr``
 
     Returns
     -------
@@ -938,8 +945,13 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
 
         # Calculate initial positions of atoms that start in respective zones
         universe.trajectory[i]
-        Zones = [universe.select_atoms(select.format(0, r_start))]
-        for z in range(1,nzones):
+        if include_center:
+            Zones = [universe.select_atoms(select.format(0, r_start))]
+            zone_min = 1
+        else:
+            Zones = []
+            zone_min = 0
+        for z in range(zone_min,nzones):
             Zones.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for z in range(nzones):
@@ -948,8 +960,11 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
         # Calculate final positions of atoms that started in each respective zone,
         # and find atoms that are currently in respective zones (i.e. Zone2)
         universe.trajectory[i+frames_per_tau]
-        Zones2 = [universe.select_atoms(select.format(0, r_start))]
-        for z in range(1,nzones):
+        if include_center:
+            Zones2 = [universe.select_atoms(select.format(0, r_start))]
+        else:
+            Zones2 = []
+        for z in range(zone_min,nzones):
             Zones2.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for z in range(nzones):
@@ -957,32 +972,14 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
                 positions_start_finish[z].append(Zones[z].positions + (+com[i+frames_per_tau] - com[i]))
             else:
                 positions_start_finish[z].append(Zones[z].positions)
-            tmp = positions_start_finish[z][1]-positions_start_finish[z][0]
-
-            for ii in range(len(tmp)):
-                tmp_check = np.abs(tmp[ii]) > dimensions/2 
-                if np.any(tmp_check):
-                    ind = np.where(tmp_check)[0]
-                    for jj in ind:
-                        if tmp[ii][jj] > 0:
-                            tmp[ii][jj] -= dimensions[jj]
-                        else:
-                            tmp[ii][jj] += dimensions[jj]
-
+            tmp = mf.check_wrap(positions_start_finish[z][1]-positions_start_finish[z][0], dimensions)
             msd_total[z].extend(list(np.sum(np.square(tmp),axis=1)))
 
             tmp_ind1 = [x.ix for x in Zones[z]]
             RetainedFraction = Zones[z] - Zones[z].difference(Zones2[z])
             for atom in RetainedFraction:
                 ind = tmp_ind1.index(atom.ix)
-                tmp = positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind]
-                jjnd = np.where(np.abs(tmp) > dimensions/2)[0]
-                for jj in jjnd:
-                    if tmp[jj] > 0:
-                        tmp[jj] -= dimensions[jj]
-                    else:
-                        tmp[jj] += dimensions[jj]
-
+                tmp = mf.check_wrap(positions_start_finish[z][1][ind]-positions_start_finish[z][0][ind], dimensions)
                 msd_retained[z].append(np.sum(np.square(tmp)))
 
             try: 
@@ -1086,18 +1083,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
         # Calculate final positions of atoms
         universe.trajectory[i+frames_per_tau]
         for j, group in enumerate(groups):
-            tmp = group.positions-positions_start_finish[j][0]
-
-            for ii in range(len(tmp)):
-                tmp_check = np.abs(tmp[ii]) > dimensions/2
-                if np.any(tmp_check):
-                    ind = np.where(tmp_check)[0]
-                    for jj in ind:
-                        if tmp[ii][jj] > 0:
-                            tmp[ii][jj] -= dimensions[jj]
-                        else:
-                            tmp[ii][jj] += dimensions[jj]
-
+            tmp = mf.check_wrap(group.positions-positions_start_finish[j][0], dimensions)
             msd_total[j].extend(list(np.sum(np.square(tmp),axis=1)))
 
     debye_waller_total = np.zeros(ngroups)
@@ -1109,7 +1095,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
     return debye_waller_total, debye_waller_total_std
 
 
-def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, select=None, r_cut=3.0, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100):
+def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, step=None, select=None, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100, kwargs_metric={}, include_center=True):
     """
     Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
 
@@ -1132,10 +1118,10 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
         This atom type must be provided unless ``select`` is provided. This atom type represents the core for the radial analysis. Note that with how this selection criteria is written, that if two atoms of this type are close together, a sort of iso-line is formed around the two atoms so that the DW parameter is not skewed by target atoms that are far from one reference type and close to another.
     select_neighbor : str
         Selection string restricting the atom types to be included. For example, ``reference_select="type 2 and type 4"``, although one atom type is probably recommended.
+    step : int, Optional, default=None
+        Optionally evaulate for a single step, this will overwrite ``r_cut, stop_frame, skip_frame``
     select : str, Optional, default=None
         A string to overwrite the default selection criteria: ``({select_target}) and around {r_start} {r_start+i_zone*dr} ({select_reference})``
-    r_cut : float, Optional, default=3.0
-        Cutoff used to determine ``reference_atoms`` used in calculation.
     r_start : float, Optional, default=2.0
         Inner most radius to define the core sphere, this is Zone 0
     dr : float, Optional, default=1.0
@@ -1152,6 +1138,10 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
         If ``verbose`` write out progress every, this many frames.
     bins = int, Optional, default=100
         Number of binds used in histogram. Can be any valid input for ``numpy.histogram(x, bins=bins)``
+    kwargs_metric : dict, Optional, default={}
+        Keyword arguments for execution of `tetrahedral_order_parameter`
+    include_center : bool, Optional, default=True
+        If True, the first shell will be a sphere from zero to ``r_start`` and the second shell will be ``r_start`` to ``r_start+dr``. If ``include_center==False``, the first shell is ``r_start+dr``
 
     Returns
     -------
@@ -1177,49 +1167,65 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
 
     if verbose:
         print("Imported trajectory")
-    dimensions = universe.trajectory[0].dimensions[:3]
 
-    if stop_frame == None or lx < stop_frame:
-        stop_frame = lx
-        if verbose:
-            print("`stop_frame` has been reset to align with the trajectory length, {}".format(lx))
+    if step == None:
+        if stop_frame == None or lx < stop_frame:
+            stop_frame = lx
+            if verbose:
+                print("`stop_frame` has been reset to align with the trajectory length, {}".format(lx))
+        timesteps = range(0,int(stop_frame),int(skip_frame))
+    else:
+        timesteps = [step]
 
-    q_array = [[] for x in range(nzones)]
-    q_array_interface = [[] for x in range(nzones)]
-    for i in range(0,int(stop_frame),int(skip_frame)):
+    q_dict = [{} for x in range(nzones)]
+    for i in timesteps:
         if verbose and i%write_increment == 0:
             print("Calculating Frame {} out of {}".format(i,stop_frame))
 
         universe.trajectory[i]
-        groups = [universe.select_atoms(select.format(0, r_start))]
-        for z in range(1,nzones):
+        if include_center:
+            groups = [universe.select_atoms(select.format(0, r_start))]
+            zone_min = 1
+        else:
+            groups = []
+            zone_min = 0
+        for z in range(zone_min,nzones):
             groups.append(universe.select_atoms(select.format(r_start+dr*(z-1), r_start+dr*z)))
 
         for j, group in enumerate(groups):
-            q_tmp, q_tmp_interface = tetrahedral_order_parameter(universe, group, select_neighbor, step=i, r_cut=r_cut, verbose=verbose)
-            q_array[j].extend(q_tmp)
-            q_array_interface[j].extend(q_tmp_interface)
+            q_tmp = tetrahedral_order_parameter(universe, group, select_neighbor, **kwargs_metric)
+            for key, values in q_tmp.items():
+                if key not in q_dict[j]:
+                    q_dict[j][key] = [] 
+                q_dict[j][key].extend(values)
 
-
+    q_out = {}
     for i in range(nzones):
-        hist, bin_edges = np.histogram(q_array[i], bins=bins, range=(0.,1.))
-        hist_interface, bin_edges = np.histogram(q_array_interface[i], bins=bins, range=(0.,1.))
+        for q, values in q_dict[i].items():
+            hist, bin_edges = np.histogram(values, bins=bins, range=(0.,1.))
+            if i == 0:
+                bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+                q_hist = np.zeros((len(bin_centers),len(q_dict[i])+1))
+                q_hist[:,0] = bin_centers
+            q_hist[:,i+1] = hist
+
         if i == 0:
-            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
-            q_hist = np.zeros((len(bin_centers),nzones+1))
-            q_hist[:,0] = bin_centers
-            q_hist_interface = np.zeros((len(bin_centers),nzones+1))
-            q_hist_interface[:,0] = bin_centers
-        q_hist[:,i+1] = hist
-        q_hist_interface[:,i+1] = hist_interface
+            key = f"0.00-{r_start:.2f}"
+        else:
+            key = "{.2f}-{.2f}".format(r_start+dr*(i-1), r_start+dr*i)
+        q_out[key] = {
+                      "q_hist": q_hist,
+                      "q_frac": np.sum(q_hist[:,1:], axis=1)/np.sum(q_hist[:,1:]),
+                      "q_coord": list(q_dict[i].keys())
+                     }
 
-    return q_hist, q_hist_interface
+    return q_out
 
-def tetrahedral_order_parameter(universe, group, select_neighbor, step=None, r_cut=3.0, stop_frame=None, skip_frame=1, verbose=False, write_increment=100):
+def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, angle_cut=30):
     """
     Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
 
-    Notice that if more than four atoms are found, a warning is issued and the closest four are used. In the case that there are less than four atoms within the cutoff, the metric is still computed for n==3, but reported in a separate matrix.
+    Notice that if more than four atoms are found, a warning is issued and the closest four are used to calculate the metric. However, the parameter is still categorized by the number of neighbors meet the geometric criteria, based off of
 
     Note that the reference select should encompass atom types, and not regions for this function to be meaningful.
 
@@ -1236,95 +1242,122 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, step=None, r_c
         Atom group to be analyzed 
     select_neighbor : str
         Selection string restricting the atom types to be included. For example, ``reference_select="type 2 and type 4"``, although one atom type is probably recommended.
-    step : int, Optional, default=None
-        Optionally evaulate for a single step, this will overwrite ``r_cut, stop_frame, skip_frame``
-    r_cut : float, Optional, default=3.0
+    r_cut : float, Optional, default=3.4
         Cutoff used to determine ``reference_atoms`` used in calculation.
-    stop_frame : int, Optional, default=None
-        Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
-    skip_frame : int, Optional, default=1
-        Interval of frames to skip. Advised if given universe frames are not independent.
-    verbose : bool, Optional, default=False
-        If true, progress will be printed
-    write_increment : int, Optional, default=100
-        If ``verbose`` write out progress every, this many frames.
+    angle_cut :float, Optional, default=30 
+        Cutoff for angle between interacting hydrogen, its donor, and the acceptor oxygen in the tetrahedral. A value of None will remove this contraint.
 
     Returns
     -------
-    q_array : numpy.ndarray
-        The tetrahedral order parameter array of values
-    q_array_interface : numpy.ndarray
-        The tetrahedral order parameter array of values for 3 neighbors, assuming that there is an interface preventing the full tetrahedral
+    q_dict : dictionary
+         Dictionary of tetrahedral order parameters categorized by their coordination number
         
     """
 
     universe = check_universe(universe)
     lx = len(universe.trajectory)
-
-    if verbose:
-        print("Imported trajectory")
     dimensions = universe.trajectory[0].dimensions[:3]
 
-    if step == None:
-        if stop_frame == None or lx < stop_frame:
-            stop_frame = lx
-            if verbose:
-                print("`stop_frame` has been reset to align with the trajectory length, {}".format(lx))
-        timesteps = range(0,int(stop_frame),int(skip_frame))
-    else:
-        timesteps = [step]
+    q_dict = {}
+    for k, atm in enumerate(group):
+        atm_pos = universe.select_atoms("index {}".format(atm.ix))[0].position
+        atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} index {}".format(r_cut, atm.ix))
 
-    q_array = []
-    q_array_interface = []
-    for i in timesteps:
-        if verbose and i%write_increment == 0:
-            print("Calculating Frame {} out of {}".format(i,stop_frame))
+        remove = []
+        if atm.bonded_atoms:
+            for atm2 in atoms:
+                if len(atm.bonded_atoms) != 2 or len(atm2.bonded_atoms) != 2:
+                    raise ValueError("This function has been written for use with water. Feel free to contribute changes to generalize this function.")
+                pos = np.zeros((4,3,3))
+                pos[:2,0,:] = atm.bonded_atoms.positions
+                pos[:2,1,:] = atm2.position
+                pos[:2,2,:] = atm.position
+                pos[2:,0,:] = atm2.bonded_atoms.positions
+                pos[2:,1,:] = atm.position
+                pos[2:,2,:] = atm2.position
+                angles = np.array([mf.angle(x[2],x[0],x[1]) for x in pos])
+                dist = np.array([[mf.check_wrap([x[0]-x[2]], dimensions)[0], mf.check_wrap([x[1]-x[2]], dimensions)[0]] for x in pos])
+                dist = np.array([np.sqrt(np.sum(np.square(x), axis=1)) for x in dist])
+                if angle_cut is None:
+                    if np.all([ dist[x][0] > dist[x][1] for x in range(len(angles))]):
+                        remove.append(atm2)
+                else:
+                    if np.all([ dist[x][0] > dist[x][1] or angles[x] >= angle_cut for x in range(len(angles))]):
+                        remove.append(atm2)
+            atoms -= mda.AtomGroup([x.ix for x in remove],universe)
 
-        universe.trajectory[i]
-        q_tmp = np.zeros(len(group))
-        q_tmp_interface = np.zeros(len(group))
-        for k, atm in enumerate(group):
-            atm_pos = universe.select_atoms("index {}".format(atm.ix))[0].position
-            atoms = universe.select_atoms("({}) ".format(select_neighbor)+"and around {} index {}".format(r_cut, atm.ix))
-            if len(atoms) < 3:
-                q_tmp[k] = np.nan
-                q_tmp_interface[k] = np.nan
-                continue
+        positions = mf.check_wrap(atoms.positions - atm_pos, dimensions)
+        if np.any(np.sqrt(np.sum(np.square(positions), axis=1)) > r_cut):
+            raise ValueError("Neighbor atoms are not within cutoff")
 
-            positions = atoms.positions - atm_pos
-            for ii in range(len(positions)):
-                tmp_check = np.abs(positions[ii]) > dimensions/2
-                if np.any(tmp_check):
-                    ind = np.where(tmp_check)[0]
-                    for jj in ind:
-                        if positions[ii][jj] > 0:
-                            positions[ii][jj] -= dimensions[jj]
-                        else:
-                            positions[ii][jj] += dimensions[jj]
-            if np.any(np.sqrt(np.sum(np.square(positions), axis=1)) > r_cut):
-                raise ValueError("Neighbor atoms are not within cutoff")
+        l_atoms = len(atoms)
+        if len(atoms) > 4:
+            warnings.warn("tetrahedral order parameter: cutoff produced more than four adjacent atoms.")
+            dist = np.sum(positions**2, axis=1)
+            ind = sorted([x for _, x in sorted(zip(dist,list(range(len(atoms)))))][:4])
+            positions = positions[ind]
+        lx = len(positions)
 
-            if len(atoms) > 4:
-                warnings.warn("tetrahedral order parameter: cutoff produced more than four adjacent atoms.")
-                dist = np.sum(positions**2, axis=1)
-                ind = sorted([x for _, x in sorted(zip(dist,list(range(len(atoms)))))][:4])
-                positions = positions[ind]
-            lx = len(positions)
+        positions /= np.sqrt(np.sum(np.square(positions),axis=1))[:,np.newaxis]
+        tmp_cos = [(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)]
+        tmp = 1.0 - 3.0/8.0*np.sum([(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx-1) for y in range(x+1,lx)])
 
-            positions /= np.sqrt(np.sum(np.square(positions),axis=1))[:,np.newaxis]
-            tmp_cos = [(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx) for y in range(x+1,lx)]
-            tmp = 1.0 - 3.0/8.0*np.sum([(np.dot(positions[x],positions[y])+1.0/3.0)**2 for x in range(lx-1) for y in range(x+1,lx)])
+        if l_atoms not in q_dict:
+            q_dict[l_atoms] = []
+        q_dict[l_atoms].append(tmp)
 
-            if lx < 4:
-                q_tmp[k] = np.nan
-                q_tmp_interface[k] = tmp
+    return q_dict
+
+def create_ndx(groups=[], names=None, separate_by=None, filename="index.ndx", kwargs_writer={}):
+    """ Write a Gromacs style ndx file from a list of atom groups.
+
+    This function can be used to prepare a calculation in the scattering function package, `dynasor <https://dynasor.materialsmodeling.org/index.html>`_
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    groups : list, Optional, default=[]
+        List of ``AtomGroups`` to be included in the index file.
+    names : list, Optional, default=None
+        List of equal length to ``groups`` to separate different "molecules" (i.e., groups) to call in gromacs
+    separate_by : str, Optional, default=None
+        Subdivide groups with this mdanalysis `selection string <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_. Could be any value used in AtomGroup.groupby method.
+    kwargs_writer : dict, Optional, default={}
+        Keyword arguments used in the `Gromacs writer <https://docs.mdanalysis.org/documentation_pages/selections/gromacs.html>`_ 
+
+    Returns
+    -------
+    Saved index file in gromacs style.
+
+    """
+    if not groups:
+        raise ValueError("No groups were provided for writing an index file.")
+    if len(groups) > 1 and names is None:
+        warnings.warn("More than one AtomGroup is provided without differentiating `names`.")
+    elif names is not None and len(groups) != len(names):
+        raise ValueError("The number of `AtomGroups` must equal the number of `names`")
+
+    with mda.selections.gromacs.SelectionWriter(filename, **kwargs_writer) as ndx:
+        for i, group in enumerate(groups):
+            if separate_by is None:
+                if names is not None:
+                    ndx.write(group, name=names[i])
+                else:
+                    ndx.write(group)
             else:
-                q_tmp[k] = tmp
-                q_tmp_interface[k] = np.nan
+                subgroups = group.groupby(separate_by)
+                for sel, subgroup in subgroups.items():
+                    name = "{}_{}".format(separate_by[:-1], sel)
+                    if names is not None:
+                        ndx.write(subgroup, name=names[i]+"_"+name)
+                    else:
+                        ndx.write(subgroup, name=name)
 
-        q_array.extend([x for x in q_tmp if not np.isnan(x)])
-        q_array_interface.extend([x for x in q_tmp_interface if not np.isnan(x)])
-
-    return q_array, q_array_interface
 
 

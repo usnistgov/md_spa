@@ -10,7 +10,6 @@
     mdanalysis
     msd
     rdf
-    read_lammps
     residence_time
     viscosity
     zeno

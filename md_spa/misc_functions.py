@@ -34,3 +34,67 @@ def vector_alignment( target_pt, target_vec, ref_pts, ref_vecs):
     metric = np.dot(target_vec,ref_vec)
     
     return metric, ref_vec
+
+def angle(vertex, pos1, pos2):
+    """
+    Calculate the angle between two vectors
+
+    Parameters
+    ----------
+    vertex : numpy.ndarray
+        Position of the angle vertex
+    pos1 : numpy.ndarray
+        Position of one point defining the angle
+    pos2 : numpy.ndarray
+        Position of another point defining the angle
+
+    Returns
+    -------
+    angle : float
+        Angle in degrees    
+
+    """
+
+    vec1 = pos1 - vertex
+    vec2 = pos2 - vertex
+
+    vec1 /= np.sqrt(np.sum(np.square(vec1)))
+    vec2 /= np.sqrt(np.sum(np.square(vec2)))
+
+    angle = np.arccos(np.dot(vec1,vec2))*180/np.pi
+    if angle > 180.:
+        angle -= 180.
+
+    return angle
+
+def check_wrap(pos_diff, dimensions, dist_type="distance"):
+    """
+    Check that the difference in positions is possible in the box dimensions, and wrap accordingly.
+
+    Parameters
+    ----------
+    pos_diff : numpy.ndarray
+        Matrix of atoms by coordinates, represents the difference between atom set and some reference point.
+    dimensions : numpy.ndarray
+        Array of box length in three dimensions, assuming origin at (0,0,0)
+    dist_type : str, Optional, default="distance"
+        Type of coordinate data. By default it is assumed to be an array to calculate the distance between atoms and some reference. Thus, the "coordinates" should be transformed if the value is greater than half the box length. 
+    
+        - distance : A matrix of displacement vectors representing the distance between atoms and some reference 
+        - wrap : A matrix of coordinates to wrap into the box
+
+    Returns
+    -------
+    pos_diff_new : numpy.ndarray
+        Matrix of atoms by coordinates, represents the difference between atom set and some reference poin
+t, wrapped if approproate.
+
+    """
+    if dist_type == "distance":
+        images = ( dimensions/2 - pos_diff ) // dimensions
+    elif dist_type == "wrap":
+        images = ( dimensions - pos_diff ) // dimensions
+    pos_diff_new = pos_diff + images * dimensions
+
+    return pos_diff_new
+
