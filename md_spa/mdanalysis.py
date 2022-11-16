@@ -1394,7 +1394,7 @@ def add_elements2types(universe, conversion_dict):
             for i in subgroup.ix:
                 elements[i] = conversion_dict[atm_type]
         else:
-            warnings.warn("Atom type, {}, is not found in the provided `conversion_dict`, elements are defined as 'X',")
+            warnings.warn("Atom type, {}, is not found in the provided `conversion_dict`, elements are defined as 'X',".format(atm_type))
 
     universe.add_TopologyAttr('elements', elements)
     return universe
