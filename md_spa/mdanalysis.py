@@ -1359,5 +1359,45 @@ def create_ndx(groups=[], names=None, separate_by=None, filename="index.ndx", kw
                     else:
                         ndx.write(subgroup, name=name)
 
+def add_elements2types(universe, conversion_dict):
+    """ Add elements to universe based on atom type
+
+    This function is useful to write out lammps files in the xyz format.
+
+    Parameters
+    ----------
+    u : obj/tuple
+        Can either be:
+        
+        - MDAnalysis universe
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
+        - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
+
+    conversion_dict : dict
+        Dictionary defining the element for each type, e.g., ``{"1": "H", "2": "O"}``
+    
+    Returns
+    -------
+    universe : obj
+        universe with elements 
+
+    """
+
+    universe = check_universe(universe)
+
+    group = universe.select_atoms("all")
+    group_by_type = group.groupby("types")
+
+    elements = ["X"]*universe.atoms.n_atoms
+    for atm_type, subgroup in group_by_type.items():
+        if atm_type in conversion_dict:
+            for i in subgroup.ix:
+                elements[i] = conversion_dict[atm_type]
+        else:
+            warnings.warn("Atom type, {}, is not found in the provided `conversion_dict`, elements are defined as 'X',")
+
+    universe.add_TopologyAttr('elements', elements)
+    return universe
+
 
 
