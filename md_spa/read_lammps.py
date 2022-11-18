@@ -7,6 +7,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.image as img
 
+from md_spa_utils import data_manipulation as dm
+
 def read_lammps_ave_time(filename, dtype=float):
     """Read a LAMMPS ave/time file. Written By Lauren Abbott"""
     
@@ -117,8 +119,38 @@ def redefine_lammps_dump_timesteps( filename, timestep0, filename_out=None, over
     if replace:
         os.system("mv {} {}".format(filename_out, filename))
 
-def read_lammps_dump(filename, col=-1, col_name='', dtype=float):
-    """Read a LAMMPS dump file. Written By Lauren Abbott"""
+def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, unwrap=False, dtype=float):
+    """Read a LAMMPS dump file.
+
+    Note:
+
+    - Atoms are automatically sorted by index according to the appropriate dimension
+    - Because the box lengths are returned, the coordinates are translated so that the minimum is at the origin.
+    - One may write a lammps dump file with each frame containing a different number of atoms or a different set of atoms. This function will record values of NaN when one of the specified atom indices are not present.
+
+    Parameters
+    ----------
+    filename : str
+        Path and filename to lammps dump file
+    col_name : list/str, Optional, default=""
+        A list of column names in the header or a specific column name to pull from the dump file
+    atom_indices : list, Optional, default=None
+        A list of atom indices to pull from the trajectory where the indices start from 0 to N-1 (this function offsets the lammps default of numbering from 1 to N)
+    max_frames : int, Optional, default=None
+        Stop reading the file when this many timesteps have been read
+    unwrap : bool, Optional, default=False
+        If the columns ['x', 'y', 'z'] are requested and the columns ['ix', 'iy', 'iz'] are found, the coordinates will be unwrapped. 
+
+    Returns
+    -------
+    dump_output : numpy.ndarray
+        3D array of (Nframes, Natoms, Ncolumns), unless one column name is provided, in which case the output is (Nframes, Natoms)
+    box_lengths : numpy.ndarray
+        An array of the box lengths in the x, y, and z direction. The box cannot change in size.
+
+    """
+    if atom_indices is not None:
+        atom_indices = list(atom_indices)
     
     arr_all = []
     with open(filename, 'r') as f:
@@ -128,57 +160,102 @@ def read_lammps_dump(filename, col=-1, col_name='', dtype=float):
                 break
             elif line == '\n':
                 continue
-            parts = line.strip().split()
+            line_array = line.strip().split()
             
             flag = 'all'
-            if isinstance(col, list) and len(col) > 0:
-                flag = 'im'
-            elif col >= 0:
-                flag = 'i'
-            elif isinstance(col_name, list) and len(col_name) > 0:
-                flag = 'sm'
+            if isinstance(col_name, list) and len(col_name) > 0:
+                flag = 'matrix'
             elif len(col_name) > 0:
-                flag = 's'
+                flag = 'single'
+                if unwrap:
+                    raise ValueError("Cannot unwrap single column")
             
-            if parts[1] == "TIMESTEP":
+            if line_array[1] == "TIMESTEP": # Not Used
                 timestep = int(f.readline().strip())
+            if len(arr_all) >= max_frames:
+                break
             
-            elif parts[1] == "NUMBER":
-                num_atoms = int(f.readline().strip())
+            elif line_array[1] == "NUMBER":
+                natoms = int(f.readline().strip())
+                if atom_indices is not None:
+                    if len(atom_indices) > natoms or any([(x >= natoms or x < 0) for x in atom_indices]):
+                        raise ValueError("Provided indices are incompatible with provided dump file")
+                    else:
+                        num_matrix = len(atom_indices)
+                else:
+                    num_matrix = natoms
                 
-            elif parts[1] == "BOX":
+            elif line_array[1] == "BOX":
                 xlo, xhi = map(float, f.readline().strip().split())
                 ylo, yhi = map(float, f.readline().strip().split())
                 zlo, zhi = map(float, f.readline().strip().split())
-                box_dims = np.array([[xlo,xhi,xhi-xlo],[ylo,yhi,yhi-ylo],[zlo,zhi,zhi-zlo]], dtype=float)
+                tmp_box_dims = np.array([xhi-xlo, yhi-ylo, zhi-zlo], dtype=float)
+                try:
+                    if not np.all(tmp_box_dims == box_dims):
+                        raise ValueError("The box size changes from {} to {}".format(box_dims, tmp_box_dims))
+                except:
+                    box_dims = tmp_box_dims
                 
-            elif parts[1] == "ATOMS":
-                fields = parts[2:]
-                if flag == 'im':
-                    arr = np.zeros((num_atoms, len(col)), dtype=dtype)
-                elif flag == 'sm':
-                    arr = np.zeros((num_atoms, len(col_name)), dtype=dtype)
+            elif line_array[1] == "ATOMS":
+                fields = line_array[2:]
+                if flag != 'single':
+                    try:
+                        image_cols = [fields.index(s) for s in ["ix", "iy", "iz"]]
+                    except:
+                        image_cols = None
+                    if flag == "matrix":
+                        if "xu" in col_name:
+                            coord_cols = [col_name.index(s) for s in ["xu", "yu", "zu"]]
+                        elif "x" in col_name:
+                            coord_cols = [col_name.index(s) for s in ["x", "y", "z"]]
+                        else:
+                            coord_cols = None
+                    else:
+                        if "xu" in fields:
+                            coord_cols = [fields.index(s)-1 for s in ["xu", "yu", "zu"]]
+                        elif "x" in fields:
+                            coord_cols = [fields.index(s)-1 for s in ["x", "y", "z"]]
+                        else:
+                            coord_cols = None
+
+                if flag == 'matrix':
+                    arr = np.nan*np.ones((num_matrix, len(col_name)), dtype=dtype)
                     col = [fields.index(s) for s in col_name]
-                elif flag == 'i':
-                    arr = np.zeros(num_atoms, dtype=dtype)
-                elif flag == 's':
-                    arr = np.zeros(num_atoms, dtype=dtype)
+                elif flag == 'single':
+                    arr = np.nan*np.ones(num_matrix, dtype=dtype)
                     col = fields.index(col_name)
                 elif flag == 'all':
-                    arr = np.zeros((num_atoms, len(fields)), dtype=dtype)
+                    arr = np.nan*np.ones((num_matrix, len(fields)-1), dtype=dtype)
+                if unwrap:
+                    if image_cols is None:
+                        raise ValueError("The given trajectory cannot be unwrapped without image flags")
+                    elif not all([s in col_name for s in ["x", "y", "z"]]):
+                        raise ValueError("The given trajectory cannot be unwrapped without x, y, z columns")
                     
-                for i in range(num_atoms):
-                    dat = f.readline().strip().split()
-                    if flag == 'im' or flag == 'sm':
-                        arr[i] = [dat[c] for c in col]
-                    elif flag == 'i' or flag == 's':
-                        arr[i] = dat[col]
+                for i in range(natoms):
+                    dat = [x if not dm.isfloat(x) else float(x) for x in f.readline().strip().split()]
+                    ind = int(dat[0])-1
+                    if atom_indices is not None:
+                        if ind in atom_indices:
+                            ind = atom_indices.index(ind)
+                        else:
+                            continue
+
+                    if flag == 'matrix':
+                        arr[ind] = [dat[c] for c in col]
+                    elif flag == 'single':
+                        arr[ind] = dat[col]
                     else:
-                        arr[i] = dat
+                        arr[ind] = dat[1:]
+
+                    if unwrap:
+                        arr[ind][coord_cols] +=  np.array([dat[c] for c in image_cols]) * box_dims
+                    if coord_cols is not None:
+                        arr[ind][coord_cols] -= np.array([xlo, ylo, zlo])
                 
                 arr_all.append(arr)
     
-    return np.array(arr_all, dtype=dtype)
+    return np.array(arr_all, dtype=dtype), box_dims
 
 def read_lammps_data(filename, section="atoms"):
     """Read specific section from LAMMPS data file. Written By Lauren Abbott"""
@@ -196,8 +273,8 @@ def read_lammps_data(filename, section="atoms"):
             parts = line.strip().split()
             
             if len(parts) > 1 and parts[1] == 'atoms':
-                num_atoms = int(parts[0])
-                counts['atoms'] = num_atoms
+                natoms = int(parts[0])
+                counts['atoms'] = natoms
             elif len(parts) > 1 and parts[1] == 'bonds':
                 num_bonds = int(parts[0])
                 counts['bonds'] = num_bonds
@@ -246,18 +323,18 @@ def read_lammps_data(filename, section="atoms"):
                     break
             
             elif parts[0] == 'Atoms':
-                atoms = np.zeros((num_atoms + 1, 9), dtype=float)
+                atoms = np.zeros((natoms + 1, 9), dtype=float)
                 f.readline()
-                for i in range(num_atoms):
+                for i in range(natoms):
                     bits = f.readline().strip().split()
                     atoms[int(bits[0])] = bits[1:]
                 if section == "atoms":
                     break
             
             elif parts[0] == 'Velocities':
-                velocities = np.zeros((num_atoms + 1, 3), dtype=float)
+                velocities = np.zeros((natoms + 1, 3), dtype=float)
                 f.readline()
-                for i in range(num_atoms):
+                for i in range(natoms):
                     bits = f.readline().strip().split()
                     velocities[int(bits[0])] = bits[1:]
                 if section == "velocities":
