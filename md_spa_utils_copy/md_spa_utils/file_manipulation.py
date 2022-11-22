@@ -209,3 +209,57 @@ def write_csv(filename, array, mode="a", header=None, header_comment="#", delimi
             f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")
+
+def csv2dict(filename, comment="#"):
+    """ Create dict from csv file
+
+    The last commented header line is assumed to be the categories and the first column the keys.
+    Thus the following csv file:
+
+    # This is a file
+    # type, prop1, prop2, prop3
+    A, 1, 2, 3
+    B, 4, 5, 6
+
+    Will result in the dictionary: ``dictionary = {"A": {"prop1": 1, "prop2": 2, "prop3": 3}, 
+        "B": {"prop1": 4, "prop2": 5, "prop3": 6}}``
+
+    Numbers are converted accordingly
+
+    Parameters
+    ----------
+    filename : str
+        File name to the csv file
+    comment : str, Optional, default="#"
+        String at the beginning of a line to denote a comment
+
+    Returns
+    -------
+     output : dict
+         Dictionary of csv entries
+
+    """
+
+    if not os.path.isfile(filename):
+        raise ValueError("The file, {}, could not be found.".format(filename))
+
+    with open(filename, "r") as f:
+        contents = csv.reader(f)
+        data = list(map(list, contents))
+    data = [[ast.literal_eval(x.strip()) if x.strip().replace('.','',1).isdigit() else x.strip() for x in y] for y in data]
+
+    # find header, discard comments
+    header = None
+    output = {}
+    for i,line in enumerate(data):
+        if comment in line[0]:
+            header = line[1:] # First column is irrelevant
+        else:
+            if header is None:
+                raise ValueError("Commented column headers were not found")
+            if len(header) != len(line[1:]):
+                raise ValueError("The number of column headers ({}) does not equal the number of columns ({}) in line {}".format(len(header),len(line[1:]),i))
+            output[line[0]] = {header[x]: line[x+1] for x in range(len(header))}
+
+    return output
+    
