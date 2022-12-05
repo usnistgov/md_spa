@@ -24,7 +24,7 @@ if flag_cython:
     for cyext in cython_list:
         cypath = list(os.path.split(cyext))
         cypath[-1] = cypath[-1].split(".")[-2]
-        cy_ext_1 = Extension(name=".".join(cypath), 
+        cy_ext_1 = Extension(name=".".join(cypath).replace(os.path.sep,"."), 
                              sources=[cyext], 
                              include_dirs=[fpath, np.get_include()],
                              extra_compile_args=['-Wno-deprecated-declarations'],

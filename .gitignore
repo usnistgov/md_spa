@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+md_spa/cython_modules/*.c
 
 # Distribution / packaging
 .Python
