@@ -1,11 +1,11 @@
 
 import numpy as np
 
-from cython_modules import _scattering_functions as scat
-
-from md_spa import misc_functions as mf
-from md_spa import read_lammps as rl
 from md_spa_utils import file_manipulation as fm
+
+from .cython_modules import _scattering_functions as scat
+from . import misc_functions as mf
+from . import read_lammps as rl
 
 def static_structure_factor(traj, dims, elements, qmax=10, qmin=None, kwargs_linspace=None, flag="python"):
     """ Calculate the isotropic static structure factor
@@ -123,12 +123,10 @@ def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", g
         if group_ids is not None:
             isf = [isf]
             for tmp_ids in group_ids:
-                print(len(isf),len(isf[-1]),tmp_ids)
-                tmp_isf = np.nanmean(np.square(f_values)[None,tmp_ids] * np.sin( qr[:,tmp_ids] ) / ( qr[:,tmp_ids] ), axis=1)
+                tmp_isf = np.nanmean(np.square(f_values[tmp_ids])[None,:] * np.sin( qr[:,tmp_ids] ) / ( qr[:,tmp_ids] ), axis=1)
                 #cumf2 = np.sum(np.square(f_values[tmp_ids]))
                 cumf2 = 1
                 tmp_isf /= cumf2
                 isf.append(tmp_isf)
-                print(len(isf),len(isf[-1]))
 
     return np.array(isf)
