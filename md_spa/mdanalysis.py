@@ -141,7 +141,10 @@ def generate_universe(package, args, kwargs={}):
     """
 
     supported_packages = ["LAMMPS"]
-    tmp_kwargs = {"continuous": True}
+    if isinstance(args[1],list) and len(args[1]) > 1:
+        tmp_kwargs = {"continuous": True}
+    else:
+        tmp_kwargs = {}
     tmp_kwargs.update(kwargs)
 
     if package == "LAMMPS":
