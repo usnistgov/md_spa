@@ -147,12 +147,23 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
         3D array of (Nframes, Natoms, Ncolumns), unless one column name is provided, in which case the output is (Nframes, Natoms)
     box_lengths : numpy.ndarray
         An array of the box lengths in the x, y, and z direction. The box cannot change in size.
+    steps : numpy.ndarray
+        An array of the times found in the provided dump file.
 
     """
     if atom_indices is not None:
         atom_indices = list(atom_indices)
+
+    flag = 'all'
+    if isinstance(col_name, list) and len(col_name) > 0:
+        flag = 'matrix'
+    elif len(col_name) > 0:
+        flag = 'single'
+        if unwrap:
+            raise ValueError("Cannot unwrap single column")
     
     arr_all = []
+    steps = []
     with open(filename, 'r') as f:
         while True:
             line = f.readline()
@@ -162,17 +173,10 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
                 continue
             line_array = line.strip().split()
             
-            flag = 'all'
-            if isinstance(col_name, list) and len(col_name) > 0:
-                flag = 'matrix'
-            elif len(col_name) > 0:
-                flag = 'single'
-                if unwrap:
-                    raise ValueError("Cannot unwrap single column")
-            
-            if line_array[1] == "TIMESTEP": # Not Used
+            if line_array[1] == "TIMESTEP":
                 timestep = int(f.readline().strip())
-            if len(arr_all) >= max_frames:
+                steps.append(timestep)
+            if max_frames is not None and len(arr_all) >= max_frames:
                 break
             
             elif line_array[1] == "NUMBER":
@@ -217,15 +221,21 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
                             coord_cols = [fields.index(s)-1 for s in ["x", "y", "z"]]
                         else:
                             coord_cols = None
+                else:
+                    coord_cols = None
 
                 if flag == 'matrix':
-                    arr = np.nan*np.ones((num_matrix, len(col_name)), dtype=dtype)
+                    arr = np.ones((num_matrix, len(col_name)), dtype=dtype)
                     col = [fields.index(s) for s in col_name]
                 elif flag == 'single':
-                    arr = np.nan*np.ones(num_matrix, dtype=dtype)
+                    arr = np.ones(num_matrix, dtype=dtype)
                     col = fields.index(col_name)
                 elif flag == 'all':
-                    arr = np.nan*np.ones((num_matrix, len(fields)-1), dtype=dtype)
+                    arr = np.ones((num_matrix, len(fields)-1), dtype=dtype)
+
+                if dtype != str:
+                    arr *= np.nan
+
                 if unwrap:
                     if image_cols is None:
                         raise ValueError("The given trajectory cannot be unwrapped without image flags")
@@ -255,7 +265,7 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
                 
                 arr_all.append(arr)
     
-    return np.array(arr_all, dtype=dtype), box_dims
+    return np.array(arr_all, dtype=dtype), box_dims, np.array(steps)
 
 def read_lammps_data(filename, section="atoms"):
     """Read specific section from LAMMPS data file. Written By Lauren Abbott"""

@@ -550,7 +550,7 @@ def fit_standard_deviation_exponent(time, standard_deviation, fit_kwargs={}, sho
 
 def find_einstein_viscosity(time, cumulative_integral,  min_exp=0.991, min_Npts=10, skip=1, show_plot=False, title=None, save_plot=False, plot_name="einstein_viscosity.png", verbose=False, fit_limits=(None,None), min_R2=0.97):
     """
-    Extract the viscosity from the Einstein relation: ..math:`2\eta = d (cumulative_integral)/dt` where the ``cumulative_integral`` is the square of the average running integral of the pressure tensor components vs time.
+    Extract the viscosity from the Einstein relation: :math:`2\eta = d (cumulative_integral)/dt` where the ``cumulative_integral`` is the square of the average running integral of the pressure tensor components vs time.
 
     Parameters
     ----------
