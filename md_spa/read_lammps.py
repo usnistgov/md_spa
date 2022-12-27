@@ -173,11 +173,11 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
                 continue
             line_array = line.strip().split()
             
+            if max_frames is not None and len(arr_all) >= max_frames:
+                break
             if line_array[1] == "TIMESTEP":
                 timestep = int(f.readline().strip())
                 steps.append(timestep)
-            if max_frames is not None and len(arr_all) >= max_frames:
-                break
             
             elif line_array[1] == "NUMBER":
                 natoms = int(f.readline().strip())
