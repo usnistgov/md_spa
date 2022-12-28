@@ -3,7 +3,7 @@ import numpy as np
 import scipy.stats
 import warnings
 
-def basic_stats(data, confidence=0.95, error_type="standard_error"):
+def basic_stats(data, axis=None, confidence=0.95, error_type="standard_error"):
     """
     Given a set of data, calculate the mean and standard error
 
@@ -12,11 +12,13 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
     Parameters
     ----------
     data : numpy.ndarray
-        1D list or array of data
+        Array or matrix of data. If there is more than one dimension and an axis isn't given, then all values are used in the population.
+    axis : int, Optional, default=None
+        Axis over which to compute operation as defined in numpy.
     confidence : float, Optional, default=0.95
         Confidence Interval certainty, used when ``error_type = "confidence"``
     error_type : str, Optional, default="standard_error"
-        Type of error to be output, can be "standard_error" or "confidence", or "standard_dev"
+        Type of error to be output, can be "standard_error" or "confidence" (from standard error), "standard_dev", or "variance".
 
     Returns
     -------
@@ -29,25 +31,37 @@ def basic_stats(data, confidence=0.95, error_type="standard_error"):
         
     """
 
+    data = np.array(data, float)
     if not isiterable(data):
         raise ValueError("Input data is not iterable")
  
-    if len(data) != 0 and len(data) != np.isnan(data).sum():
-        data = np.array(data,np.float)
-        lx = len(data) - np.isnan(data).sum()
-        se = np.nanstd(data)/np.sqrt(lx)
+    if np.size(data) != 0 and np.size(data) != np.isnan(data).sum():
+        if axis is None:
+            lx = np.prod(np.shape(data)) - np.isnan(data).sum()
+        elif isinstance(axis, tuple):
+            not_axis = (x for x in range(len(np.shape(data))) if x not in axis)
+            lx = np.prod([x for i,x in enumerate(np.shape(data)) if i in axis])*np.ones(not_axis)
+            lx -= np.isnan(data).sum(axis)
+        elif isinstance(axis, int):
+            lx = np.shape(data)[axis] - np.isnan(data).sum(axis)
+        else:
+            raise ValueError("This entry for 'axis' is not valid: {}".format(axis))
+
+        mean = np.nanmean(data, axis=axis)
+        se = np.nanstd(data, axis=axis)/np.sqrt(lx)
         if error_type == "standard_error":
             std = se
         elif error_type == "confidence":
-            std = se * scipy.stats.t.ppf((1 + confidence) / 2., lx-1)
+            std = se * (scipy.stats.norm.interval(confidence, loc=mean, scale=se)-mean)[-1]
         elif error_type == "standard_dev":
-            std = np.nanstd(data)
+            std = np.nanstd(data, axis=axis)
+        elif error_type == "variance":
+            std = np.nanstd(data, axis=axis)**2
         else:
             raise ValueError("error_type, {}, is not supported".format(error_type))
-        mean = np.nanmean(data)
-        if lx > 8:
-            tmp = scipy.stats.normaltest(data).pvalue
-            if tmp < 0.05:
+        if np.any(lx > 8):
+            tmp = scipy.stats.normaltest(data, axis=axis).pvalue
+            if np.any(tmp < 0.05):
                 warnings.warn("This dataset is not normal according to scipy.normaltest() with a pvalue={}".format(tmp))
     else:
         mean = np.nan
