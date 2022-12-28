@@ -106,9 +106,9 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                       kwargs_minimizer=kwargs_minimizer,
                                                       tau_logscale=tau_logscale,
                                                       kwargs_parameters={
-                                                                         "t1": {"value": tmp_output2[1], "vary": False},
+                                                                         "t1": {"value": 10*tmp_output2[1], "vary": False},
                                                                          "t2": {"value": tmp_output2[3], "vary": False},
-                                                                         "t3": {"value": np.exp((np.log(tmp_output2[1])+np.log(tmp_output2[3]))/2)},
+                                                                         "t3": {"value": np.exp((np.log(10*tmp_output2[1])+np.log(tmp_output2[3]))/2)},
                                                                         }  
                                                      )  
         tmp_output3, tmp_error3 = cfit.three_exponential_decays(xarray, yarray,
