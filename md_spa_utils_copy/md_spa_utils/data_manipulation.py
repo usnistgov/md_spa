@@ -3,7 +3,7 @@ import numpy as np
 import scipy.stats
 import warnings
 
-def basic_stats(data, axis=None, confidence=0.95, error_type="standard_error"):
+def basic_stats(data, axis=None, data_type="individuals", error_type="standard_deviation", error_descriptor="mean", confidence=0.95, population_dist_type="unknown"):
     """
     Given a set of data, calculate the mean and standard error
 
@@ -15,19 +15,27 @@ def basic_stats(data, axis=None, confidence=0.95, error_type="standard_error"):
         Array or matrix of data. If there is more than one dimension and an axis isn't given, then all values are used in the population.
     axis : int, Optional, default=None
         Axis over which to compute operation as defined in numpy.
+    data_type : str, Optional, default="individuals"
+        Define the data provided:
+
+        - "indivduals": Provided data represent a sample of a population
+        - "means": Provided data represent sample means
+
+    error_type : str, Optional, default="standard_deviation"
+        Type of error to be output, can be "standard_deviation", "variance", or "confidence" for either the population or sample mean distribution (unless ``data_type="means"``. Note that the standard error is the standard deviation of the sample mean distribution so the keyword arguements would provide this result when a sample population (e.g., ``data_type="individuals"``) is provided with: ``error_type="standard_deviation", error_descriptor="mean"``, or when sample means are provided (e.g., ``data_type="means"``) the keyword arguements would be: ``error_type="standard_deviation", error_descriptor="distribution"``
+    error_descriptor : str, Optional, default="mean"
+        Specify whether the error value should represent the distribution of the provided data or the sample mean distribution with "sample" or "mean" respectively.
     confidence : float, Optional, default=0.95
-        Confidence Interval certainty, used when ``error_type = "confidence"``
-    error_type : str, Optional, default="standard_error"
-        Type of error to be output, can be "standard_error" or "confidence" (from standard error), "standard_dev", or "variance".
+        Confidence Interval certainty, used when ``error_type = "confidence"``. If the number of samples in the distribution is less than 30 and ``population_dist_type="unknown"``, then t-statistics are used, if  n>30 or population_dist_type="normal" then z-statistics are used.
+    population_dist_type : str, Optional, default="unknown"
+        If the population distribution type is unknown, then the size of the sample must be greater than or equal to 30 for z-statistics to be used. If the population is known to be normal, then this action can be overwritten with the specificiation of ``population_dist_type="normal"``.
 
     Returns
     -------
     mean : float
         Average value
-    std_error : float
-        Standard error of the data
-    interval : float
-        When added and subtracted from the mean, forms the confidence interval
+    spread : float
+        Descriptor of either population or mean distributions defined with ``error_type``.
         
     """
 
@@ -35,39 +43,53 @@ def basic_stats(data, axis=None, confidence=0.95, error_type="standard_error"):
     if not isiterable(data):
         raise ValueError("Input data is not iterable")
  
-    if np.size(data) != 0 and np.size(data) != np.isnan(data).sum():
-        if axis is None:
-            lx = np.prod(np.shape(data)) - np.isnan(data).sum()
-        elif isinstance(axis, tuple):
-            not_axis = (x for x in range(len(np.shape(data))) if x not in axis)
-            lx = np.prod([x for i,x in enumerate(np.shape(data)) if i in axis])*np.ones(not_axis)
-            lx -= np.isnan(data).sum(axis)
-        elif isinstance(axis, int):
-            lx = np.shape(data)[axis] - np.isnan(data).sum(axis)
-        else:
-            raise ValueError("This entry for 'axis' is not valid: {}".format(axis))
-
-        mean = np.nanmean(data, axis=axis)
-        se = np.nanstd(data, axis=axis)/np.sqrt(lx)
-        if error_type == "standard_error":
-            std = se
-        elif error_type == "confidence":
-            std = se * (scipy.stats.norm.interval(confidence, loc=mean, scale=se)-mean)[-1]
-        elif error_type == "standard_dev":
-            std = np.nanstd(data, axis=axis)
-        elif error_type == "variance":
-            std = np.nanstd(data, axis=axis)**2
-        else:
-            raise ValueError("error_type, {}, is not supported".format(error_type))
-        if np.any(lx > 8):
-            tmp = scipy.stats.normaltest(data, axis=axis).pvalue
-            if np.any(tmp < 0.05):
-                warnings.warn("This dataset is not normal according to scipy.normaltest() with a pvalue={}".format(tmp))
-    else:
+    if np.size(data) == 0 and np.size(data) == np.isnan(data).sum():
         mean = np.nan
-        std = np.nan
+        spread = np.nan
 
-    return mean, std
+        return mean, spread
+
+    if data_type == "means" and error_descriptor == "mean":
+        raise ValueError("If the provided data is a set of sample means, the error_descriptor should be 'distribution', since the mean of this dataset is already the standard error.")
+
+    # Find the sample size(s)
+    if axis is None:
+        lx = np.prod(np.shape(data)) - np.isnan(data).sum()
+    elif isinstance(axis, tuple):
+        not_axis = (x for x in range(len(np.shape(data))) if x not in axis)
+        lx = np.prod([x for i,x in enumerate(np.shape(data)) if i in axis])*np.ones(not_axis)
+        lx -= np.isnan(data).sum(axis)
+    elif isinstance(axis, int):
+        lx = np.shape(data)[axis] - np.isnan(data).sum(axis)
+    else:
+        raise ValueError("This entry for 'axis' is not valid: {}".format(axis))
+
+    mean = np.nanmean(data, axis=axis)
+    if error_descriptor == "mean": # If standard error is desired from sample population
+        spread = np.nanstd(data, axis=axis)
+        spread = spread / np.sqrt(lx)
+    elif error_descriptor == "sample":
+        spread = np.nanstd(data, axis=axis)
+    else:
+        raise ValueError("error_descriptor, {}, is not supported, should be 'mean' or 'sample'".format(error_descriptor))
+   
+    if population_dist_type not in ["normal", "unknown"]:
+        raise ValueError("population_dist_type, {}, is not supported, should be 'normal' or 'unknown'".format(population_dist_type))
+        
+    if error_type == "standard_deviation":
+        pass
+    elif error_type == "variance":
+        spread = spread**2
+    elif error_type == "confidence":
+        if np.all(lx >= 30) or population_dist_type == "normal":
+            spread = spread * scipy.stats.norm.interval(confidence, scale=1, loc=0)[-1]
+        else:
+            print("Using t-distribution")
+            spread = spread * scipy.stats.t.interval(confidence, scale=1, loc=0, df=lx-1)[-1]
+    else:
+        raise ValueError("error_type, {}, is not supported".format(error_type))
+
+    return mean, spread
 
 def skewness(data, kwargs={}):
     """
