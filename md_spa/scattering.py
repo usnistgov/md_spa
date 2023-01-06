@@ -1,11 +1,15 @@
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from md_spa_utils import file_manipulation as fm
+from md_spa_utils import data_manipulation as dm
 
 from .cython_modules import _scattering_functions as scat
 from . import misc_functions as mf
 from . import read_lammps as rl
+from . import custom_fit as cfit
+
 
 def static_structure_factor(traj, dims, elements, qmax=10, qmin=None, kwargs_linspace=None, flag="python"):
     """ Calculate the isotropic static structure factor
@@ -119,7 +123,7 @@ def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", g
         isf = np.nanmean(np.square(f_values)[None,:] * np.sin( qr ) / ( qr ), axis=1)
         #cumf2 = np.sum(np.square(f_values))
         cumf2 = 1
-        isf /= cumf2
+        isf /= cumf
         if group_ids is not None:
             isf = [isf]
             for tmp_ids in group_ids:
@@ -130,3 +134,129 @@ def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", g
                 isf.append(tmp_isf)
 
     return np.array(isf)
+
+def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="stretched_exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, n_exponentials=1, beta=None):
+    """
+    Extract the characteristic time fit to a stretched exponential or two stretched exponential
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        Independent data set ranging from 0 to some quantity
+    ydata : numpy.ndarray
+        Dependent data set, starting at unity and decaying exponentially 
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+    save_plots : bool, Optional, default=False
+        If not None, plots comparing the exponential fits will be saved to this filename 
+    plot_name : str, Optional, default=None
+        Plot filename and path
+    show_plot : bool, Optional, default=False
+        If true, the fits will be shown
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimize()``
+    ydata_min : float, Optional, default=0.1
+        Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
+    n_exponentials : int, Optional, default=1
+        Can be 1 or 2, if the latter, the default exponent for the first exponential is the phenomenological form of 3/2 (DOI: 10.1007/978-3-030-60443-1_5) unless ``beta`` is defined.
+    beta : float, Optional, default=None
+        Exponent of the stretched exponential decay. If ``n_exponential == 2 and beta == None`` then ``beta = 3/2`` is used. Set beta as an iterable of length two to set both exponents when appropriate. Set ``beta == False`` to remove the set value of 3/2.
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ['tau', 'beta'] or ['A', 'tau1', 'beta1', 'tau2', 'beta2']
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors from lmfit: ['tau'] or ['A', 'tau1', 'beta1', 'tau2', 'beta2']
+
+    """
+
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
+
+    if yarray[-1] > ydata_min:
+        warnings.warn("Exponential decays to {}, above threshold {}. Maximum tau value to evaluate the residence time, or increase the keyword value of ydata_min.".format(yarray[-1],ydata_min))
+        flag_long = True
+    else:
+        flag_long = False
+
+    if n_exponentials == 1:
+        if beta is not None:
+            if isinstance(beta, (int,float)):
+                kwargs_parameters={"beta1": {"value": beta, "vary": False}}
+            else:
+                raise ValueError("Beta must be an int or float")
+        else:
+            kwargs_parameters = {}
+        output, uncertainties = cfit.stretched_exponential_decay(xarray, yarray,
+                                                         verbose=verbose,
+                                                         minimizer=minimizer,
+                                                         kwargs_minimizer=kwargs_minimizer,
+                                                         kwargs_parameters=kwargs_parameters,
+                                                        )
+    elif n_exponentials == 2:
+        if beta is not None:
+            if isinstance(beta, (int,float)) and not isinstance(beta, bool):
+                kwargs_parameters={"beta1": {"value": beta, "vary": False}}
+            elif dm.isiterable(beta) and len(beta) <= 2:
+                if len(beta) == 1:
+                    kwargs_parameters={"beta1": {"value": beta[0], "vary": False}}
+                else:
+                    kwargs_parameters={
+                        "beta1": {"value": beta[0], "vary": False},
+                        "beta2": {"value": beta[1], "vary": False},
+                    }
+            elif isinstance(beta, bool) and not beta:
+                kwargs_parameters = {}
+            else:
+                raise ValueError("Beta must be an int, float, or iterable of length <= 2")
+        else:
+            kwargs_parameters={"beta1": {"value": 3/2, "vary": False}}
+        # Make function to guess starting parameters based on the derivative of spline from data?
+        output, uncertainties = cfit.two_stretched_exponential_decays(xarray, yarray,
+                                                      verbose=verbose,
+                                                      minimizer=minimizer,
+                                                      kwargs_minimizer=kwargs_minimizer,
+                                                      kwargs_parameters=kwargs_parameters,
+                                                     )
+    else:
+        raise ValueError("Only 1 or 2 stretched exponentials are supported")
+
+    if save_plot or show_plot:
+        fig, ax = plt.subplots(1,2, figsize=(6,3))
+        if n_exponentials == 1:
+            yfit = np.exp(-(xarray/output[0])**output[1])
+            ax[0].plot(xarray,yarray,".",label="Data")
+            ax[0].plot(xarray,yfit, label="Fit",linewidth=1)
+            ax[1].plot(xarray,yarray,".",label="Data")
+            ax[1].plot(xarray,yfit, label="Fit",linewidth=1)
+        else:
+            params = {key: value for key, value in zip(['A', 'tau1', 'beta1', 'tau2', 'beta2'], output)}
+            yfit = cfit._res_two_stretched_exponential_decays(params, xarray, 0.0)
+            ax[0].plot(xarray,yarray,".",label="Data")
+            ax[0].plot(xarray,yfit, label="Fit",linewidth=1)
+            ax[1].plot(xarray,yarray,".",label="Data")
+            ax[1].plot(xarray,yfit, label="Fit",linewidth=1)
+        ax[0].set_ylabel("$F_S(q,t)$")
+        ax[0].set_xlabel("Time")
+        ax[0].set_xscale('log')
+        ax[1].set_ylabel("$F_S(q,t)$")
+        ax[1].set_xlabel("Time")
+        ax[1].set_xscale('log')
+        ax[1].set_yscale('log')
+        ax[1].legend(loc="best")
+        plt.tight_layout()
+        if save_plot:
+            plt.savefig(plot_name,dpi=300)
+
+        if show_plot:
+            plt.show()
+        plt.close("all")
+
+    return output, uncertainties
+

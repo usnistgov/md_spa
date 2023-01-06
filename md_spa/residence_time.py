@@ -31,9 +31,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     show_plot : bool, Optional, default=False
         If true, the fits will be shown
     kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
-    kwargs_matrix_lsq : dict, Optional, default={}
-        Kwayword arguments for ``matrix_least_squares``
+        Keyword arguments for ``lmfit.minimize()``
     ydata_min : float, Optional, default=0.1
         Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
     tau_logscale : bool, Optional, default=False

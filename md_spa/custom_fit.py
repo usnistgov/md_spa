@@ -609,6 +609,230 @@ def _d_three_exponential_decays(params0, xarray, yarray, switch=None):
 
     return np.transpose(np.array(output))
 
+def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
+    """
+    Provided data fit to:
+
+    Values of zero and NaN are ignored in the fit.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ydata : numpy.ndarray
+        dependent data set
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+
+        - ``"tau" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"beta" = {"value": 3/2, "min": np.finfo(float).eps, "max":3}``
+
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ['tau']
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: [beta']
+        
+    """
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
+
+    param_kwargs = {
+                    "tau": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4},
+                    "beta": {"value": 0.1, "min": np.finfo(float).eps, "max":3},
+                   }
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.stretched exponential_decay, which requires parameters: 'tau' and 'beta'".format(key))
+
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
+
+    exp = Parameters()
+    exp.add("tau", **param_kwargs["tau"])
+    exp.add("beta", **param_kwargs["beta"])
+    if minimizer in ["leastsq"]:
+        kwargs_min["Dfun"] = _d_stretched_exponential_decay
+    Result1 = lmfit.minimize(_res_stretched_exponential_decay, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
+
+    # Format output
+    output = np.zeros(2)
+    uncertainties = np.zeros(2)
+    for i,(param, value) in enumerate(Result1.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        if minimizer == "leastsq":
+            print("Termination: {}".format(Result1.lmdif_message))
+        else:
+            print("Termination: {}".format(Result1.message))
+        lmfit.printfuncs.report_fit(Result1.params)
+
+    return output, uncertainties
+
+def _res_stretched_exponential_decay(params, xarray, yarray, switch=None):
+    return -(xarray/params["tau"])**params["beta"] - np.log(yarray)
+
+def _d_stretched_exponential_decay(params, xarray, yarray, switch=None):
+
+    tmp_output = []
+    tmp_output.append( params["beta"]/params["tau"] * (xarray/params["tau"])**params["beta"] * np.exp(-(xarray/params["tau"])**params["beta"] ) ) # tau
+    tmp_output.append( -np.log(xarray/params["tau"]) * (xarray/params["tau"])**params["beta"] * np.exp(-(xarray/params["tau"])**params["beta"] ) ) # tau
+
+    output = []
+    if np.all(switch != None):
+        for i, tf in enumerate(switch):
+            if tf:
+                output.append(tmp_output[i])
+    else:
+        output = tmp_output
+
+    if len(tmp_output) == 2 and np.isnan(tmp_output[1][0]):
+        raise ValueError("Dfun in scipy.optimize.leastsq cannot handle NaN values, please exclude t=0 from the fit or don't analytically calculate the Jacobian.")
+
+    return np.transpose(np.array(output))
+
+def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
+    """
+    Provided data fit to:
+
+    Values of zero and NaN are ignored in the fit.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ydata : numpy.ndarray
+        dependent data set
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
+
+        - ``"A" = {"value": 0.8, "min": 0, "max":1}``
+        - ``"tau1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"beta1" = {"value": 1/2, "min": np.finfo(float).eps, "max":3}``
+        - ``"tau2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
+        - ``"beta2" = {"value": 3/2, "min": np.finfo(float).eps, "max":3}``
+
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
+        
+    """
+
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
+
+    param_kwargs = {
+        "A": {"value": 0.8, "min": 0, "max":1},
+        "tau1": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4},
+        "beta1": {"value": 1/2, "min": np.finfo(float).eps, "max":3},
+        "tau2": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4},
+        "beta2": {"value": 3/2, "min": np.finfo(float).eps, "max":3},
+    }
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'A', 'tau1', 'beta1', 'tau2' and 'beta2'".format(key))
+
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
+
+    exp = Parameters()
+    exp.add("A", **param_kwargs["A"])
+    exp.add("tau1", **param_kwargs["tau1"])
+    exp.add("beta1", **param_kwargs["beta1"])
+    exp.add("tau2", **param_kwargs["tau2"])
+    exp.add("beta2", **param_kwargs["beta2"])
+
+    if minimizer in ["leastsq"]:
+        kwargs_min["Dfun"] = _d_two_stretched_exponential_decays
+    Result2 = lmfit.minimize(_res_two_stretched_exponential_decays, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
+
+    # Format output
+    output = np.zeros(5)
+    uncertainties = np.zeros(5)
+    for i,(param, value) in enumerate(Result2.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        if minimizer == "leastsq":
+            print("Termination: {}".format(Result2.lmdif_message))
+        else:
+            print("Termination: {}".format(Result2.message))
+        lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
+
+    return output, uncertainties
+
+def _res_two_stretched_exponential_decays(params, xarray, yarray, switch=None):
+    return params["A"]*np.exp(-(xarray/params["tau1"])**params["beta1"]) + (1-params["A"])*np.exp(-(xarray/params["tau2"])**params["beta2"]) - yarray
+
+def _d_two_stretched_exponential_decays(params, xarray, yarray, switch=None):
+
+    tmp_output = []
+    ratio1 = (xarray/params["tau1"])**params["beta1"]
+    ratio2 = (xarray/params["tau2"])**params["beta2"]
+    exp1 = np.exp(-ratio1)
+    exp2 = np.exp(-ratio2)
+    tmp_output.append(exp1-exp2)
+    tmp_output.append( params["A"]*params["beta1"]/params["tau1"] * ratio1 * exp1 ) # tau1
+    tmp_output.append( -params["A"]*np.log(xarray/params["tau1"]) * ratio1 * exp1 ) # beta1 
+    tmp_output.append( -params["A"]*params["beta2"]/params["tau2"] * ratio2 * exp2 ) # tau2
+    tmp_output.append( params["A"]*np.log(xarray/params["tau2"]) * ratio2 * exp2 ) # beta2 
+
+    output = []
+    if np.all(switch != None):
+        for i, tf in enumerate(switch):
+            if tf:
+                output.append(tmp_output[i])
+                if i == 2 and np.isnan(tmp_output[i][0]):
+                    raise ValueError("Dfun in scipy.optimize.leastsq cannot handle NaN values, please exclude t=0 from the fit or don't analytically calculate the Jacobian.")
+    else:
+        output = tmp_output
+        if np.isnan(tmp_output[2][0]):
+            raise ValueError("Dfun in scipy.optimize.leastsq cannot handle NaN values, please exclude t=0 from the fit or don't analytically calculate the Jacobian.")
+
+    return np.transpose(np.array(output))
+
 def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
     """
     Fit Gaussian function to data with ``lmfit.GaussianModel``
