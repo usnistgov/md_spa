@@ -126,38 +126,32 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         uncertainties[6:] = tmp_error3
 
     if save_plot or show_plot:
+        fig, ax = plt.subplots(1,2, figsize=(6,3))
         yfit1 = tmp_output1[0]*np.exp(-xarray/tmp_output1[1])
-        plt.plot(xarray,yarray,".",label="Data")
-        plt.plot(xarray,yfit1,label="1 Exp.",linewidth=1)
+        ax[0].plot(xarray,yarray,".",label="Data")
+        ax[0].plot(xarray,yfit1,label="1 Exp.",linewidth=1)
         params = {key: value for key, value in zip(["a1","t1","a2","t2"],tmp_output2)}
         yfit2 = cfit._res_two_exponential_decays(params, xarray, 0.0)
-        plt.plot(xarray,yfit2,label="2 Exp.",linewidth=1)
+        ax[0].plot(xarray,yfit2,label="2 Exp.",linewidth=1)
         if not flag_long:
             params = {key: value for key, value in zip(["a1","t1","a2","t2", "a3", "t3"],tmp_output3)}
             yfit3 = cfit._res_three_exponential_decays(params, xarray, 0.0)
-            plt.plot(xarray,yfit3,label="3 Exp.",linewidth=1)
-        plt.ylabel("Probability")
-        plt.xlabel("Time")
-        plt.tight_layout()
-        plt.legend(loc="best")
-        if save_plot:
-            plt.savefig(plot_name,dpi=300)
+            ax[0].plot(xarray,yfit3,label="3 Exp.",linewidth=1)
+        ax[0].set_ylabel("Probability")
+        ax[0].set_xlabel("Time")
 
-        plt.figure(2)
-        plt.plot(xarray,yarray,".",label="Data")
-        plt.plot(xarray,yfit1,label="1 Exp.",linewidth=1)
-        plt.plot(xarray,yfit2,label="2 Exp.",linewidth=1)
+        ax[1].plot(xarray,yarray,".",label="Data")
+        ax[1].plot(xarray,yfit1,label="1 Exp.",linewidth=1)
+        ax[1].plot(xarray,yfit2,label="2 Exp.",linewidth=1)
         if not flag_long:
-            plt.plot(xarray,yfit3,label="3 Exp.",linewidth=1)
-        plt.ylabel("log Probability")
-        plt.xlabel("Time")
-        plt.tight_layout()
-        plt.yscale('log')
-        plt.legend(loc="best")
+            ax[1].plot(xarray,yfit3,label="3 Exp.",linewidth=1)
+        ax[1].set_ylabel("log Probability")
+        ax[1].set_xlabel("Time")
+        ax[1].set_yscale('log')
+        ax[1].legend(loc="best")
+        fig.tight_layout()
         if save_plot:
-            tmp_save_plot = list(os.path.split(plot_name))
-            tmp_save_plot[1] = "log_"+tmp_save_plot[1]
-            plt.savefig(os.path.join(*tmp_save_plot),dpi=300)
+            fig.savefig(plot_name,dpi=300)
 
         if show_plot:
             plt.show()
