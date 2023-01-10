@@ -210,7 +210,7 @@ def write_csv(filename, array, mode="a", header=None, header_comment="#", delimi
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")
 
-def csv2dict(filename, comment="#"):
+def csv2dict(filename, comment="#", tiers=1):
     """ Create dict from csv file
 
     The last commented header line is assumed to be the categories and the first column the keys.
@@ -222,7 +222,18 @@ def csv2dict(filename, comment="#"):
     B, 4, 5, 6
 
     Will result in the dictionary: ``dictionary = {"A": {"prop1": 1, "prop2": 2, "prop3": 3}, 
-        "B": {"prop1": 4, "prop2": 5, "prop3": 6}}``
+        "B": {"prop1": 4, "prop2": 5, "prop3": 6}}`` for ``tiers == 1``
+
+    If ``tiers == 2`` then the second column entries are also used as keys such as the following:
+ 
+    # This is a file
+    # type, subtype, prop1, prop2, prop3
+    A, a, 1, 2, 3
+    A, b, 4, 5, 6
+    B, b, 7, 8, 9
+
+    Will result in the dictionary: ``dictionary = {"A": {"a": {"prop1": 1, "prop2": 2, "prop3": 3}, 
+        "b": {"prop1": 4, "prop2": 5, "prop3": 6}}, "B": {"b": {"prop1": 7, "prop2": 8, "prop3": 9}}}``
 
     Numbers are converted accordingly
 
@@ -232,6 +243,8 @@ def csv2dict(filename, comment="#"):
         File name to the csv file
     comment : str, Optional, default="#"
         String at the beginning of a line to denote a comment
+    tiers : int, Optional, default=1
+        Number of tiers in dictionary before the remaining entries are in a single dictionary with column header values as keys.
 
     Returns
     -------
@@ -253,13 +266,24 @@ def csv2dict(filename, comment="#"):
     output = {}
     for i,line in enumerate(data):
         if comment in line[0]:
-            header = line[1:] # First column is irrelevant
+            header = line[tiers:] # Column headers for tiers are irrelevant
         else:
             if header is None:
                 raise ValueError("Commented column headers were not found")
-            if len(header) != len(line[1:]):
-                raise ValueError("The number of column headers ({}) does not equal the number of columns ({}) in line {}".format(len(header),len(line[1:]),i))
-            output[line[0]] = {header[x]: line[x+1] for x in range(len(header))}
+            if len(header) != len(line[tiers:]):
+                raise ValueError("The number of column headers ({}) does not equal the number of columns ({}) in line {}".format(len(header),len(line[tiers:]),i))
+
+            tier_keys = line[:tiers]
+            tmp_dict = output
+            for j, key in enumerate(tier_keys):
+                if j+1 == tiers:
+                    if key in tmp_dict:
+                        warnings.warn("Overwriting entries for tiers: dict[{}]".format("][".join([str(x) for x in tier_keys])))
+                    tmp_dict[key] = {header[x]: line[x+tiers] for x in range(len(header))}
+                else:
+                    if key not in tmp_dict:
+                        tmp_dict[key] = {}
+                    tmp_dict = tmp_dict[key]
 
     return output
     
