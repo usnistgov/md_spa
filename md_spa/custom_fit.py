@@ -628,8 +628,8 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     kwargs_parameters : dict, Optional
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
 
-        - ``"tau" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4}``
-        - ``"beta" = {"value": 3/2, "min": np.finfo(float).eps, "max":3}``
+        - ``"tau" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2}``
+        - ``"beta" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
     verbose : bool, Optional, default=False
         Output fitting statistics
@@ -650,8 +650,8 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
         raise ValueError("y-axis data is NaN")
 
     param_kwargs = {
-                    "tau": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4},
-                    "beta": {"value": 0.1, "min": np.finfo(float).eps, "max":3},
+                    "tau": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2},
+                    "beta": {"value": 0.1, "min": np.finfo(float).eps, "max":5},
                    }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
@@ -732,10 +732,10 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
 
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
-        - ``"tau1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
-        - ``"beta1" = {"value": 1/2, "min": np.finfo(float).eps, "max":3}``
-        - ``"tau2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
-        - ``"beta2" = {"value": 3/2, "min": np.finfo(float).eps, "max":3}``
+        - ``"tau1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
+        - ``"beta1" = {"value": 1/2, "min": np.finfo(float).eps, "max":5}``
+        - ``"tau2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
+        - ``"beta2" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
     verbose : bool, Optional, default=False
         Output fitting statistics
@@ -758,10 +758,10 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
 
     param_kwargs = {
         "A": {"value": 0.8, "min": 0, "max":1},
-        "tau1": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4},
-        "beta1": {"value": 1/2, "min": np.finfo(float).eps, "max":3},
-        "tau2": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4},
-        "beta2": {"value": 3/2, "min": np.finfo(float).eps, "max":3},
+        "tau1": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2},
+        "beta1": {"value": 1/2, "min": np.finfo(float).eps, "max":5},
+        "tau2": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2},
+        "beta2": {"value": 3/2, "min": np.finfo(float).eps, "max":5},
     }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
@@ -1099,9 +1099,9 @@ def stretched_cumulative_exponential(xarray, yarray, minimizer="leastsq", weight
 
     if verbose:
         if minimizer == "leastsq":
-            print("N-Gaussians. Termination: {}".format(Result1.lmdif_message))
+            print("Termination: {}".format(Result1.lmdif_message))
         else:
-            print("N-Gaussians. Termination: {}".format(Result1.message))
+            print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
     return output, uncertainties

@@ -79,7 +79,7 @@ def static_structure_factor(traj, dims, elements, qmax=10, qmin=None, kwargs_lin
 
 
 def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", group_ids=None):
-    """ Calculate the isotropic static structure factor
+    """ Calculate the isotropic coherent intermediate scattering function
 
     Parameters
     ----------
@@ -187,8 +187,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
 
     if n_exponentials == 1:
         if beta is not None:
-            if isinstance(beta, (int,float)):
-                kwargs_parameters={"beta1": {"value": beta, "vary": False}}
+            if isinstance(beta, (int,float)) and not isinstance(beta, bool):
+                kwargs_parameters={"beta": {"value": beta, "vary": False}}
             else:
                 raise ValueError("Beta must be an int or float")
         else:
@@ -224,8 +224,17 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                       kwargs_minimizer=kwargs_minimizer,
                                                       kwargs_parameters=kwargs_parameters,
                                                      )
+        if output[1] < output [3]:
+            output[0] = 1 - output[0]
+            tmp_output = output[1:3].copy()
+            output[1:3] = output[3:]
+            output[3:] = tmp_output
+            tmp_uncertainties = uncertainties[1:3].copy()
+            uncertainties[1:3] = uncertainties[3:]
+            uncertainties[3:] = tmp_uncertainties
     else:
         raise ValueError("Only 1 or 2 stretched exponentials are supported")
+
 
     if save_plot or show_plot:
         fig, ax = plt.subplots(1,2, figsize=(6,3))
