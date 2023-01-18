@@ -224,7 +224,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                       kwargs_minimizer=kwargs_minimizer,
                                                       kwargs_parameters=kwargs_parameters,
                                                      )
-        if output[1] < output [3]:
+        if output[1] > output [3]:
             output[0] = 1 - output[0]
             tmp_output = output[1:3].copy()
             output[1:3] = output[3:]

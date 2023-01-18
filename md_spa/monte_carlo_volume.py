@@ -34,14 +34,14 @@ def random_points(npts, ranges):
 
 def overlapping_spheres(rcut, ref_pts, npts=1e+4, repeats=3):
     """
-    Monte Carlo code to determine the volume of sevewral overlapping spheres
+    Monte Carlo code to determine the volume of several overlapping spheres
 
     Parameters
     ----------
-    ref_pts : numpy.ndarray
-        Array of reference points for centers of circles    
     rcut : float/numpy.ndarray
         Radius of the circles, or an array of different radii for each circle.
+    ref_pts : numpy.ndarray
+        Array of reference points for centers of circles    
     npts : int, Optional, default=1e+4
         Number of vector "points" to produce. 
     repeats : int, Optional, default=3
@@ -78,7 +78,7 @@ def overlapping_spheres(rcut, ref_pts, npts=1e+4, repeats=3):
 
         #in_vol = np.array([np.any(np.array([np.sum((ref_pts[i]-x)**2)<=rcut[i]**2 for i in range(len(rcut))])) for x in test_pts], dtype=bool)
         region_volumes[k] = volume*len(np.where(in_vol==True)[0])/npts
-    final_stats = dm.basic_stats(region_volumes, error_type="standard_dev")
+    final_stats = dm.basic_stats(region_volumes, error_descriptor="sample")
 
     return final_stats[0], final_stats[1]
 
