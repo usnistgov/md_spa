@@ -4,9 +4,11 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize as spo
+import scipy.special as sps
 
 import lmfit
 from lmfit import minimize, Parameters
+
 
 def matrix_least_squares(xdata, ydata, sample_array={}, method="nnls", method_kwargs={}, function="exponential_decay", verbose=False):
     """
@@ -118,6 +120,7 @@ def matrix_least_squares(xdata, ydata, sample_array={}, method="nnls", method_kw
 
     return final_prefactors, final_tau
 
+
 def exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
     Provided data fit to:
@@ -218,6 +221,7 @@ def _d_exponential_decay(params, xarray, yarray, switch=None):
         output = tmp_output
 
     return np.transpose(np.array(output))
+
 
 def two_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False):
     """
@@ -394,6 +398,7 @@ def _d_two_exponential_decays(params0, xarray, yarray, switch=None):
         output = tmp_output
 
     return np.transpose(np.array(output))
+
 
 def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False):
     """
@@ -609,6 +614,7 @@ def _d_three_exponential_decays(params0, xarray, yarray, switch=None):
 
     return np.transpose(np.array(output))
 
+
 def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
     Provided data fit to:
@@ -710,6 +716,7 @@ def _d_stretched_exponential_decay(params, xarray, yarray, switch=None):
         raise ValueError("Dfun in scipy.optimize.leastsq cannot handle NaN values, please exclude t=0 from the fit or don't analytically calculate the Jacobian.")
 
     return np.transpose(np.array(output))
+
 
 def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
@@ -833,6 +840,7 @@ def _d_two_stretched_exponential_decays(params, xarray, yarray, switch=None):
 
     return np.transpose(np.array(output))
 
+
 def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
     """
     Fit Gaussian function to data with ``lmfit.GaussianModel``
@@ -884,6 +892,7 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
         uncertainties[i] = value.stderr
 
     return output, uncertainties
+
 
 def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
@@ -997,6 +1006,7 @@ def _d_n_gaussians(params, xarray, yarray, num):
     output = np.concatenate(out, axis=0)
 
     return np.transpose(np.array(output))
+
 
 def stretched_cumulative_exponential(xarray, yarray, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
@@ -1245,6 +1255,7 @@ def _res_double_cumulative_exponential(x, xarray, yarray, weighting=None):
         error = error*np.array(weighting)
     return error
 
+
 def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}):
     """
     Provided data fit to:
@@ -1342,6 +1353,7 @@ def _res_double_viscosity_cumulative_exponential(x, xarray, yarray, weighting=No
         error = error*np.array(weighting)
     return error
 
+
 def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_minimizer={}):
     """
     Provided data fit to: ..math:`A*x^{b}` after linearizing with a log transform.
@@ -1406,4 +1418,120 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
         lmfit.printfuncs.report_fit(result.params)
 
     return output, uncertainties
+
+
+def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False,):
+    """
+    Provided data fit to: ..math:`A*x^{b}` after linearizing with a log transform.
+
+    Values of zero and NaN are ignored in the fit.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ydata : numpy.ndarray
+        dependent data set
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same length as the provided data, contains the weights for each data point.
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+
+        - ``"alpha" = {"value": 0.1, "min": 0, "max":100}``
+        - ``"beta" = {"value": 1.0, "min": 0, "max":100}``
+
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ["alpha", "beta"]
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: ["alpha", "beta"]
+        
+    """
+
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
+
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
+
+    if np.all(weighting != None):
+        weighting = weighting[ydata>0]
+        if minimizer == "emcee":
+            kwargs_min["is_weighted"] = True
+    elif minimizer == "emcee":
+        kwargs_min["is_weighted"] = False
+
+    param_kwargs = {
+                    "alpha": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+2},
+                    "beta": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2},
+                   }
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.gamma_distribution, which requires parameters: 'alpha' and 'beta'".format(key))
+
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
+
+    exp1 = Parameters()
+    exp1.add("alpha", **param_kwargs["alpha"])
+    exp1.add("beta", **param_kwargs["beta"])
+    if minimizer in ["leastsq"]:
+        kwargs_min["Dfun"] = _d_gamma_distribution
+    Result1 = lmfit.minimize(_res_gamma_distribution, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
+
+    # Format output
+    output = np.zeros(2)
+    uncertainties = np.zeros(2)
+    for i,(param, value) in enumerate(Result1.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        if minimizer == "leastsq":
+            print("Termination: {}".format(Result1.lmdif_message))
+        else:
+            print("Termination: {}".format(Result1.message))
+        lmfit.printfuncs.report_fit(Result1.params)
+
+    return output, uncertainties
+
+def _res_gamma_distribution(params, xarray, yarray, switch=None):
+    term1 = params["beta"]**params["alpha"] / sps.gamma(params["alpha"])
+    term2 = xarray**(params["alpha"] - 1.0)
+    term3 = np.exp(-params["beta"]*xarray)
+    return term1 * term2 * term3 - yarray
+
+def _d_gamma_distribution(params, xarray, yarray, switch=None):
+    term1 = params["beta"]**params["alpha"] / sps.gamma(params["alpha"])
+    term2 = xarray**(params["alpha"] - 1.0)
+    term3 = np.exp(-params["beta"]*xarray)
+
+    tmp_output = []
+    tmp_output.append(term1 * term2 * term3 * (-sps.digamma(params["alpha"]) + np.log(params["beta"]) + np.log(xarray))) # alpha
+    tmp_output.append(term1/params["beta"] * term2 * term3 * (params["alpha"] - params["beta"] * xarray)) # beta
+
+    output = []
+    if np.all(switch != None):
+        for i, tf in enumerate(switch):
+            if tf:
+                output.append(tmp_output[i])
+    else:
+        output = tmp_output
+
+    return np.transpose(np.array(output))
 
