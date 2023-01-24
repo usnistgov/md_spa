@@ -97,6 +97,8 @@ def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", g
     group_ids : list[lists], Optional, default=None
         Optional list of group ids will produce the total isf, in addition to isf of other groups
         destinguished by the given ids.
+    flag : str, Optional, default='python'
+        Choose 'python' implementation or accelerated 'cython' option.
 
     Returns
     -------
@@ -134,6 +136,51 @@ def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", g
                 isf.append(tmp_isf)
 
     return np.array(isf)
+
+def self_van_hove(traj, r_max=7.0, dr=0.1, flag="python", group_ids=None):
+    """ Calculate the self van Hove equation.
+
+    Parameters
+    ----------
+    traj : numpy.ndarray
+        Trajectory of atoms, usually log spaced by some base (e.g., 2) although this 
+        choice doesn't affect the inner workings of this function. Dimensions are 
+        (Nframes, Natoms, Ndims)
+    
+    group_ids : list[lists], Optional, default=None
+        Optional list of group ids will produce the total isf, in addition to isf of other groups
+        destinguished by the given ids.
+    flag : str, Optional, default='python'
+        Not yet enabled! Choose 'python' implementation or accelerated 'cython' option.
+
+    Returns
+    -------
+    structure_factor : numpy.ndarray
+        Array the isotropic self (coherent) intermediate scattering function.
+
+    """
+    if flag == "cython":
+        ValueError("Cython module is not yet available.")
+    else:
+        (nframes, natoms, ndims) = np.shape(traj)
+        r_array = np.arange(r_max+dr, dr)
+        nr = len(r_array)
+        displacements = np.sqrt(np.sum(np.square(traj-traj[0,:,:][None,:,:]),axis=-1))
+        gs = np.zeros((nr, nframes+1))
+        gs[:,0] = r_array[:-1]+dr/2
+        for i, disp in enumerate(displacements):
+            gs[:, i+1] = np.histogram(disp, bins=r_array)[0]/natoms
+
+        if group_ids is not None:
+            gs = [gs]
+            for tmp_ids in group_ids:
+                tmp_gs = np.zeros((nr, nframes+1))
+                tmp_gs[:,0] = r_array[:-1]+dr/2
+                for i, disp in enumerate(displacements):
+                    tmp_gs[:, i+1] = np.histogram(disp[tmp_ids], bins=r_array)[0]/len(tmp_ids)
+                gs.append(tmp_gs)
+
+    return np.array(gs)
 
 def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="stretched_exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, n_exponentials=1, beta=None):
     """
