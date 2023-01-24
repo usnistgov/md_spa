@@ -8,9 +8,13 @@
     custom_fit
     fit_data
     mdanalysis
+    misc_functions
+    monte_carlo_volume
     msd
     rdf
+    read_lammps
     residence_time
+    scattering
     viscosity
     zeno
     
