@@ -3,7 +3,7 @@ import numpy as np
 import scipy.stats
 import warnings
 
-def basic_stats(data, axis=None, data_type="individuals", error_type="standard_deviation", error_descriptor="mean", confidence=0.95, population_dist_type="unknown"):
+def basic_stats(data, axis=None, data_type="individuals", error_type="standard_deviation", error_descriptor="mean", confidence=0.95, population_dist_type="unknown", verbose=False):
     """
     Given a set of data, calculate the mean and standard error
 
@@ -22,13 +22,15 @@ def basic_stats(data, axis=None, data_type="individuals", error_type="standard_d
         - "means": Provided data represent sample means
 
     error_type : str, Optional, default="standard_deviation"
-        Type of error to be output, can be "standard_deviation", "variance", or "confidence" for either the population or sample mean distribution (unless ``data_type="means"``. Note that the standard error is the standard deviation of the sample mean distribution so the keyword arguements would provide this result when a sample population (e.g., ``data_type="individuals"``) is provided with: ``error_type="standard_deviation", error_descriptor="mean"``, or when sample means are provided (e.g., ``data_type="means"``) the keyword arguements would be: ``error_type="standard_deviation", error_descriptor="distribution"``
+        Type of error to be output, can be "standard_deviation", "variance", or "confidence" for either the population or sample mean distribution (unless ``data_type="means"``. Note that the standard error is the standard deviation of the sample mean distribution so the keyword arguements would provide this result when a sample population (e.g., ``data_type="individuals"``) is provided with: ``error_type="standard_deviation", error_descriptor="mean"``, or when sample means are provided (e.g., ``data_type="means"``) the keyword arguements would be: ``error_type="standard_deviation", error_descriptor="sample"``
     error_descriptor : str, Optional, default="mean"
         Specify whether the error value should represent the distribution of the provided data or the sample mean distribution with "sample" or "mean" respectively.
     confidence : float, Optional, default=0.95
         Confidence Interval certainty, used when ``error_type = "confidence"``. If the number of samples in the distribution is less than 30 and ``population_dist_type="unknown"``, then t-statistics are used, if  n>30 or population_dist_type="normal" then z-statistics are used.
     population_dist_type : str, Optional, default="unknown"
         If the population distribution type is unknown, then the size of the sample must be greater than or equal to 30 for z-statistics to be used. If the population is known to be normal, then this action can be overwritten with the specificiation of ``population_dist_type="normal"``.
+    verbose : bool, Optional, default=False
+        Display algorithmic decisions
 
     Returns
     -------
@@ -50,7 +52,7 @@ def basic_stats(data, axis=None, data_type="individuals", error_type="standard_d
         return mean, spread
 
     if data_type == "means" and error_descriptor == "mean":
-        raise ValueError("If the provided data is a set of sample means, the error_descriptor should be 'distribution', since the mean of this dataset is already the standard error.")
+        raise ValueError("If the provided data is a set of sample means, the error_descriptor should be 'sample', since the mean of this dataset is already the standard error.")
 
     # Find the sample size(s)
     if axis is None:
@@ -84,7 +86,8 @@ def basic_stats(data, axis=None, data_type="individuals", error_type="standard_d
         if np.all(lx >= 30) or population_dist_type == "normal":
             spread = spread * scipy.stats.norm.interval(confidence, scale=1, loc=0)[-1]
         else:
-            print("Using t-distribution")
+            if verbose:
+                print("Using t-distribution")
             spread = spread * scipy.stats.t.interval(confidence, scale=1, loc=0, df=lx-1)[-1]
     else:
         raise ValueError("error_type, {}, is not supported".format(error_type))
