@@ -225,7 +225,7 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
 
     return rdf_output
 
-def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
+def calc_msds(u, groups, dt=1, verbose=False, fft=False, run_kwargs={}):
     """
     Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
@@ -244,6 +244,8 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
         Define dt to convert frame numbers to time in picoseconds
     verbose : bool, Optional, default=False
         Set whether calculation will be run with comments
+    fft : bool, Optional, default=False
+        Choose whether to use the fft method, in that case the non gaussian parameter will not be computed.
     run_kwargs : dict, Optional, default={}
         Other keyword arguments from ``MDAnalysis.analysis.msd.MSD.run()``
 
@@ -263,10 +265,11 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
 
     nbins = len(u.trajectory)
     msd_output = np.zeros((len(groups)+1,nbins))
-    nongaussian_parameter = np.zeros((len(groups)+1,nbins))
+    if not fft:
+        nongaussian_parameter = np.zeros((len(groups)+1,nbins))
     flag_bins = False
     for i, group in enumerate(groups):
-        MSD = mda_msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=True)
+        MSD = mda_msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=fft)
         MSD.run(verbose=verbose, **run_kwargs)
         if verbose:
             print("Generated MSD for group {}".format(group))
@@ -274,11 +277,16 @@ def calc_msds(u, groups, dt=1, verbose=False, run_kwargs={}):
         if not flag_bins:
             flag_bins = True
             msd_output[0] = np.arange(MSD.n_frames)*dt # ps
-            nongaussian_parameter[0] = np.arange(MSD.n_frames)*dt # ps
+            if not fft:
+                nongaussian_parameter[0] = np.arange(MSD.n_frames)*dt # ps
         msd_output[i+1] = MSD.results.timeseries # angstroms^2
-        nongaussian_parameter[i+1] = MSD.results.nongaussian_parameter
+        if not fft:
+            nongaussian_parameter[i+1] = MSD.results.nongaussian_parameter
 
-    return msd_output, nongaussian_parameter
+    if not fft:
+        return msd_output, nongaussian_parameter
+    else:
+        return msd_output
 
 def calc_persistence_length(u, backbone_indices, save_plot=True, figure_name="plot_lp_fit.png", verbose=True):
     """
