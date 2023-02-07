@@ -109,7 +109,9 @@ def check_universe(universe):
         elif length == 2:
             u = generate_universe(*universe)
         elif length == 3:
-            u = generate_universe(universe[0], universe[1], universe[2])
+            if not isinstance(universe[2], dict):
+                raise ValueError("Keyword arguments must be provided in a dict")
+            u = generate_universe(universe[0], universe[1], kwargs=universe[2])
     else:
         raise ValueError("Input, {}, of type, {}, cannot be used to produce an MDAnalysis universe".format(universe, type(universe)))
 
