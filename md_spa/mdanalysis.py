@@ -271,7 +271,10 @@ def calc_msds(u, groups, dt=1, verbose=False, fft=False, run_kwargs={}):
         nongaussian_parameter = np.zeros((len(groups)+1,nbins))
     flag_bins = False
     for i, group in enumerate(groups):
-        MSD = mda_msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=fft)
+        if fft:
+            MSD = mda_msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=fft)
+        else:
+            MSD = mda_msd.EinsteinMSD(u, select=group, msd_type='xyz', fft=fft, nongaussian=True)
         MSD.run(verbose=verbose, **run_kwargs)
         if verbose:
             print("Generated MSD for group {}".format(group))
