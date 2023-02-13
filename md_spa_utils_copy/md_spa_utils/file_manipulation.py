@@ -174,7 +174,7 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_sta
                 f.write(", ".join([str(x) for x in data[i]])+"\n")
     
 
-def write_csv(filename, array, mode="a", header=None, header_comment="#", delimiter=", "):
+def write_csv(filename, array, mode="w", header=None, header_comment="#", delimiter=", "):
     """
     Write or append csv file.
 
@@ -184,7 +184,7 @@ def write_csv(filename, array, mode="a", header=None, header_comment="#", delimi
         Filename and path to csv file
     array : list
         This iterable object should be oriented so that axis=0 represents rows
-    mode : str, Optional, default="a"
+    mode : str, Optional, default="w"
         String to identify the mode with which to ``open(filename, mode)``
     header : list, Optional, default=None
         List of the same length as the second dimension
