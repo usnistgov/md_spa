@@ -292,7 +292,7 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
 
     best = np.array([np.nan for x in range(7)])
     longest = np.array([np.nan for x in range(7)])
-    for npts in range(min_Npts,len(time)):
+    for npts in range(min_Npts,len(time),skip):
         for i in range(0,len(time)-npts,skip):
             t_tmp = time[i:(i+npts)]
             msd_tmp = msd[i:(i+npts)]
