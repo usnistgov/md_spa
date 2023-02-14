@@ -84,7 +84,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
             kwargs_debye_waller["title"] = titles[i]
         best, longest = find_diffusivity(t_tmp, data[i], **kwargs_find_diffusivity)
         dw, tau = debye_waller(t_tmp, data[i], **kwargs_debye_waller)
-        tmp_data.append(list(additional_entries)+[titles[i],dw, tau]+list(best)+list(longest))
+        tmp_data.append(list(additional_entries)+[titles[i]]+list(dw)+list(tau)+list(best)+list(longest))
 
     file_headers = ["Group", "DW [Ang^2]", "tau [ps]", "Best D [Ang^2/ps]", "B D SE", "B t_bound1 [ps]", "B t_bound2 [ps]", "B Exponent", "B Intercept [Ang^2]", "B Npts", "Longest D [Ang^2/ps]", "L D SE", "L t_bound1 [ps]", "L t_bound2 [ps]", "L Exponent", "L Intercept [Ang^2]", "L Npts"]
     if not os.path.isfile(fileout) or mode=="w":
@@ -120,7 +120,10 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
     
     Returns
     -------
-    debye-waller : float
+    debye-waller-parameter : float
+        Instances where there is a 
+    tau : numpy.ndarray
+        Characteristic times associated with the Debye-Waller parameter values
 
     """
 
