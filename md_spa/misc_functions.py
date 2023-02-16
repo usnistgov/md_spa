@@ -96,5 +96,4 @@ t, wrapped if approproate.
         images = ( dimensions - pos_diff ) // dimensions
     pos_diff_new = pos_diff + images * dimensions
 
-    return pos_diff_new
 
