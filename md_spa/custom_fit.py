@@ -1150,7 +1150,7 @@ def _d_stretched_cumulative_exponential(params, xarray, yarray, weighting=None, 
     return out
 
 
-def double_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}, include_C=False):
+def double_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}, include_C=False):
     """
     Provided data fit to:
     ..math:`y= A_{1}*\{alpha}*(1-exp(-(x/\tau_{1}))) + A_{2}*(1-\{alpha})*(1-exp(-(x/\tau_{2}))) +C` 
@@ -1340,6 +1340,10 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", ve
         uncertainties[i] = value.stderr
 
     if verbose:
+        if minimizer == "leastsq":
+            print("1 Exp. Termination: {}".format(result.lmdif_message))
+        else:
+            print("1 Exp. Termination: {}".format(result.message))
         lmfit.printfuncs.report_fit(result.params)
 
     return output, uncertainties
