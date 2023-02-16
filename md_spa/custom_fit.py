@@ -1256,7 +1256,7 @@ def _res_double_cumulative_exponential(x, xarray, yarray, weighting=None):
     return error
 
 
-def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}):
+def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}):
     """
     Provided data fit to:
     ..math:`y= A*\{alpha}*\tau_{1}*(1-exp(-(x/\tau_{1}))) + A*(1-\{alpha})*\tau_{2}*(1-exp(-(x/\tau_{2})))` 
@@ -1330,10 +1330,10 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", ve
         raise ValueError("The parameter(s), {}, was/were given to custom_fit.double_cumulative_exponential, which requires parameters: 'A', 'alpha', 'tau1', 'tau2'".format(list(kwargs_parameters.keys())))
 
     if minimizer in ["leastsq"]:
-        kwargs_min["Dfun"] = _d_stretched_cumulative_exponential
+        kwargs_min["Dfun"] = _d_double_viscosity_cumulative_exponential
     elif minimizer in ["trust-exact"]:
-        kwargs_min["jac"] = _d_stretched_cumulative_exponential
-    result = lmfit.minimize(_res_double_cumulative_exponential, exp1, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting}, **kwargs_min)
+        kwargs_min["jac"] = _d_double_viscosity_cumulative_exponential
+    result = lmfit.minimize(_res_double_viscosity_cumulative_exponential, exp1, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting}, **kwargs_min)
 
     # Format output
     lx = len(result.params)
@@ -1345,9 +1345,9 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", ve
 
     if verbose:
         if minimizer == "leastsq":
-            print("1 Exp. Termination: {}".format(result.lmdif_message))
+            print("Termination: {}".format(result.lmdif_message))
         else:
-            print("1 Exp. Termination: {}".format(result.message))
+            print("Termination: {}".format(result.message))
         lmfit.printfuncs.report_fit(result.params)
 
     return output, uncertainties
