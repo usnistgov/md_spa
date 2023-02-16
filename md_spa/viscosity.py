@@ -52,6 +52,13 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", viscosit
     elif len(p_xy) not in [3,6]:
         raise ValueError("The array `p_xy` must be of shape (6,N) or (3,N)")
 
+    tmp_kwargs = {}
+    if "scale_coefficient" in viscosity_kwargs:
+        tmp_kwargs["scale_coefficient"] = viscosity_kwargs["scale_coefficient"]
+    if "error_type" in viscosity_kwargs:
+        tmp_kwargs["error_type"] = viscosity_kwargs["error_type"]
+    G_inf = high_freq_shear_modulus(p_xy, **tmp_kwargs)
+
     if method == "Green-Kubo":
         eta, stnderr = running_acf_integral(time, p_xy, **viscosity_kwargs)
     elif method == "Einstein":
@@ -61,9 +68,50 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", viscosit
 
     tmp_kwargs = {}
     tmp_kwargs["header"] = ["time", "cumulative integral", "integral SE"]
-    tmp_kwargs["header_comment"] = "# Calculating Viscosity with {} method.\n#".format(method) 
+    tmp_kwargs["header_comment"] = "# Calculating Viscosity with {} method. G_inf={}+-{}\n#".format(method,*G_inf) 
     tmp_kwargs.update(csv_kwargs)
     fm.write_csv(filename, np.transpose(np.array([time,eta,stnderr])), **tmp_kwargs)
+
+def high_freq_shear_modulus(p_xy, error_type="standard error", scale_coefficient=1,):
+    """
+    Calculate the high frequency shear modulus
+
+    Here the quantity is evalulated from the time average of each off diagonal stress tensor, squared
+
+    Parameters
+    ----------
+    p_xy : numpy.ndarray
+        Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
+    scale_coefficient : float, Optional, default=1.0
+        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`2\eta k_{B}T/V`
+    error_type : str, Optional, default="standard error"
+        Type of error to be saved, either "standard error" or "standard deviation"
+
+    Returns
+    -------
+    G_inf : float
+        High frequency shear modulus in units of pressure**2 * units of time.
+    G_inf_st : float
+        Standard error or standard deviation of the high frequency shear modulus in units of pressure**2 * units of time.
+
+    """
+
+    if not dm.isiterable(p_xy) or not dm.isiterable(p_xy[0]) or dm.isiterable(p_xy[0][0]):
+        raise ValueError("The array `p_xy` must be of shape (6,N)")
+    elif len(p_xy) != 6:
+        raise ValueError("The array `p_xy` must be of shape (6,N)")
+
+    tmp = np.mean(np.square(p_xy[3:]), axis=1)
+    G_inf = np.mean(tmp)
+    stnderror = np.std(tmp)
+    if error_type == "standard error":
+        stnderror = stnderror/np.sqrt(len(tmp)) # pxy, pxz, pyz
+    elif error_type == "standard deviation":
+        pass
+    else:
+         raise ValueError("The `error_type`, {}, is not supported".format(error_type))
+
+    return G_inf, stnderror
 
 def running_einstein(time, p_xy, error_type="standard error", scale_coefficient=1, skip=1, show_plot=False, title=None, save_plot=False, plot_name="einstein_viscosity_components.png"):
     """
@@ -320,15 +368,21 @@ def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", ti
             additional_header = ["-" for x in additional_entries]
             flag_add_header = True
 
+    with open(filename, "r") as f:
+        line = f.readline()
+
     if method == None:
-        with open(filename, "r") as f:
-            line = f.readline()
         if "Green-Kubo" in line:
             method = "Green-Kubo"
         elif "Einstein" in line:
             method = "Einstein"
         else:
             raise ValueError("Viscosity data ``method`` must be specified as either 'Einstein' or 'Green-Kubo'")
+    tmp = line.strip().split("=")[1].split("+-")
+    if len(tmp) == 2:
+        G_inf = [float(x) for x in tmp]   
+    else:
+        G_inf = [None, None]
 
     data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
     tmp_kwargs = copy.deepcopy(kwargs_find_viscosity)
@@ -338,12 +392,12 @@ def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", ti
     if method == "Green-Kubo":
         viscosity, parameters, stnderror, tcut = find_green_kubo_viscosity(data[0], data[1], data[2], **tmp_kwargs)
         tmp_list = [val for pair in zip([viscosity]+list(parameters), list(stnderror)) for val in pair]
-        output = [list(additional_entries)+[title, tcut]+list(tmp_list)]
-        file_headers = ["Group", "tcut", "eta", "eta SE", "A", "A SE", "alpha", "alpha SE", "tau1", "tau1 SE", "tau2", "tau2 SE"]
+        output = [list(additional_entries)+[title, *G_inf, tcut]+list(tmp_list)]
+        file_headers = ["Group", "G_inf", "G_inf StD", "tcut", "eta", "eta SE", "A", "A SE", "alpha", "alpha SE", "tau1", "tau1 SE", "tau2", "tau2 SE"]
     else:
         best, longest = find_einstein_viscosity(data[0], data[1], **tmp_kwargs)
-        output = [list(additional_entries)+[title]+list(best)+list(longest)]
-        file_headers = ["Group", "Best Eta", "B Eta SE", "B t_bound1", "B t_bound2", "B Exponent", "B Intercept", "B Npts", "Longest Eta", "L Eta SE", "L t_bound1", "L t_bound2", "L Exponent", "L Intercept", "L Npts"]
+        output = [list(additional_entries)+[title, *G_inf]+list(best)+list(longest)]
+        file_headers = ["Group", "G_inf", "G_inf StD" "Best Eta", "B Eta SE", "B t_bound1", "B t_bound2", "B Exponent", "B Intercept", "B Npts", "Longest Eta", "L Eta SE", "L t_bound1", "L t_bound2", "L Exponent", "L Intercept", "L Npts"]
 
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
@@ -436,7 +490,7 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
             raise ValueError("`tcut_fraction` must be a float or None.")
     else:
         tcut = None
-            
+
     tmp_kwargs = copy.deepcopy(fit_kwargs)
     if "weighting" not in tmp_kwargs:
         if weighting_method == "inverse":
@@ -452,6 +506,7 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
         tmp_kwargs["verbose"] = verbose
 
     parameters, uncertainties = cfit.double_viscosity_cumulative_exponential(time, cumulative_integral, **tmp_kwargs)
+
     # Assuming parameters = [A, alpha, 1, tau2]
     viscosity =  parameters[0]*parameters[1]*parameters[2] + parameters[0]*(1-parameters[1])*parameters[3]
     # Propagation of error
