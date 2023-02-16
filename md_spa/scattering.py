@@ -11,22 +11,21 @@ from . import read_lammps as rl
 from . import custom_fit as cfit
 
 
-def static_structure_factor(traj, dims, elements, qmax=10, qmin=None, kwargs_linspace=None, flag="python"):
+def static_structure_factor(traj, dims, elements=None, qmax=10, qmin=None, kwargs_linspace=None, flag="python"):
     """ Calculate the isotropic static structure factor
 
     Parameters
     ----------
     traj : numpy.ndarray
-        Trajectory of atoms, usually log spaced by some base (e.g., 2) although this 
-        choice doesn't affect the inner workings of this function. Dimensions are 
+        Trajectory of atoms, where spacing in time doesn't matter. Dimensions are 
         (Nframes, Natoms, Ndims)
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths. This
         requires that the lowest box values be located at the origin
-    elements : list
+    elements : list, Optional, default=None
         List of atom elements symbols from which to pull the atomic form factor. 
         Note that an isotope may be chosen by preceeding the elemental symbol with the 
-        number of neutrons.
+        number of neutrons. If None, f_values of one are used.
     qmax : float, Optional, default=10
         The maximum qvalue in the array in inverse angstroms
     qmin : float, Optional, default=None
@@ -52,11 +51,14 @@ def static_structure_factor(traj, dims, elements, qmax=10, qmin=None, kwargs_lin
     q_array = np.linspace(qmin,qmax,**kwargs_linspace, dtype=float)
 
     ## Refactor to use internal data file
-    #filename = "/Users/jac16/bin/md_spa/dat/scattering_lengths_cross_sections.dat"
-    #atom_scattering = fm.csv2dict(filename)
-    #key_f = "Coh b"
-    #f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
-    f_values = np.array([1 for x in elements], dtype=float)
+    #if elements is None:
+    #    f_values = np.array([1 for x in range(traj[0])], dtype=float)
+    #else:
+    #    filename = "/Users/jac16/bin/md_spa/dat/scattering_lengths_cross_sections.dat"
+    #    atom_scattering = fm.csv2dict(filename)
+    #    key_f = "Coh b"
+    #    f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
+    f_values = np.array([1 for x in range(traj[0])], dtype=float)
 
     traj = traj[:2] # NoteHere
 
@@ -78,7 +80,7 @@ def static_structure_factor(traj, dims, elements, qmax=10, qmin=None, kwargs_lin
     return sq, q_array
 
 
-def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", group_ids=None):
+def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="python", group_ids=None):
     """ Calculate the isotropic coherent intermediate scattering function
 
     Parameters
@@ -87,10 +89,10 @@ def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", g
         Trajectory of atoms, usually log spaced by some base (e.g., 2) although this 
         choice doesn't affect the inner workings of this function. Dimensions are 
         (Nframes, Natoms, Ndims)
-    elements : list
+    elements : list, Optional, default=None
         List of atom elements symbols from which to pull the atomic form factor. 
         Note that an isotope may be chosen by preceeding the elemental symbol with the 
-        number of neutrons.
+        number of neutrons. If ``None``, f_values of one are used.
     q_value : float, Optional, default=2.25
         The qvalue at which to calculate the isotropic static structure factor. The default
         value of 2.25 inverse angstroms comes from DOI:10.1063/1.4941946
@@ -108,11 +110,14 @@ def isotropic_coherent_scattering(traj, elements, q_value=2.25, flag="python", g
     """
 
     ## Refactor to use internal data file
-    #filename = "/Users/jac16/bin/md_spa/dat/scattering_lengths_cross_sections.dat"
-    #atom_scattering = fm.csv2dict(filename)
-    #key_f = "Coh b"
-    #f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
-    f_values = np.array([1 for x in elements], dtype=float)
+    #if elements is None:
+    #    f_values = np.array([1 for x in range(traj[0])], dtype=float)
+    #else:
+    #    filename = "/Users/jac16/bin/md_spa/dat/scattering_lengths_cross_sections.dat"
+    #    atom_scattering = fm.csv2dict(filename)
+    #    key_f = "Coh b"
+    #    f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
+    f_values = np.array([1 for x in range(traj[0])], dtype=float)
 
     if flag == "cython":
         if group_ids is not None:
