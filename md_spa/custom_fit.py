@@ -1259,7 +1259,7 @@ def _res_double_cumulative_exponential(x, xarray, yarray, weighting=None):
 def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}):
     """
     Provided data fit to:
-    ..math:`y= A_{1}*\{alpha}*\tau_{1}*(1-exp(-(x/\tau_{1}))) + A_{2}*(1-\{alpha})*\tau_{2}*(1-exp(-(x/\tau_{2})))` 
+    ..math:`y= A*\{alpha}*\tau_{1}*(1-exp(-(x/\tau_{1}))) + A*(1-\{alpha})*\tau_{2}*(1-exp(-(x/\tau_{2})))` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -1329,6 +1329,10 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="nelder", ve
     if len(kwargs_parameters) != 0:
         raise ValueError("The parameter(s), {}, was/were given to custom_fit.double_cumulative_exponential, which requires parameters: 'A', 'alpha', 'tau1', 'tau2'".format(list(kwargs_parameters.keys())))
 
+    if minimizer in ["leastsq"]:
+        kwargs_min["Dfun"] = _d_stretched_cumulative_exponential
+    elif minimizer in ["trust-exact"]:
+        kwargs_min["jac"] = _d_stretched_cumulative_exponential
     result = lmfit.minimize(_res_double_cumulative_exponential, exp1, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting}, **kwargs_min)
 
     # Format output
@@ -1356,6 +1360,28 @@ def _res_double_viscosity_cumulative_exponential(x, xarray, yarray, weighting=No
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
         error = error*np.array(weighting)
     return error
+
+def _d_double_viscosity_cumulative_exponential(params, xarray, yarray, weighting=None, switch=None):
+
+    out = np.zeros((len(xarray),4))
+    tmp_exp1 = np.exp(-xarray/params["tau1"])
+    tmp_exp2 = np.exp(-xarray/params["tau2"])
+
+    out[:,0] = params["tau1"]*params["alpha"]*(1-tmp_exp1) + params["tau2"]*(1-params["alpha"])*(1-tmp_exp2) # dA
+    out[:,1] = params["A"]*(params["tau1"]*(1-tmp_exp1) - params["tau2"]*(1-tmp_exp2)) #dalpha
+    out[:,2] = params["A"]*params["alpha"]*(1-((params["tau1"]+xarray)/params["tau1"])*tmp_exp1) # dtau1
+    out[:,3] = params["A"]*(1-params["alpha"])*(1-((params["tau2"]+xarray)/params["tau2"])*tmp_exp2) # dtau2
+
+    output = []
+    if np.all(switch != None):
+        for i, tf in enumerate(switch):
+            if tf:
+                output.append(out[:,i])
+        out = np.transpose(np.array(output))
+
+
+    return out
+
 
 
 def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_minimizer={}):
