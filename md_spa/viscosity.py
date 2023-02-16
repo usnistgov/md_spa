@@ -16,7 +16,7 @@ import md_spa_utils.data_manipulation as dm
 import md_spa_utils.file_manipulation as fm
 from . import custom_fit as cfit
 
-def pressure2viscosity_csv(time, p_xy, filename="viscosity_running_integral.csv", viscosity_kwargs={}, csv_kwargs={}, method="Green-Kubo"):
+def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", viscosity_kwargs={}, csv_kwargs={}, method="Green-Kubo"):
     """
     Calculate the viscosity of an equilibrium molecular dynamics simulation from the pressure tensor.
 
@@ -32,7 +32,7 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_running_integral.csv"
     filename : str, Optional, default="viscosity_running_integral.csv"
         Filename for csv file
     viscosity_kwargs : dict, Optional, default={}
-        Keyword arguements for ``running_acf_integral``
+        Keyword arguements for :func:`viscosity.running_acf_integral` or :func:`viscosity.running_einstein`
     csv_kwargs : dict, Optional, default={}
         Keywords for ``md_spa_utils.file_manipulation.write_csv``
     method : str, Optional, default="Einstein"
@@ -40,8 +40,7 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_running_integral.csv"
         
     Returns
     -------
-    eta : numpy.ndarray
-        Viscosity coefficient at each time frame. [Units of pressure]^2*[units of time]
+    Saved file with the viscosity coefficient at each time frame. [Units of pressure]^2*[units of time]
 
     """
 
@@ -60,10 +59,11 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_running_integral.csv"
     else:
         raise ValueError("Define one of two supported methods: Einstein or Green-Kubo")
 
-    csv_kwargs["header"] = ["time", "cumulative integral", "integral SE"]
-    csv_kwargs["header_comment"] = "# Calculating Viscosity with {} method.\n#".format(method) 
-
-    fm.write_csv(filename, np.transpose(np.array([time,eta,stnderr])), **csv_kwargs)
+    tmp_kwargs = {}
+    tmp_kwargs["header"] = ["time", "cumulative integral", "integral SE"]
+    tmp_kwargs["header_comment"] = "# Calculating Viscosity with {} method.\n#".format(method) 
+    tmp_kwargs.update(csv_kwargs)
+    fm.write_csv(filename, np.transpose(np.array([time,eta,stnderr])), **tmp_kwargs)
 
 def running_einstein(time, p_xy, error_type="standard error", scale_coefficient=1, skip=1, show_plot=False, title=None, save_plot=False, plot_name="einstein_viscosity_components.png"):
     """
@@ -110,8 +110,8 @@ def running_einstein(time, p_xy, error_type="standard error", scale_coefficient=
     _, npts = np.shape(p_xy)
     lx = 5
     p_new = np.zeros((5,npts))
-    p_new[0] = (p_xy[0]-p_new[1])/2
-    p_new[1] = (p_xy[1]-p_new[2])/2
+    p_new[0] = (p_xy[0]-p_xy[1])/2
+    p_new[1] = (p_xy[1]-p_xy[2])/2
     p_new[2:] = p_xy[3:]
 
     # Same result whether the integral is taken before or after averaging the tensor components
@@ -215,8 +215,8 @@ def running_acf_integral(time, p_xy, error_type="standard error", scale_coeffici
     _, npts = np.shape(p_xy)
     lx = 5
     p_new = np.zeros((5,npts))
-    p_new[0] = (p_xy[0]-p_new[1])/2
-    p_new[1] = (p_xy[1]-p_new[2])/2
+    p_new[0] = (p_xy[0]-p_xy[1])/2
+    p_new[1] = (p_xy[1]-p_xy[2])/2
     p_new[2:] = p_xy[3:]
 
     # Same result whether the integral is taken before or after averaging the tensor components
@@ -265,7 +265,7 @@ def running_acf_integral(time, p_xy, error_type="standard error", scale_coeffici
 
 def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", title=None, additional_entries=None, additional_header=None, kwargs_find_viscosity={}, file_header_kwargs={}, method=None):
     """
-    Given the path to a csv file containing cumulative_integral data, extract key values and save them to a .csv file. The file of cumulative_integral data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
+    Given the path to a csv file containing viscosity coefficient vs. time data, extract key values and save them to a .csv file. The file of cumulative_integral data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
 
     Parameters
     ----------
@@ -365,7 +365,7 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
     integral_error : numpy.ndarray
         Viscosity coefficient error for each time frame. The inverse of these values are used to weight the fitting process. See ``weighting_method`` to specify how this is handled.
     fit_limits : tuple, Optional, default=(None,None)
-        Choose the indices to frame the area from which to estimate the viscosity so that, ``time[fit_limits[0]:fit_limits[1]]``. This window tends to be less than 100ps. This will cut down on comutational time in spending time on regions with poor statistics.
+        Choose the time values to frame the area from which to estimate the viscosity so that, ``fit_limits[0] < time < fit_limits[1]``.
     weighting_method : str, Optional, default="b-exponent"
         The error of the cumulative integral increases with time as does the autocorrelation function from which it is computed. Method options include:
 
@@ -381,13 +381,13 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
     save_plot : bool, Optional, default=False
         choose to save a plot of the fit
     title : str, Optional, default=None
-        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plotname``.
+        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plot_name``.
     plot_name : str, Optional, default="green-kubo_viscosity.png"
-        If ``save_plot==True`` the cumulative_integral will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
+        If ``save_plot==True`` the cumulative_integral will be saved with the viscosity value marked in blue, The ``title`` is added as a prefix to this str
     verbose : bool, Optional, default=False
         Will print intermediate values or not
     fit_kwargs : dict, Optional, default={}
-        Keyword arguements for exponential functions in ``custom_fit``
+        Keyword arguements for exponential functions in :func:`custom_fit.double_viscosity_cumulative_exponential`
 
     Returns
     -------
@@ -410,16 +410,16 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
 
     if fit_limits[1] != None:
         try:
-            cumulative_integral = cumulative_integral[:fit_limits[1]]
-            time = time[:fit_limits[1]]
-            integral_error = np.array(integral_error)[:fit_limits[1]]
+            cumulative_integral = cumulative_integral[time < fit_limits[1]]
+            integral_error = np.array(integral_error)[time < fit_limits[1]]
+            time = time[fit_limits[1] > time]
         except:
             pass
     if fit_limits[0] != None:
         try:
-            cumulative_integral = cumulative_integral[fit_limits[0]:]
-            time = time[fit_limits[0]:]
-            integral_error = np.array(integral_error)[fit_limits[0]:]
+            cumulative_integral = cumulative_integral[fit_limits[0] < time]
+            integral_error = np.array(integral_error)[fit_limits[0] < time]
+            time = time[fit_limits[0] < time]
         except:
             pass
 
@@ -434,9 +434,9 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
             integral_error = np.array(integral_error)[:tcut]
         else:
             raise ValueError("`tcut_fraction` must be a float or None.")
+    else:
+        tcut = None
             
-    npts = len(time)
-
     tmp_kwargs = copy.deepcopy(fit_kwargs)
     if "weighting" not in tmp_kwargs:
         if weighting_method == "inverse":
@@ -513,10 +513,10 @@ def fit_standard_deviation_exponent(time, standard_deviation, fit_kwargs={}, sho
 
     Returns
     -------
-    b-exponent : float
-        Exponent in functional form: A*time**b
     prefactor : float
         Prefactor, A, in functional form A*time**b
+    b-exponent : float
+        Exponent in functional form: A*time**b
     uncertainties : list
         List of uncertainties in provided fit
 
@@ -583,8 +583,6 @@ def find_einstein_viscosity(time, cumulative_integral,  min_exp=0.991, min_Npts=
 
     Returns
     -------
-    Returns
-    -------
     best : np.array
         Array containing the the following results that represent a region that most closely represents a slope of unity. This region must contain at least the minimum number of points, ``min_Npts``.
 
@@ -645,7 +643,7 @@ def find_einstein_viscosity(time, cumulative_integral,  min_exp=0.991, min_Npts=
 
     best = np.array([np.nan for x in range(7)])
     longest = np.array([np.nan for x in range(7)])
-    for npts in range(min_Npts,len(time)):
+    for npts in range(min_Npts,len(time),skip):
         for i in range(0,len(time)-npts,skip):
             t_tmp = time[i:(i+npts)]
             cumulative_integral_tmp = cumulative_integral[i:(i+npts)]
