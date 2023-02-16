@@ -84,7 +84,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
             kwargs_debye_waller["title"] = titles[i]
         best, longest = find_diffusivity(t_tmp, data[i], **kwargs_find_diffusivity)
         dw, tau = debye_waller(t_tmp, data[i], **kwargs_debye_waller)
-        tmp_data.append(list(additional_entries)+[titles[i],dw, tau]+list(best)+list(longest))
+        tmp_data.append(list(additional_entries)+[titles[i]]+list(dw)+list(tau)+list(best)+list(longest))
 
     file_headers = ["Group", "DW [Ang^2]", "tau [ps]", "Best D [Ang^2/ps]", "B D SE", "B t_bound1 [ps]", "B t_bound2 [ps]", "B Exponent", "B Intercept [Ang^2]", "B Npts", "Longest D [Ang^2/ps]", "L D SE", "L t_bound1 [ps]", "L t_bound2 [ps]", "L Exponent", "L Intercept [Ang^2]", "L Npts"]
     if not os.path.isfile(fileout) or mode=="w":
@@ -98,6 +98,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
 def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=None, plot_name="debye-waller.png", verbose=False):
     """
     Analyzing the ballistic region of an MSD curve yields the debye-waller factor, which relates to the cage region that the atom experiences.
+    DOI: 10.1073/pnas.1418654112
 
     Parameters
     ----------
@@ -120,7 +121,10 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
     
     Returns
     -------
-    debye-waller : float
+    debye-waller-parameter : float
+        Instances where there is a 
+    tau : numpy.ndarray
+        Characteristic times associated with the Debye-Waller parameter values
 
     """
 
@@ -180,34 +184,30 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
             print("Found debye waller factor to be {} at {}".format(dw, tau))
 
     if save_plot or show_plot:
-        plt.figure(1)
-        plt.plot(time,msd,"k",label="Data", linewidth=0.5)
+        fig, axs = plt.subplots(1, 2, figsize=(6,4))
+        axs[0].plot(time,msd,"k",label="Data", linewidth=0.5)
         if not np.all(np.isnan(dw)):
             for tmp_tau in tau:
-                plt.plot([tmp_tau,tmp_tau],[0,np.max(msd)], linewidth=0.5)
-        plt.xlabel("time")
-        plt.ylabel("MSD")
+                axs[0].plot([tmp_tau,tmp_tau],[0,np.max(msd)], linewidth=0.5)
+        axs[0].set_xlabel("time")
+        axs[0].set_ylabel("MSD")
         if title != None:
-            plt.title(title)
-        plt.tight_layout()
+            axs[0].set_title(title)
+        # log-log plot
+        yarray = dspline(logtime)
+        axs[1].plot(logtime, yarray,"k", linewidth=0.5)
+        if not np.all(np.isnan(dw)):
+            for tmp_tau in tau:
+                axs[1].plot(np.log10([tmp_tau,tmp_tau]),[0,np.max(yarray)], linewidth=0.5)
+        axs[1].set_xlabel("log(t)")
+        axs[1].set_ylabel("$d log(MSD) / d log(t)$")
+        # save plot
+        fig.tight_layout()
         if save_plot:
-            if title != None:
+            if title is not None:
                 tmp = os.path.split(plot_name)
                 plot_name = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(plot_name,dpi=300)
-        plt.figure(2)
-        yarray = dspline(logtime)
-        plt.plot(logtime, yarray,"k", linewidth=0.5)
-        if not np.all(np.isnan(dw)):
-            for tmp_tau in tau:
-                plt.plot(np.log10([tmp_tau,tmp_tau]),[0,np.max(yarray)], linewidth=0.5)
-        plt.xlabel("log(t)")
-        plt.ylabel("$d log(MSD) / d log(t)$")
-        plt.tight_layout()
-        if save_plot:
-            tmp = os.path.split(plot_name)
-            tmp_plot_name = os.path.join(tmp[0],"dlog_"+tmp[1])
-            plt.savefig(tmp_plot_name,dpi=300)
         if show_plot:
             plt.show()
         plt.close("all")
@@ -322,7 +322,7 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
             plt.title(title)
         plt.tight_layout()
         if save_plot:
-            if title != None:
+            if title is not  None:
                 tmp = os.path.split(plot_name)
                 plot_name = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(plot_name,dpi=300)
