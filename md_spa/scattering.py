@@ -52,13 +52,13 @@ def static_structure_factor(traj, dims, elements=None, qmax=10, qmin=None, kwarg
 
     ## Refactor to use internal data file
     #if elements is None:
-    #    f_values = np.array([1 for x in range(traj[0])], dtype=float)
+    #    f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
     #else:
     #    filename = "/Users/jac16/bin/md_spa/dat/scattering_lengths_cross_sections.dat"
     #    atom_scattering = fm.csv2dict(filename)
     #    key_f = "Coh b"
     #    f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
-    f_values = np.array([1 for x in range(traj[0])], dtype=float)
+    f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
 
     traj = traj[:2] # NoteHere
 
@@ -111,13 +111,13 @@ def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="pytho
 
     ## Refactor to use internal data file
     #if elements is None:
-    #    f_values = np.array([1 for x in range(traj[0])], dtype=float)
+    #    f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
     #else:
     #    filename = "/Users/jac16/bin/md_spa/dat/scattering_lengths_cross_sections.dat"
     #    atom_scattering = fm.csv2dict(filename)
     #    key_f = "Coh b"
     #    f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
-    f_values = np.array([1 for x in range(traj[0])], dtype=float)
+    f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
 
     if flag == "cython":
         if group_ids is not None:
