@@ -60,8 +60,6 @@ def static_structure_factor(traj, dims, elements=None, qmax=10, qmin=None, kwarg
     #    f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
     f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
 
-    traj = traj[:2] # NoteHere
-
     if flag == "cython":
         sq = scat.static_structure_factor(traj, f_values, q_array, dims)
     else:
@@ -130,7 +128,7 @@ def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="pytho
         isf = np.nanmean(np.square(f_values)[None,:] * np.sin( qr ) / ( qr ), axis=1)
         #cumf2 = np.sum(np.square(f_values))
         cumf2 = 1
-        isf /= cumf
+        isf /= cumf2
         if group_ids is not None:
             isf = [isf]
             for tmp_ids in group_ids:
