@@ -2,6 +2,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.ndimage import gaussian_filter1d
+
 import misc_modules.custom_plotting as cplot
 import md_spa.custom_fit as cfit
 
