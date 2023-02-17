@@ -11,7 +11,7 @@ from . import read_lammps as rl
 from . import custom_fit as cfit
 
 
-def static_structure_factor(traj, dims, elements=None, qmax=10, qmin=None, kwargs_linspace=None, flag="python"):
+def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=None, flag="python"):
     """ Calculate the isotropic static structure factor
 
     Parameters
@@ -26,10 +26,8 @@ def static_structure_factor(traj, dims, elements=None, qmax=10, qmin=None, kwarg
         List of atom elements symbols from which to pull the atomic form factor. 
         Note that an isotope may be chosen by preceeding the elemental symbol with the 
         number of neutrons. If None, f_values of one are used.
-    qmax : float, Optional, default=10
-        The maximum qvalue in the array in inverse angstroms
-    qmin : float, Optional, default=None
-        If no value is given, half of the largest distance is taken.
+    sigma : float, Optional, default=1
+        The particle size in the system used to define q_max = 2*np.pi/sigma
     kwargs_linspace : dict, Optional, default={"num":1000}
         Keyword arguments for np.linspace function to produce q array to calculate the 
         structure factor 
@@ -44,8 +42,8 @@ def static_structure_factor(traj, dims, elements=None, qmax=10, qmin=None, kwarg
 
     """
 
-    if qmin is None:
-        qmin = 1/np.max(dims)
+    qmin = 2*np.pi/(np.max(dims)/2)
+    qmax = 2*np.pi/sigma
     if kwargs_linspace is None:
         kwargs_linspace = {"num": 1000}
     q_array = np.linspace(qmin,qmax,**kwargs_linspace, dtype=float)
