@@ -67,11 +67,7 @@ def static_structure_factor(traj, dims, elements=None, qmax=10, qmin=None, kwarg
         (nframes, natoms, ndims) = np.shape(traj)
         sq = np.zeros(nq)
         for i in range(natoms):
-            print("{} of {}".format(i,natoms))
             fi = f_values[i]
-            print(traj-traj[:,i,:][:,None,:])
-            print(np.shape(traj-traj[:,i,:][:,None,:]), dims)
-            print(mf.check_wrap(traj-traj[:,i,:][:,None,:], dims))
             displacements = np.sqrt(np.sum(np.square(mf.check_wrap(traj-traj[:,i,:][:,None,:], dims)),axis=-1))
             # displacements is an array Nframes, Natoms
             qr = np.einsum("ij,k->ijk", displacements, q_array)
