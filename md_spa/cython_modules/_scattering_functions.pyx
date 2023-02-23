@@ -14,6 +14,9 @@ def static_structure_factor(traj, f_values, q_array, dims):
 
         sq0 = np.zeros(len(q_array))
         sq = _structure_factor(traj, f_values, q_array, dims, sq0)
+        lx = len(q_array)
+        print(type(sq), sq)
+        print(type(sq), np.asarray(sq))
 
         return sq
 

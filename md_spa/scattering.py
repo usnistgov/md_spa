@@ -73,6 +73,9 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
         cumf2 = np.sum(np.square(f_values))
         sq = sq/cumf2/nframes
 
+    print("q", q_array)
+    print("sf", sq)
+
     return sq, q_array
 
 
@@ -183,7 +186,7 @@ def self_van_hove(traj, r_max=7.0, dr=0.1, flag="python", group_ids=None):
 
     return np.array(gs)
 
-def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="stretched_exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, n_exponentials=1, beta=None):
+def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="stretched_exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, n_exponentials=1, beta=None, weighting=None):
     """
     Extract the characteristic time fit to a stretched exponential or two stretched exponential
 
@@ -211,6 +214,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         Can be 1 or 2, if the latter, the default exponent for the first exponential is the phenomenological form of 3/2 (DOI: 10.1007/978-3-030-60443-1_5) unless ``beta`` is defined.
     beta : float, Optional, default=None
         Exponent of the stretched exponential decay. If ``n_exponential == 2 and beta == None`` then ``beta = 3/2`` is used. Set beta as an iterable of length two to set both exponents when appropriate. Set ``beta == False`` to remove the set value of 3/2.
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same length as the provided data, contains the weights for each data point.
 
     Returns
     -------
@@ -246,6 +251,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                          minimizer=minimizer,
                                                          kwargs_minimizer=kwargs_minimizer,
                                                          kwargs_parameters=kwargs_parameters,
+                                                         weighting=weighting,
                                                         )
     elif n_exponentials == 2:
         if beta is not None:
@@ -271,6 +277,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                       minimizer=minimizer,
                                                       kwargs_minimizer=kwargs_minimizer,
                                                       kwargs_parameters=kwargs_parameters,
+                                                      weighting=weighting,
                                                      )
         if output[1] > output [3]:
             output[0] = 1 - output[0]

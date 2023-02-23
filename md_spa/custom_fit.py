@@ -718,7 +718,7 @@ def _d_stretched_exponential_decay(params, xarray, yarray, switch=None):
     return np.transpose(np.array(output))
 
 
-def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
+def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
     """
     Provided data fit to:
 
@@ -737,6 +737,8 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
     kwargs_parameters : dict, Optional
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
         - ``"tau1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
@@ -762,6 +764,13 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
+
+    if np.all(weighting != None):
+        if minimizer == "emcee":
+            kwargs_min["is_weighted"] = True
+    elif minimizer == "emcee":
+        kwargs_min["is_weighted"] = False
+    kwargs_min.update({"nan_policy": "omit"})
 
     param_kwargs = {
         "A": {"value": 0.8, "min": 0, "max":1},
@@ -792,7 +801,7 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
 
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_two_stretched_exponential_decays
-    Result2 = lmfit.minimize(_res_two_stretched_exponential_decays, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
+    Result2 = lmfit.minimize(_res_two_stretched_exponential_decays, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
 
     # Format output
     output = np.zeros(5)
@@ -810,10 +819,16 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
 
     return output, uncertainties
 
-def _res_two_stretched_exponential_decays(params, xarray, yarray, switch=None):
-    return params["A"]*np.exp(-(xarray/params["tau1"])**params["beta1"]) + (1-params["A"])*np.exp(-(xarray/params["tau2"])**params["beta2"]) - yarray
+def _res_two_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
+   
+    out =  params["A"]*np.exp(-(xarray/params["tau1"])**params["beta1"]) + (1-params["A"])*np.exp(-(xarray/params["tau2"])**params["beta2"]) - yarray
+    if np.all(weighting != None):
+        if len(weighting) != len(out):
+            raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
+        out = out*np.array(weighting)
+    return out
 
-def _d_two_stretched_exponential_decays(params, xarray, yarray, switch=None):
+def _d_two_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
 
     tmp_output = []
     ratio1 = (xarray/params["tau1"])**params["beta1"]
@@ -1118,7 +1133,7 @@ def stretched_cumulative_exponential(xarray, yarray, minimizer="leastsq", weight
 
 def _res_stretched_cumulative_exponential(params, xarray, yarray, weighting=None, switch=None):
 
-    out = params["A"]*(1-np.exp(-(xarray)**params["beta"]/params["lc_beta"])) + params["C"]
+    out = params["A"]*(1-np.exp(-(xarray)**params["beta"]/params["lc_beta"])) + params["C"] - yarray
 
 #    print(params["A"].value, params["lc_beta"].value, params["beta"].value, params["C"].value)
     if np.all(weighting != None):
@@ -1126,7 +1141,7 @@ def _res_stretched_cumulative_exponential(params, xarray, yarray, weighting=None
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
         out = out*np.array(weighting)
 
-    return out - yarray
+    return out
 
 def _d_stretched_cumulative_exponential(params, xarray, yarray, weighting=None, switch=None):
 
@@ -1522,7 +1537,7 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
     exp1.add("beta", **param_kwargs["beta"])
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_gamma_distribution
-    Result1 = lmfit.minimize(_res_gamma_distribution, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
+    Result1 = lmfit.minimize(_res_gamma_distribution, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting,}, **kwargs_min)
 
     # Format output
     output = np.zeros(2)
@@ -1540,13 +1555,18 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
 
     return output, uncertainties
 
-def _res_gamma_distribution(params, xarray, yarray, switch=None):
+def _res_gamma_distribution(params, xarray, yarray, switch=None, weighting=None,):
     term1 = params["beta"]**params["alpha"] / sps.gamma(params["alpha"])
     term2 = xarray**(params["alpha"] - 1.0)
     term3 = np.exp(-params["beta"]*xarray)
-    return term1 * term2 * term3 - yarray
+    out = term1 * term2 * term3 - yarray
+    if np.all(weighting != None):
+        if len(weighting) != len(out):
+            raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
+        out = out*np.array(weighting)
+    return out
 
-def _d_gamma_distribution(params, xarray, yarray, switch=None):
+def _d_gamma_distribution(params, xarray, yarray, switch=None, weighting=None,):
     term1 = params["beta"]**params["alpha"] / sps.gamma(params["alpha"])
     term2 = xarray**(params["alpha"] - 1.0)
     term3 = np.exp(-params["beta"]*xarray)
