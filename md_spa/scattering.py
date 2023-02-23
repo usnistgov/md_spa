@@ -73,9 +73,6 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
         cumf2 = np.sum(np.square(f_values))
         sq = sq/cumf2/nframes
 
-    print("q", q_array)
-    print("sf", sq)
-
     return sq, q_array
 
 

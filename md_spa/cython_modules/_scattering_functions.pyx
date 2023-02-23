@@ -14,11 +14,8 @@ def static_structure_factor(traj, f_values, q_array, dims):
 
         sq0 = np.zeros(len(q_array))
         sq = _structure_factor(traj, f_values, q_array, dims, sq0)
-        lx = len(q_array)
-        print(type(sq), sq)
-        print(type(sq), np.asarray(sq))
 
-        return sq
+        return np.asarray(sq)
 
 def isotropic_coherent_scattering(traj, f_values, q_value):
 
@@ -28,7 +25,7 @@ def isotropic_coherent_scattering(traj, f_values, q_value):
         isf0 = np.zeros(traj.shape[0])
         isf = _isotropic_coherent_scattering(traj, f_values, q_value, isf0)
 
-        return isf
+        return np.asarray(isf)
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
