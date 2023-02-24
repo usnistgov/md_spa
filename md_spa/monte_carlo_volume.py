@@ -55,12 +55,15 @@ def overlapping_spheres(rcut, ref_pts, npts=1e+4, repeats=3):
         The standard deviation based on the number of times this calculation was repeated
 
     """
+    npts = int(npts)
+    repeats = int(repeats)
 
     if not dm.isiterable(rcut):
         rcut = rcut*np.ones(len(ref_pts))
     elif len(ref_pts) != len(rcut):
         raise ValueError("Length of rcut (circle radii) and number of reference points (circle centers) must be equal")
 
+    nrefs = len(ref_pts)
     ref_pts = np.array(ref_pts)
     ref_pts -= np.mean(ref_pts, axis=0)
     ranges = [[np.min(x)-rcut[i], np.max(x)+rcut[i]] for i,x in enumerate(ref_pts.T)]
@@ -69,16 +72,12 @@ def overlapping_spheres(rcut, ref_pts, npts=1e+4, repeats=3):
     if npts == None:
         npts = int(volume)*10
 
-    region_volumes = np.zeros(repeats)
-    for k in range(repeats):
-        test_pts = random_points(npts, ranges)
-        in_vol = np.empty(int(npts), dtype=bool)
-        for i, x in enumerate(test_pts):
-            in_vol[i] = np.any([np.sum((ref_pts[j]-x)**2)<=rcut[j]**2 for j in range(len(rcut))])
-
-        #in_vol = np.array([np.any(np.array([np.sum((ref_pts[i]-x)**2)<=rcut[i]**2 for i in range(len(rcut))])) for x in test_pts], dtype=bool)
-        region_volumes[k] = volume*len(np.where(in_vol==True)[0])/npts
-    final_stats = dm.basic_stats(region_volumes, error_descriptor="sample")
+    test_points = np.reshape(random_points(repeats*npts, ranges), (repeats, npts, 3))
+    distances = np.sum(np.square(test_points[:,:,None,:] - ref_pts[None, None, :, :]), axis=-1)
+    in_vol_count = np.sum(distances <= np.square(rcut)[None, None, :], axis=-1) # Sum over ref points
+    in_vol = in_vol_count > 0 # Bool, in volume or out?
+    vol_repeats = np.sum(in_vol, axis=-1)/npts*volume
+    final_stats = dm.basic_stats(vol_repeats, error_descriptor="sample")
 
     return final_stats[0], final_stats[1]
 
