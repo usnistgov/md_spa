@@ -71,7 +71,7 @@ def consolidate_arrays(rdf_array, file_out="rdf_out.txt", pairs=None):
         for line in rdf_data:
             ff.write(", ".join(str(x) for x in line)+"\n")
 
-def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="rdf_out.txt", pairs=None):
+def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="out.csv", pairs=None):
     """
     This function will take equivalent rdf data output from several independent lammps "boxes" and average it together.
 
@@ -82,15 +82,15 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="rdf_out.t
     boxes : list
         List of entries that individually complete the path to a lammps rdf output file.
     file_in : str, Optional, default='rdf.txt'
-        Name of rdf data output from lammps
-    file_out : str, Optional, default='out.txt'
+        Name of rdf data output from lammps. If None, the filename is included in ``target_dir``
+    file_out : str, Optional, default='out.csv'
         Filename for consolidated data file, the output file will be equipped with two prefixes, for the rdf\_ and integrated coord\_ data.
     pairs : list, Optional, default=None
         Optional list of iterable structure of length 2 each containing pairs of values that represent the rdf
 
     Returns
     -------
-    text file
+    Comma separated files representing the average rdf, average coordination, rdf boxes, and coordination from boxes.
 
     """
 
@@ -103,65 +103,42 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="rdf_out.t
     except:
         raise ValueError("The given input `target_dir` should have a placeholder {} with which to format the path with entries in `boxes`")
 
-    remove = []
-    for b in boxes:
-        tmp_path = os.path.join(target_dir.format(b),file_in)
-        if not os.path.isfile(tmp_path):
-            remove.append(b)
-    boxes = [b for b in boxes if b not in remove]
-
     # Consolidate data
-    tmp_boxes = [x for x in boxes if os.path.isfile(os.path.join(target_dir.format(x),file_in))]
-    rdf_matrix = np.mean(f.read_files([os.path.join(target_dir.format(i),file_in) for i in tmp_boxes],f.read_lammps_ave_time, dtype=float), axis=1)
-    rdf_avg = np.mean(rdf_matrix, axis=0)
+    tmp_boxes = []
+    for box in boxes:
+        filename = os.path.join(target_dir.format(box),file_in) if file_in is not None else target_dir.format(box)
+        if os.path.isfile(filename):
+            tmp_boxes.append(np.transpose(np.genfromtxt(filename, delimiter=" ", skip_header=4)))
+    if not tmp_boxes:
+        warnings.warn("Files from: {}, could not be found.".format(filename))
+        return
+    data_boxes = np.array(tmp_boxes)
+    lx = len(data_boxes[0])
 
-    # Separate Data
-    rdf_data = []
-    coord_data = []
+    r_data = data_boxes[0][1][None, :]
+    rdf_boxes = data_boxes[:, list(range(2,lx,2)), :]
+    coord_boxes = data_boxes[:, list(range(3,lx,2)), :]
+    rdf, rdf_error = dm.basic_stats( rdf_boxes, axis=0, error_descriptor="sample")
+    coord, coord_error = dm.basic_stats( coord_boxes, axis=0, error_descriptor="sample")
 
-    for i,col in enumerate(rdf_avg.T):
-        if i == 0:
-            continue
-        elif i == 1:
-            rdf_data.append(col)
-            coord_data.append(col)
-        elif i % 2 == 0:
-            rdf_data.append(col)
-        else:
-            coord_data.append(col)
+    rdf_data = np.transpose(np.concatenate((r_data, np.array([xx for x in zip(rdf, rdf_error) for xx in x])), axis=0))
+    coord_data = np.transpose(np.concatenate((r_data, np.array([xx for x in zip(coord, coord_error) for xx in x])), axis=0))
 
     # Prepare to write output files
-    Npairs = len(rdf_data)-1
-
+    Npairs = lx/2 - 1
     tmp = os.path.split(file_out)
     fout = os.path.join(tmp[0],"{}_"+tmp[1])
 
-    if pairs == None:
-        tmp_header = ", ".join(["Pair {}".format(i+1) for i in range(Npairs)])
+    tmp_header = ["r [Distance Units]"] + [x for i in range(Npairs) for x in ["Pair {}".format(i+1), "Pair {} StD".format(i+1)]]
+    if len(pairs) != Npairs:
+        warnings.warn("The number of given pairs does not match the output, using standard header.")
+    elif not all([len(x)==2 for x in pairs]):
+        warnings.warn("The list of pairs should be iterable structures of length two. Using standard header.")
     else:
-        if len(pairs) != Npairs:
-            warnings.warn("The number of given pairs does not match the output, using standard header.")
-            tmp_header = ", ".join(["Pair {}".format(i+1) for i in range(Npairs)])
-        elif not all([len(x)==2 for x in pairs]):
-            warnings.warn("The list of pairs should be iterable structures of length two. Using standard header.")
-            tmp_header = ", ".join(["Pair {}".format(i+1) for i in range(Npairs)])
-        else:
-            tmp_header = ", ".join(["{}-{}".format(x,y) for x,y in pairs])
+        tmp_header = ["r [Distance Units]"] + [z for x,y in pairs for z in ["{}-{}".format(x,y), "{}-{} StD".format(x,y)]]
 
-    # Write output files
-    rdf_data = np.array(rdf_data).T
-    with open(fout.format("rdf"),'w') as ff:
-        ff.write("# RDF for Boxes: {}\n".format(tmp_boxes))
-        ff.write("# r [Distance Units], {}\n".format(tmp_header))
-        for line in rdf_data:
-            ff.write(", ".join(str(x) for x in line)+"\n")
-
-    coord_data = np.array(coord_data).T
-    with open(fout.format("rdf_coord"),'w') as ff:
-        ff.write("# RDF Derived Coordination for Boxes: {}\n".format(boxes))
-        ff.write("# r [Distance Units], {}\n".format(tmp_header))
-        for line in coord_data:
-            ff.write(", ".join(str(x) for x in line)+"\n")
+    fm.write_csv( fout.format("rdf"), rdf_data, header=tmp_header)
+    fm.write_csv( fout.format("coord"), coord_data, header=tmp_header)
 
 def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=25, save_fit=False, plotname="rdf.png",title="Pair-RDF", extrema_cutoff=0.01):
     """
@@ -332,7 +309,7 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
     return np.array(r_peaks), np.array(gr_peaks), np.array(r_mins), r_0, r_clust
 
 
-def keypoints2csv(filename, fileout="rdf.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, extract_keypoints_kwargs={}, file_header_kwargs={}):
+def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional_entries=None, additional_header=None, extract_keypoints_kwargs={}, file_header_kwargs={}, column_list=None, kwargs_genfromtxt={}):
     """
     Given the path to a csv file containing rdf data, extract key values and save them to a .csv file. The file of rdf data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
 
@@ -344,8 +321,6 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", delimiter=",", titles=N
         Filename of output .csv file
     mode : str, Optional, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    delimiter : str, Optional, default=","
-        Delimiter between data in input file
     titles : list[str], Optional, default=None
         Titles for plots if that is specified in the ``extract_keypoints_kwargs``
     additional_entries : list, Optional, default=None
@@ -356,6 +331,10 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", delimiter=",", titles=N
         Keywords for `extract_keypoints` function
     file_header_kwargs : dict, Optional, default={}
         Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
+    column_list : list, Optional, default=None
+        If not None, this list specifies the column indices (starting from 0) to analyze. Note, the first column must be the distance.
+    kwargs_genfromtxt : dict, Optional, default={}
+        Dictionary of keyword arguments for ``np.genfromtxt`` to import the file, ``filename``.
 
     Returns
     -------
@@ -368,7 +347,14 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", delimiter=",", titles=N
 
     if titles == None:
         titles = fm.find_header(filename, **file_header_kwargs)
-    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
+        if column_list is not None:
+            titles = titles[column_list]
+    data = np.transpose(np.genfromtxt(filename, **kwargs_genfromtxt))
+    if column_list is not None:
+        try:
+            data = data[column_list]
+        except:
+            raise ValueError("Provided column_indices do not align with the number of file columns, {}".format(len(data)))
     if len(titles) != len(data):
         raise ValueError("The number of titles does not equal the number of columns")
 
