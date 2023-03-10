@@ -1,6 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import warnings
 
 from md_spa_utils import file_manipulation as fm
 from md_spa_utils import data_manipulation as dm
@@ -223,6 +224,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
 
     """
 
+    if weighting is not None:
+        weighting = weighting[ydata>0]
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
 
