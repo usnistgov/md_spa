@@ -125,7 +125,7 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="out.csv",
     coord_data = np.transpose(np.concatenate((r_data, np.array([xx for x in zip(coord, coord_error) for xx in x])), axis=0))
 
     # Prepare to write output files
-    Npairs = lx/2 - 1
+    Npairs = int(lx/2 - 1)
     tmp = os.path.split(file_out)
     fout = os.path.join(tmp[0],"{}_"+tmp[1])
 
@@ -400,7 +400,7 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
 
 
 def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=25, save_fit=False, plotname="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
-    """
+    """ Extract Debye-Waller FACTOR (not parameter like from MSD)
 
     Based on the work found at `DOI: 10.1021/jp064661f <https://doi.org/10.1021/jp064661f>`_
 
