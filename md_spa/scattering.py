@@ -1,6 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import itertools
 
 from md_spa_utils import file_manipulation as fm
 from md_spa_utils import data_manipulation as dm
@@ -76,8 +77,8 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
     return sq, q_array
 
 
-def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="python", group_ids=None):
-    """ Calculate the isotropic coherent intermediate scattering function
+def isotropic_incoherent_scattering(traj, elements=None, q_value=2.25, flag="python", group_ids=None):
+    """ Calculate the isotropic incoherent self intermediate scattering function
 
     Parameters
     ----------
@@ -101,7 +102,7 @@ def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="pytho
     Returns
     -------
     structure_factor : numpy.ndarray
-        Array the isotropic self (coherent) intermediate scattering function.
+        Array the isotropic self (incoherent) intermediate scattering function.
 
     """
 
@@ -116,12 +117,11 @@ def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="pytho
     f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
 
     if flag == "cython":
-        if group_ids is not None:
-            raise ValueError("The use of the group_ids keyword is not yet supported with cython.")
-        isf = scat.isotropic_coherent_scattering(traj, f_values, q_value)
+        if group_ids:
+            raise ValueError("The option, group_ids, is not yet supported with cython.")
+        isf = scat.isotropic_incoherent_scattering(traj, f_values, q_value)
     else:
         (nframes, natoms, ndims) = np.shape(traj)
-        isf = np.zeros(nframes)
         qr = np.sqrt(np.sum(np.square(traj-traj[0,:,:][None,:,:]),axis=-1))*q_value
         isf = np.nanmean(np.square(f_values)[None,:] * np.sin( qr ) / ( qr ), axis=1)
         #cumf2 = np.sum(np.square(f_values))
@@ -137,6 +137,94 @@ def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="pytho
                 isf.append(tmp_isf)
 
     return np.array(isf)
+
+def isotropic_coherent_scattering(traj, elements=None, q_value=2.25, flag="python", group_ids=None, combinations=[], verbose=False):
+    """ Calculate the isotropic coherent collective intermediate scattering function
+
+    Parameters
+    ----------
+    traj : numpy.ndarray
+        Trajectory of atoms, usually log spaced by some base (e.g., 2) although this 
+        choice doesn't affect the inner workings of this function. Dimensions are 
+        (Nframes, Natoms, Ndims)
+    elements : list, Optional, default=None
+        List of atom elements symbols from which to pull the atomic form factor. 
+        Note that an isotope may be chosen by preceeding the elemental symbol with the 
+        number of neutrons. If ``None``, f_values of one are used.
+    q_value : float, Optional, default=2.25
+        The qvalue at which to calculate the isotropic static structure factor. The default
+        value of 2.25 inverse angstroms comes from DOI:10.1063/1.4941946
+    group_ids : list[lists], Optional, default=None
+        Optional list of group ids will produce the total isf, in addition to isf between other
+        groups destinguished by the given ids. Note that this option will not reduce memory usage, 
+        instead it pulls relevant rows and columns when appropriate.
+    combinations : list, Optional, default=None
+        List of tuples containing the indices for group_ids to return the collective ISF for. The
+        first index for the reference group and the second index for the target group. If None,
+        all conbinations are returned. E.g., if ``group_ids = [list1, list2, list3]``, then ``combinations
+        = itertools.combinations(len(group_ids), 2)``
+    flag : str, Optional, default='python'
+        Choose 'python' implementation or accelerated 'cython' option.
+    verbose : bool, Optional, default=False
+        Display comments
+
+    Returns
+    -------
+    structure_factor : numpy.ndarray
+        Array the isotropic collective (coherent) intermediate scattering function.
+
+    """
+
+    if combinations is None and len(group_ids) > 0:
+        if len(group_ids) > 1:
+            combinations = [(0,None)]
+        else:
+            combinations = list(itertools.combinations(len([None]+group_ids), 2))
+            combinations = [x for x in combinations if x[0] is None]
+
+    if verbose:
+        print("Producing collective ISF for combinations: {}".format(combinations))
+
+    (nframes, natoms, ndims) = np.shape(traj)
+    if verbose:
+        print("This function will make a matrix with dimensions: {}, totaling {} elements".format(
+            (nframes, natoms, natoms, ndims), np.prod(np.shape(traj))*natoms)
+        )
+
+    ## Refactor to use internal data file
+    #if elements is None:
+    #    f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
+    #else:
+    #    filename = "/Users/jac16/bin/md_spa/dat/scattering_lengths_cross_sections.dat"
+    #    atom_scattering = fm.csv2dict(filename)
+    #    key_f = "Coh b"
+    #    f_values = np.array([atom_scattering[x][key_f] for x in elements], dtype=float)
+    f_values = np.array([1 for x in range(len(traj[0]))], dtype=float)
+    f_matrix = f_values[:, None]*f_values[None, :]
+
+    if flag == "cython":
+        raise ValueError("This function is not yet supported with cython.")
+        if group_ids:
+            raise ValueError("The option, group_ids, is not yet supported with cython.")
+        isf = scat.isotropic_coherent_scattering(traj, f_values, q_value)
+    else:
+        qr = np.sqrt(np.sum(np.square(traj[:, None, :, :]-traj[0,:,:][None,:,None,:]), axis=-1))*q_value
+        isf = np.nansum(f_matrix[None, :, :] * np.sin( qr ) / ( qr ), axis=(1,2)) / natoms
+
+        #cumf2 = np.sum(f_matrix)
+        cumf2 = 1
+        isf /= cumf2
+        if group_ids is not None:
+            isf = [isf]
+            for (g0, g1) in combintations:
+                tmp_isf = np.nansum(np.square(f_values[tmp_ids])[None,:] * np.sin( qr[:,tmp_ids] ) / ( qr[:,tmp_ids] ), axis=1)
+                #cumf2 = np.sum(np.square(f_values[tmp_ids]))
+                cumf2 = 1
+                tmp_isf /= cumf2
+                isf.append(tmp_isf)
+
+    return np.array(isf)
+
 
 def self_van_hove(traj, r_max=7.0, dr=0.1, flag="python", group_ids=None):
     """ Calculate the self van Hove equation.
