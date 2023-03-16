@@ -1,6 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import warnings
 
 from md_spa_utils import file_manipulation as fm
 from md_spa_utils import data_manipulation as dm
@@ -223,6 +224,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
 
     """
 
+    if weighting is not None:
+        weighting = weighting[ydata>0]
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
 
@@ -239,6 +242,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         if beta is not None:
             if isinstance(beta, (int,float)) and not isinstance(beta, bool):
                 kwargs_parameters={"beta": {"value": beta, "vary": False}}
+            elif isinstance(beta, bool) and not beta:
+                kwargs_parameters = {}
             else:
                 raise ValueError("Beta must be an int or float")
         else:

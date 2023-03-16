@@ -615,7 +615,7 @@ def _d_three_exponential_decays(params0, xarray, yarray, switch=None):
     return np.transpose(np.array(output))
 
 
-def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
+def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
     """
     Provided data fit to:
 
@@ -637,6 +637,8 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
         - ``"tau" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2}``
         - ``"beta" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same length as the provided data, contains the weights for each data point.
     verbose : bool, Optional, default=False
         Output fitting statistics
 
@@ -654,6 +656,13 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
 
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
+
+    if np.all(weighting != None):
+        if minimizer == "emcee":
+            kwargs_min["is_weighted"] = True
+    elif minimizer == "emcee":
+        kwargs_min["is_weighted"] = False
+    kwargs_min.update({"nan_policy": "omit"})
 
     param_kwargs = {
                     "tau": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2},
@@ -677,7 +686,7 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     exp.add("beta", **param_kwargs["beta"])
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_stretched_exponential_decay
-    Result1 = lmfit.minimize(_res_stretched_exponential_decay, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
+    Result1 = lmfit.minimize(_res_stretched_exponential_decay, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
 
     # Format output
     output = np.zeros(2)
@@ -695,10 +704,16 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
 
     return output, uncertainties
 
-def _res_stretched_exponential_decay(params, xarray, yarray, switch=None):
-    return -(xarray/params["tau"])**params["beta"] - np.log(yarray)
+def _res_stretched_exponential_decay(params, xarray, yarray, switch=None, weighting=None,):
+    out = -(xarray/params["tau"])**params["beta"] - np.log(yarray)
+    if np.all(weighting != None):
+        if len(weighting) != len(out):
+            raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
+        out = out*np.array(weighting)
+    return out
 
-def _d_stretched_exponential_decay(params, xarray, yarray, switch=None):
+
+def _d_stretched_exponential_decay(params, xarray, yarray, switch=None, weighting=None,):
 
     tmp_output = []
     tmp_output.append( params["beta"]/params["tau"] * (xarray/params["tau"])**params["beta"] * np.exp(-(xarray/params["tau"])**params["beta"] ) ) # tau
@@ -758,19 +773,22 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         
     """
 
-    xarray = xdata[ydata>0]
-    yarray = ydata[ydata>0]
     kwargs_min = copy.deepcopy(kwargs_minimizer)
-
-    if np.all(np.isnan(ydata[1:])):
-        raise ValueError("y-axis data is NaN")
 
     if np.all(weighting != None):
         if minimizer == "emcee":
             kwargs_min["is_weighted"] = True
+        weighting[ydata>0]
+        if np.all(np.isnan(weighting[1:])):
+            weighting = None
     elif minimizer == "emcee":
         kwargs_min["is_weighted"] = False
     kwargs_min.update({"nan_policy": "omit"})
+
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
     param_kwargs = {
         "A": {"value": 0.8, "min": 0, "max":1},
@@ -801,7 +819,15 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
 
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_two_stretched_exponential_decays
-    Result2 = lmfit.minimize(_res_two_stretched_exponential_decays, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
+    Result2 = lmfit.minimize(
+        _res_two_stretched_exponential_decays, 
+        exp, 
+        method=minimizer, 
+        args=(xarray, yarray), 
+        kws={"switch": switch, 
+        "weighting": weighting}, 
+        **kwargs_min
+    )
 
     # Format output
     output = np.zeros(5)
@@ -826,6 +852,7 @@ def _res_two_stretched_exponential_decays(params, xarray, yarray, switch=None, w
         if len(weighting) != len(out):
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
         out = out*np.array(weighting)
+
     return out
 
 def _d_two_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
