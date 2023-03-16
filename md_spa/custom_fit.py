@@ -737,6 +737,8 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
     kwargs_parameters : dict, Optional
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
         - ``"tau1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
@@ -744,8 +746,6 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         - ``"tau2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
         - ``"beta2" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
-    weighting : numpy.ndarray, Optional, default=None
-        Of the same length as the provided data, contains the weights for each data point.
     verbose : bool, Optional, default=False
         Output fitting statistics
 

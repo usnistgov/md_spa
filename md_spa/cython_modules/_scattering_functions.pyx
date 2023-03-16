@@ -17,13 +17,13 @@ def static_structure_factor(traj, f_values, q_array, dims):
 
         return np.asarray(sq)
 
-def isotropic_incoherent_scattering(traj, f_values, q_value):
+def isotropic_coherent_scattering(traj, f_values, q_value):
 
         if traj.shape[1] != f_values.shape[0]:
             raise ValueError("The number of atoms in `traj` does not equal the number of atoms in `f_values`")
 
         isf0 = np.zeros(traj.shape[0])
-        isf = _isotropic_incoherent_scattering(traj, f_values, q_value, isf0)
+        isf = _isotropic_coherent_scattering(traj, f_values, q_value, isf0)
 
         return np.asarray(isf)
 
@@ -69,7 +69,7 @@ cdef _structure_factor( double[:,:,:] traj,
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
-cdef _isotropic_incoherent_scattering(double[:,:,:] traj,
+cdef _isotropic_coherent_scattering(double[:,:,:] traj,
                                     double[:] f_values,
                                     double q_value,
                                     double[:] isf,
