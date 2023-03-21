@@ -90,7 +90,7 @@ def check_wrap(pos_diff, dimensions, dist_type="distance"):
 t, wrapped if approproate.
 
     """
-    dimensions = np.expand_dims(dimensions, (0,1))
+    dimensions = np.expand_dims(dimensions, tuple(range(len(np.shape(pos_diff))-1)))
     if dist_type == "distance":
         images = ( dimensions/2 - pos_diff ) // dimensions
     elif dist_type == "wrap":
