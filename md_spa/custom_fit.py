@@ -650,19 +650,23 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
         Array containing parameter standard errors: [beta']
         
     """
-    xarray = xdata[ydata>0]
-    yarray = ydata[ydata>0]
-    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
-    if np.all(np.isnan(ydata[1:])):
-        raise ValueError("y-axis data is NaN")
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(weighting != None):
         if minimizer == "emcee":
             kwargs_min["is_weighted"] = True
+        weighting[ydata>0]
+        if np.all(np.isnan(weighting[1:])):
+            weighting = None
     elif minimizer == "emcee":
         kwargs_min["is_weighted"] = False
     kwargs_min.update({"nan_policy": "omit"})
+
+    xarray = xdata[ydata>0]
+    yarray = ydata[ydata>0]
+    if np.all(np.isnan(ydata[1:])):
+        raise ValueError("y-axis data is NaN")
 
     param_kwargs = {
                     "tau": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2},
