@@ -39,8 +39,8 @@ def self_intermediate_scattering(traj, f_values, q_value, dims):
             raise ValueError("The number of atoms in `traj` does not equal the number of atoms in `f_values`")
 
         isf0 = np.zeros(traj.shape[0])
-        count = np.zeros(traj.shape[0], dtype=int)
-        nframes, natoms, ndims = np.shape(traj)
+        count = np.zeros(traj.shape[0], dtype=np.int32)
+        (nframes, natoms, ndims) = np.shape(traj)
 
         cdef double[:,:,:] traj_view = traj
         cdef double[:] f_values_view = f_values
@@ -241,7 +241,7 @@ cdef double[:] _self_intermediate_scattering(
                 count[i] = count[i] + 1
         isf[i] = isf[i] / ( cumf2 * ( natoms - count[i] ) )
         if count[i] > 0:
-            printf("Frame %i has %i atoms that traveled more than half the box length", i, count[i])
+            printf("Frame %i has %i atoms that traveled more than half the box length\n", i, count[i])
 
     return isf
 
