@@ -384,7 +384,7 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
     if flag == "cython":
         if group_ids is not None:
             raise ValueError("The use of the group_ids keyword is not yet supported with cython.")
-        isf = scat.collective_intermediate_scattering(traj, dims, R, f_values, q_value)
+        isf = scat.collective_intermediate_scattering(traj, f_values, q_value, dims)
     else:
         isf = np.zeros(nframes)
         NR = np.zeros(nframes)
@@ -449,7 +449,7 @@ def self_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="
         value of 2.25 inverse angstroms comes from DOI:10.1063/1.4941946
     group_ids : list[lists], Optional, default=None
         Optional list of group ids will produce the total isf, in addition to isf of other groups
-        destinguished by the given ids.
+       destinguished by the given ids.
     flag : str, Optional, default='python'
         Choose 'python' implementation or accelerated 'cython' option.
     wrapped : bool, Optional, default=True
@@ -471,14 +471,14 @@ def self_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="
     f_values = scattering_length(elements, natoms, "incoherent")
 
     if flag == "cython":
-        isf = scat.self_intermediate_scattering(traj, dims, R, f_values, q_value)
+        isf = scat.self_intermediate_scattering(traj, f_values, q_value, dims)
         if group_ids is not None:
             tmp_isf = isf.copy()
             isf = np.zeros((len(group_ids)+1, len(isf)))
             isf[0] = tmp_isf
             for i,tmp_ids in enumerate(group_ids):
                 if tmp_ids:
-                    tmp_isf = isotropic_weighted_incoherent_distances( disp[:, tmp_ids], f_values[tmp_ids], q_value, dims, R=R)
+                    tmp_isf = scat.self_intermediate_scattering( traj[:, tmp_ids, :], f_values[tmp_ids], q_value, dims)
                     isf[i+1] = tmp_isf
                 else:
                     isf[i+1] = np.nan*np.ones(nframes)
