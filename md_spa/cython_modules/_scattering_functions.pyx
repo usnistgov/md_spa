@@ -39,7 +39,7 @@ def self_intermediate_scattering(traj, f_values, q_value, dims):
             raise ValueError("The number of atoms in `traj` does not equal the number of atoms in `f_values`")
 
         isf0 = np.zeros(traj.shape[0])
-        count = np.zeros(traj.shape[0])
+        count = np.zeros(traj.shape[0], dtype=int)
         nframes, natoms, ndims = np.shape(traj)
 
         cdef double[:,:,:] traj_view = traj
