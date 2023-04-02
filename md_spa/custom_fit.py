@@ -1518,7 +1518,7 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
 
         - ``"alpha" = {"value": 0.1, "min": 0, "max":100}``
-        - ``"beta" = {"value": 1.0, "min": 0, "max":100}``
+        - ``"gamma" = {"value": 1.0, "min": 0, "max":100}``
 
     verbose : bool, Optional, default=False
         Output fitting statistics
@@ -1526,9 +1526,9 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
     Returns
     -------
     parameters : numpy.ndarray
-        Array containing parameters: ["alpha", "beta"]
+        Array containing parameters: ["alpha", "gamma"]
     stnd_errors : numpy.ndarray
-        Array containing parameter standard errors: ["alpha", "beta"]
+        Array containing parameter standard errors: ["alpha", "gamma"]
         
     """
 
@@ -1548,13 +1548,13 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
 
     param_kwargs = {
                     "alpha": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+2},
-                    "beta": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2},
+                    "gamma": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2},
                    }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
             param_kwargs[key].update(value)
         else:
-            raise ValueError("The parameter, {}, was given to custom_fit.gamma_distribution, which requires parameters: 'alpha' and 'beta'".format(key))
+            raise ValueError("The parameter, {}, was given to custom_fit.gamma_distribution, which requires parameters: 'alpha' and 'gamma'".format(key))
 
     switch = [True for x in range(len(param_kwargs))]
     for i, (key, value) in enumerate(param_kwargs.items()):
@@ -1565,7 +1565,7 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
 
     exp1 = Parameters()
     exp1.add("alpha", **param_kwargs["alpha"])
-    exp1.add("beta", **param_kwargs["beta"])
+    exp1.add("gamma", **param_kwargs["gamma"])
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_gamma_distribution
     Result1 = lmfit.minimize(_res_gamma_distribution, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting,}, **kwargs_min)
@@ -1587,9 +1587,9 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
     return output, uncertainties
 
 def _res_gamma_distribution(params, xarray, yarray, switch=None, weighting=None,):
-    term1 = params["beta"]**params["alpha"] / sps.gamma(params["alpha"])
+    term1 = params["gamma"]**params["alpha"] / sps.gamma(params["alpha"])
     term2 = xarray**(params["alpha"] - 1.0)
-    term3 = np.exp(-params["beta"]*xarray)
+    term3 = np.exp(-params["gamma"]*xarray)
     out = term1 * term2 * term3 - yarray
     if np.all(weighting != None):
         if len(weighting) != len(out):
@@ -1598,13 +1598,13 @@ def _res_gamma_distribution(params, xarray, yarray, switch=None, weighting=None,
     return out
 
 def _d_gamma_distribution(params, xarray, yarray, switch=None, weighting=None,):
-    term1 = params["beta"]**params["alpha"] / sps.gamma(params["alpha"])
+    term1 = params["gamma"]**params["alpha"] / sps.gamma(params["alpha"])
     term2 = xarray**(params["alpha"] - 1.0)
-    term3 = np.exp(-params["beta"]*xarray)
+    term3 = np.exp(-params["gamma"]*xarray)
 
     tmp_output = []
-    tmp_output.append(term1 * term2 * term3 * (-sps.digamma(params["alpha"]) + np.log(params["beta"]) + np.log(xarray))) # alpha
-    tmp_output.append(term1/params["beta"] * term2 * term3 * (params["alpha"] - params["beta"] * xarray)) # beta
+    tmp_output.append(term1 * term2 * term3 * (-sps.digamma(params["alpha"]) + np.log(params["gamma"]) + np.log(xarray))) # alpha
+    tmp_output.append(term1/params["gamma"] * term2 * term3 * (params["alpha"] - params["gamma"] * xarray)) # gamma
 
     output = []
     if np.all(switch != None):
