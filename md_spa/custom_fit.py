@@ -709,7 +709,7 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     return output, uncertainties
 
 def _res_stretched_exponential_decay(params, xarray, yarray, switch=None, weighting=None,):
-    out = -(xarray/params["tau"])**params["beta"] - np.log(yarray)
+    out =  np.exp(-(xarray/params["tau"])**params["beta"]) - yarray
     if np.all(weighting != None):
         if len(weighting) != len(out):
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
