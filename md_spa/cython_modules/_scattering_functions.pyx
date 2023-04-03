@@ -97,7 +97,7 @@ cdef double[:] _structure_factor(
     int nq,
 ) nogil:
 
-    cdef double cumf2
+    cdef double avgf2
     cdef double tmp
     cdef double tmp2
     cdef double disp
@@ -108,15 +108,11 @@ cdef double[:] _structure_factor(
 
     R = dims[0] / 2
 
-    cumf2 = 0.0
-    for j in range(natoms):
-        cumf2 = cumf2 + f_values[j]
-    cumf2 = ( cumf2 / natoms )**2
-
-##
-    for l in range(nq):
-        tmp = _n_particles_radius_R(q_array[l], natoms, dims, R)
-##
+    avgf2 = 0.0
+    for i in range(natoms): 
+        for j in range(natoms):
+            avgf2 = avgf2 + f_values[i] * f_values[j]
+    avgf2 = avgf2 / natoms**2
 
     NR = 0
     for i in range(nframes):
@@ -137,11 +133,11 @@ cdef double[:] _structure_factor(
                             sq[l] = sq[l] + tmp
                     NR = NR + 1
 
-    NR = NR / nframes / natoms / cumf2
+    NR = NR / nframes / natoms / avgf2
     for l in range(nq):
         tmp = _n_particles_radius_R(q_array[l], natoms, dims, R)
         tmp2 = _finite_size_correction(q_array[l], NR, natoms, dims, R)
-        sq[l] = sq[l] / cumf2 / nframes / natoms - tmp + tmp2
+        sq[l] = sq[l] / avgf2 / nframes / natoms - tmp + tmp2
 
     return sq
 
@@ -209,23 +205,21 @@ cdef double[:] _self_intermediate_scattering(
     int ndims,
 ) nogil:
 
-    cdef float cumf2
+    cdef float avgf2
     cdef float tmp
     cdef float disp
     cdef double R
     cdef int image
     cdef int i, j, n
 
-    cumf2 = 0.0
-    tmp = 0.0
+    avgf2 = 0.0
     for j in range(natoms):
-        cumf2 = cumf2 + f_values[j]**2
-        tmp = tmp + f_values[j]
-    cumf2 = cumf2 / natoms - ( tmp / natoms ) / 2
+        avgf2 = avgf2 + f_values[j]**2
+    avgf2 = avgf2 / natoms 
 
     R = dims[0] / 2
 
-    for i in range(1,nframes):
+    for i in range(nframes):
         for j in range(natoms):
             disp = 0.0
             for n in range(ndims):
@@ -239,7 +233,7 @@ cdef double[:] _self_intermediate_scattering(
                     isf[i] = isf[i] + tmp
             else:
                 count[i] = count[i] + 1
-        isf[i] = isf[i] / ( cumf2 * ( natoms - count[i] ) )
+        isf[i] = isf[i] / ( avgf2 * ( natoms - count[i] ) )
         if count[i] > 0:
             printf("Frame %i has %i atoms that traveled more than half the box length\n", i, count[i])
 
@@ -258,7 +252,7 @@ cdef double[:] _collective_intermediate_scattering(
     int ndims,
 ) nogil:
 
-    cdef double cumf2
+    cdef double avgf2
     cdef double tmp
     cdef double tmp2
     cdef double disp
@@ -270,10 +264,11 @@ cdef double[:] _collective_intermediate_scattering(
 
     R = dims[0] / 2
 
-    cumf2 = 0.0
-    for j in range(natoms):
-        cumf2 = cumf2 + f_values[j]
-    cumf2 = ( cumf2 / natoms )**2
+    avgf2 = 0.0
+    for i in range(natoms):
+        for j in range(natoms):
+            avgf2 = avgf2 + f_values[i] * f_values[j]
+    avgf2 = avgf2 / natoms**2
 
     NR = 0
     for i in range(nframes):
@@ -283,7 +278,7 @@ cdef double[:] _collective_intermediate_scattering(
                 if j != k:
                     disp = 0.0
                     for n in range(ndims):
-                        tmp = traj[i,j,n] - traj[i,k,n]
+                        tmp = traj[i,j,n] - traj[0,k,n]
                         image = <int> ((dims[n]/2 - tmp) // dims[n])
                         disp = disp + (tmp + image * dims[n])**2
                     disp = sqrt(disp)
@@ -296,9 +291,9 @@ cdef double[:] _collective_intermediate_scattering(
                             isf[i] = isf[i] + tmp
                     else:
                         count = count + 1
-                isf[i] = isf[i] / ( cumf2 * ( natoms - count - 1 ) )
+        isf[i] = isf[i] / ( avgf2 * natoms )
 
-    NR = NR / nframes / natoms / cumf2
+    NR = NR / nframes / natoms / avgf2
     tmp = _n_particles_radius_R(q_value, natoms, dims, R)
     tmp2 = _finite_size_correction(q_value, NR, natoms, dims, R)
     for i in range(nframes):

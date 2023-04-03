@@ -180,12 +180,12 @@ def isotropic_weighted_incoherent_distances( displacements, f_values, q_values, 
     weighting = np.sin(qr)/qr
     weighting[qr < np.finfo(float).eps] = 1 # lim of sin(x)/x as x-> 0 equals 1
 
-    b2inc = np.nanmean(f_values**2) - np.nanmean(f_values)**2 if not np.all(f_values == 1.0) else 1.0
+    avgf2 = np.nanmean(f_values**2)
     if nq is not None:
-        weighting *= (f_values**2 / b2inc)[None, :, None] # (nframes, natoms, nq)
+        weighting *= (f_values**2 / avgf2)[None, :, None] # (nframes, natoms, nq)
         weighted_average = np.nanmean(weighting, axis=-2) # (nframes, nq)
     else:
-        weighting *= (f_values**2 / b2inc)[None, :] # (nframes, natoms)
+        weighting *= (f_values**2 / avgf2)[None, :] # (nframes, natoms)
         weighted_average = np.nanmean(weighting, axis=-1) # (nframes)
 
     return weighted_average
@@ -202,7 +202,7 @@ def isotropic_weighted_coherent_distances( displacements, f_reference, f_values,
     Parameters
     ----------
     displacements : numpy.ndarray
-        Atomic displacements. 2D array, the dimensions will be (nframes, natoms, natoms) where the 2nd
+        Atomic displacements. 2D array, the dimensions will be (nframes, natoms) where the 2nd
         dimension represents the centers of spheres and the third dimension is the displacement between that
         center and each atom within distance ``R``. If 2D, then the dimensions are for (nframes, natoms).
     f_reference : numpy.ndarray or list
@@ -255,12 +255,12 @@ def isotropic_weighted_coherent_distances( displacements, f_reference, f_values,
         ind_self = np.where(displacements[0] < np.finfo(float).eps)[0]
         weighting[:,ind_self] = np.nan
 
-    bcoh = np.nanmean(f_values) # Should be multiplied by average b_ref, but not in this function
+    avgf2 = np.nanmean(f_values[:, None] * f_values[None, :])
     if nq is not None:
-        weighting *= f_values[None, :, None]*f_reference / bcoh # (nframes, natoms, nq)
+        weighting *= f_values[None, :, None]*f_reference / avgf2 # (nframes, natoms, nq)
         weighted_average = np.nansum(weighting, axis=-2) # (nframes, nq)
     else:
-        weighting *= f_values[None, :]*f_reference / bcoh # (nframes, natoms)
+        weighting *= f_values[None, :]*f_reference / avgf2 # (nframes, natoms)
         weighted_average = np.nansum(weighting, axis=-1) # (nframes)
 
     return weighted_average
@@ -393,8 +393,9 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
             disp[disp > R] = np.nan
             isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values, q_value, dims, R=R, include_self=False)
             NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(natoms), 0.0, dims, R=R, include_self=False)
+
         isf = isf/natoms/np.nanmean(f_values) - n_particles_radius_R(q_value, natoms, dims, R=R)
-        NR = np.nanmean(NR)/natoms/np.nanmean(f_values)
+        NR = np.nanmean(NR)/natoms/np.nanmean(f_values[:,None]*f_values[None,:])
         isf += finite_size_correction(q_value, NR, natoms, dims, R=R)
 
         if group_ids is not None:
