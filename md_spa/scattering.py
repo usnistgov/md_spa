@@ -559,7 +559,7 @@ def self_van_hove(traj, r_max=7.0, dr=0.1, flag="python", group_ids=None):
 
     return np.array(gs)
 
-def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="stretched_exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, n_exponentials=1, beta=None, weighting=None):
+def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="stretched_exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, n_exponentials=1, beta=None, weighting=None, collective=False):
     """
     Extract the characteristic time fit to a stretched exponential or two stretched exponential
 
@@ -589,6 +589,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         Exponent of the stretched exponential decay. If ``n_exponential == 2 and beta == None`` then ``beta = 3/2`` is used. Set beta as an iterable of length two to set both exponents when appropriate. Set ``beta == False`` to remove the set value of 3/2.
     weighting : numpy.ndarray, Optional, default=None
         Of the same length as the provided data, contains the weights for each data point.
+    collective : bool, Optional, default=False
+        If True, the data will be normalized to the first value and plot axis labeled accordingly
 
     Returns
     -------
@@ -603,6 +605,14 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         weighting = weighting[ydata>0]
     xarray = xdata[ydata>0]
     yarray = ydata[ydata>0]
+    if collective:
+        if not np.isnan(yarray[0]):
+            yarray /= yarray[0]
+        elif not np.isnan(yarray[1]):
+            yarray /= yarray[1]
+        else:
+            raise ValueError("Why are the first two values NaN?!")
+
     if np.size(yarray) == 0:
         if n_exponentials == 1:
             return np.nan*np.ones(2), np.nan*np.ones(2)
@@ -688,10 +698,14 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
             ax[0].plot(xarray,yfit, label="Fit",linewidth=1)
             ax[1].plot(xarray,yarray,".",label="Data")
             ax[1].plot(xarray,yfit, label="Fit",linewidth=1)
-        ax[0].set_ylabel("$F_S(q,t)$")
+        if not collective:
+            ax[0].set_ylabel("$F_S(q,t)$")
+            ax[1].set_ylabel("$F_S(q,t)$")
+        else:
+            ax[0].set_ylabel("$F_C(q,t)$")
+            ax[1].set_ylabel("$F_C(q,t)$")
         ax[0].set_xlabel("Time")
         ax[0].set_xscale('log')
-        ax[1].set_ylabel("$F_S(q,t)$")
         ax[1].set_xlabel("Time")
         ax[1].set_xscale('log')
         ax[1].set_yscale('log')
