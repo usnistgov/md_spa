@@ -65,7 +65,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                      verbose=verbose,
                                                      minimizer=minimizer,
                                                      kwargs_minimizer=kwargs_minimizer,
-
+                                                     kwargs_parameters={"a1": {"vary": False}},
                                                     )
     output[:2] = tmp_output1
     uncertainties[:2] = tmp_error1
@@ -78,6 +78,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                       tau_logscale=tau_logscale,
                                                       kwargs_parameters={
                                                                          "t1": {"value": tmp_output1[1], "vary": False},
+                                                                         "a1": {"vary": False}
                                                                         }
                                                      )
         tmp_output2, tmp_error2 = cfit.two_exponential_decays(xarray, yarray, 
