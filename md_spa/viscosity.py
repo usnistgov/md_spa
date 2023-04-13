@@ -16,7 +16,7 @@ import md_spa_utils.data_manipulation as dm
 import md_spa_utils.file_manipulation as fm
 from . import custom_fit as cfit
 
-def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", viscosity_kwargs={}, csv_kwargs={}, method="Green-Kubo"):
+def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", calc_kwargs={}, csv_kwargs={}, method="Green-Kubo"):
     """
     Calculate the viscosity of an equilibrium molecular dynamics simulation from the pressure tensor.
 
@@ -31,7 +31,7 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", viscosit
         Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
     filename : str, Optional, default="viscosity_running_integral.csv"
         Filename for csv file
-    viscosity_kwargs : dict, Optional, default={}
+    calc_kwargs : dict, Optional, default={}
         Keyword arguements for :func:`viscosity.running_acf_integral` or :func:`viscosity.running_einstein`
     csv_kwargs : dict, Optional, default={}
         Keywords for ``md_spa_utils.file_manipulation.write_csv``
@@ -53,16 +53,16 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", viscosit
         raise ValueError("The array `p_xy` must be of shape (6,N) or (3,N)")
 
     tmp_kwargs = {}
-    if "scale_coefficient" in viscosity_kwargs:
-        tmp_kwargs["scale_coefficient"] = viscosity_kwargs["scale_coefficient"]
-    if "error_type" in viscosity_kwargs:
-        tmp_kwargs["error_type"] = viscosity_kwargs["error_type"]
+    if "scale_coefficient" in calc_kwargs:
+        tmp_kwargs["scale_coefficient"] = calc_kwargs["scale_coefficient"]
+    if "error_type" in calc_kwargs:
+        tmp_kwargs["error_type"] = calc_kwargs["error_type"]
     G_inf = high_freq_shear_modulus(p_xy, **tmp_kwargs)
 
     if method == "Green-Kubo":
-        eta, stnderr = running_acf_integral(time, p_xy, **viscosity_kwargs)
+        eta, stnderr = running_acf_integral(time, p_xy, **calc_kwargs)
     elif method == "Einstein":
-        eta, stnderr = running_einstein(time, p_xy, **viscosity_kwargs)
+        eta, stnderr = running_einstein(time, p_xy, **calc_kwargs)
     else:
         raise ValueError("Define one of two supported methods: Einstein or Green-Kubo")
 
@@ -71,6 +71,54 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", viscosit
     tmp_kwargs["header_comment"] = "# Calculating Viscosity with {} method. G_inf={}+-{}\n#".format(method,*G_inf) 
     tmp_kwargs.update(csv_kwargs)
     fm.write_csv(filename, np.transpose(np.array([time,eta,stnderr])), **tmp_kwargs)
+
+
+def pressure2shear_modulus_csv(time, p_xy, filename="shear_modulus_values.csv", calc_kwargs={}, csv_kwargs={}):
+    """
+    Calculate the viscosity of an equilibrium molecular dynamics simulation from the pressure tensor.
+
+    DOI: 10.1063/5.0098265
+
+    Parameters
+    ----------
+    time : numpy.ndarray
+        Array of time values corresponding to pressure tensor data
+    p_xy : numpy.ndarray
+        Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
+    filename : str, Optional, default="shear_modulus_values.csv"
+        Filename for csv file
+    calc_kwargs : dict, Optional, default={}
+        Keyword arguements for :func:`viscosity.dynamic_shear_modulus`
+    csv_kwargs : dict, Optional, default={}
+        Keywords for ``md_spa_utils.file_manipulation.write_csv``
+        
+    Returns
+    -------
+    Saved file with the viscosity coefficient at each time frame. [Units of pressure]^2*[units of time]
+
+    """
+
+    if not dm.isiterable(time) or dm.isiterable(time[0]):
+        raise ValueError("The array `time` must be of shape (,N)")
+
+    if not dm.isiterable(p_xy) or not dm.isiterable(p_xy[0]) or dm.isiterable(p_xy[0][0]):
+        raise ValueError("The array `p_xy` must be of shape (6,N) or (3,N)")
+    elif len(p_xy) not in [3,6]:
+        raise ValueError("The array `p_xy` must be of shape (6,N) or (3,N)")
+
+    tmp_kwargs = {}
+    if "scale_coefficient" in calc_kwargs:
+        tmp_kwargs["scale_coefficient"] = calc_kwargs["scale_coefficient"]
+    if "error_type" in calc_kwargs:
+        tmp_kwargs["error_type"] = calc_kwargs["error_type"]
+
+    Gshear, stnderr = dynamic_shear_modulus(time, p_xy, **calc_kwargs)
+
+    tmp_kwargs = {}
+    tmp_kwargs["header"] = ["time", "G [pressure^2 time]", "G SE"]
+    tmp_kwargs.update(csv_kwargs)
+    fm.write_csv(filename, np.transpose(np.array([time, Gshear, stnderr])), **tmp_kwargs)
+
 
 def high_freq_shear_modulus(p_xy, error_type="standard error", scale_coefficient=1,):
     """
@@ -81,9 +129,9 @@ def high_freq_shear_modulus(p_xy, error_type="standard error", scale_coefficient
     Parameters
     ----------
     p_xy : numpy.ndarray
-        Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
+        Pressure tensor data at each time step. The first dimension can be of either length 6, representing the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
     scale_coefficient : float, Optional, default=1.0
-        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`2\eta k_{B}T/V`
+        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`G_{\infty} k_{B}T/V`
     error_type : str, Optional, default="standard error"
         Type of error to be saved, either "standard error" or "standard deviation"
 
@@ -311,6 +359,100 @@ def running_acf_integral(time, p_xy, error_type="standard error", scale_coeffici
         
     return scale_coefficient*eta, scale_coefficient*stnderror
 
+def dynamic_shear_modulus(time, p_xy, error_type="standard error", scale_coefficient=1, skip=1, show_plot=False, title=None, save_plot=False, plot_name="green-kubo_viscosity_components.png"):
+    """
+    Calculate the time dependent dynamic shear modulus of an equilibrium molecular dynamics simulation from the independent pressure components: pxy, pxz, pyz, (pxx-pyy)/2, and (pyy-pzz)/2.
+
+    DOI: 10.1063/5.0098265
+
+    Parameters
+    ----------
+    time : numpy.ndarray
+        Array of time values corresponding to pressure tensor data
+    p_xy : numpy.ndarray
+        Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
+    scale_coefficient : float, Optional, default=1.0
+        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`G k_{B}T/V`
+    error_type : str, Optional, default="standard error"
+        Type of error to be saved, either "standard error" or "standard deviation"
+    skip : int, Optional, default=1
+        Number of frame to skip to obtain an independent trajectory
+    show_plot : bool, Optional, default=False
+        choose to show a plot of the fit
+    save_plot : bool, Optional, default=False
+        choose to save a plot of the fit
+    title : str, Optional, default=None
+        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plotname``.
+    plot_name : str, Optional, default="green-kubo_viscosity_components.png"
+        If ``save_plot==True`` the cumulative_integral will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
+
+    Returns
+    -------
+    cumulative_integral : numpy.ndarray
+        Time dependent shear modulus at each time frame. Units of pressure**2 * units of time.
+        
+    """
+    if not dm.isiterable(time) or dm.isiterable(time[0]):
+        raise ValueError("The array `time` must be of shape (,N)")
+
+    if not dm.isiterable(p_xy) or not dm.isiterable(p_xy[0]) or dm.isiterable(p_xy[0][0]):
+        raise ValueError("The array `p_xy` must be of shape (6,N)")
+    elif len(p_xy) != 6:
+        raise ValueError("The array `p_xy` must be of shape (6,N)")
+
+    _, npts = np.shape(p_xy)
+    lx = 5
+    p_new = np.zeros((5,npts))
+    p_new[0] = (p_xy[0]-p_xy[1])/2
+    p_new[1] = (p_xy[1]-p_xy[2])/2
+    p_new[2:] = p_xy[3:]
+
+    # Same result whether the integral is taken before or after averaging the tensor components
+    acf_set = np.array([dm.autocorrelation(x) for x in p_new])
+    Gshear = np.mean(acf_set, axis=0)
+    stnderror = np.sqrt(np.sum(np.square(acf_set-Gshear), axis=0)/(lx-1))
+    if error_type == "standard error":
+        stnderror = stnderror/np.sqrt(lx)
+    elif error_type == "standard deviation":
+        pass
+    else:
+         raise ValueError("The `error_type`, {}, is not supported".format(error_type))
+
+    if save_plot or show_plot:
+        p_labels = {0: "($G_{xx} - G_{yy}$)/2", 1: "($G_{yy} - G_{zz}$)/2", 2: "$G_{xy}$", 3: "$G_{xz}$", 4: "$G_{yz}$"}
+        for i,G_tmp in enumerate(acf_set):
+            if lx ==5 and i < 2:
+                color = "c"
+            else:
+                color = "b"
+            if lx <5:
+                label = p_labels[i+2]
+            else:
+                label = p_labels[i]
+            plt.plot(time, scale_coefficient*G_tmp, linewidth=0.5, color=color, label=label)
+        plt.plot(time, scale_coefficient*Gshear, "k", label=r"G")
+        plt.fill_between(time, scale_coefficient*(Gshear-stnderror), scale_coefficient*(Gshear+stnderror), alpha=0.25, color="black")
+        plt.plot([time[0], time[-1]], [0,0], "k", linewidth=0.5)
+        plt.legend(loc="lower right")
+        plt.ylim((0,scale_coefficient*np.max(Gshear+stnderror)))
+        plt.xlim((0,time[np.where(Gshear/Gshear[0] < 0.01)[0][0]]))
+        plt.xlabel("time")
+        plt.ylabel("G")
+        if title != None:
+            plt.title(title)
+        plt.tight_layout()
+        if save_plot:
+            if title != None:
+                tmp = os.path.split(plot_name)
+                plot_name = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
+            plt.savefig(plot_name,dpi=300)
+        if show_plot:
+            plt.show()
+        plt.close("all")
+
+    return scale_coefficient*Gshear, scale_coefficient*stnderror
+
+
 def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", title=None, additional_entries=None, additional_header=None, kwargs_find_viscosity={}, file_header_kwargs={}, method=None):
     """
     Given the path to a csv file containing viscosity coefficient vs. time data, extract key values and save them to a .csv file. The file of cumulative_integral data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
@@ -406,6 +548,185 @@ def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", ti
     else:
         fm.write_csv(fileout, output, mode=mode)
 
+def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter=",", title=None, additional_entries=None, additional_header=None, fit_kwargs={}, file_header_kwargs={}):
+    """
+    Given the path to a csv file containing viscosity coefficient vs. time data, extract key values and save them to a .csv file. The file of cumulative_integral data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
+
+    Parameters
+    ----------
+    filename : str
+        Input filename and path to lammps cumulative_integral output file
+    fileout : str, Optional, default="viscosity.csv"
+        Filename of output .csv file
+    mode : str, Optional, default="a"
+        Mode used in writing the csv file, either "a" or "w".
+    delimiter : str, Optional, default=","
+        Delimiter between data in input file
+    title : list[str], Optional, default=None
+        Titles for plots if that is specified in the ``kwargs_find_viscosity``
+    additional_entries : list, Optional, default=None
+        This iterable structure can contain additional information about this data to be added to the beginning of the row
+    additional_header : list, Optional, default=None
+        If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
+    fit_kwargs : dict, Optional, default={}
+        Keywords for ``find_green_kubo_viscosity`` or ``find_einstein_viscosity`` functions depending on ``method``
+    file_header_kwargs : dict, Optional, default={}
+        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
+
+    Returns
+    -------
+    csv file
+    
+    """
+
+    if not os.path.isfile(filename):
+        raise ValueError("The given file could not be found: {}".format(filename))
+
+    if np.all(additional_entries != None):
+        flag_add_ent = True
+        if not dm.isiterable(additional_entries):
+            raise ValueError("The provided variable `additional_entries` must be iterable")
+    else:
+        flag_add_ent = False
+        additional_entries = []
+    if np.all(additional_header != None):
+        flag_add_header = True
+        if not dm.isiterable(additional_header):
+            raise ValueError("The provided variable `additional_header` must be iterable")
+    else:
+        flag_add_header = False
+
+    if flag_add_ent:
+        if flag_add_header:
+            if len(additional_entries) != len(additional_header):
+                raise ValueError("The variables `additional_entries` and `additional_header` must be of equal length")
+        else:
+            additional_header = ["-" for x in additional_entries]
+            flag_add_header = True
+
+    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
+    tmp_kwargs = copy.deepcopy(fit_kwargs)
+    if "title" not in tmp_kwargs and title != None:
+        tmp_kwargs["title"] = title
+
+    parameters, stnderror = fit_shear_modulus(data[0], data[1], data[2], **tmp_kwargs)
+    tmp_list = [val for pair in zip(parameters, stnderror) for val in pair]
+    output = [list(additional_entries)+[title]+list(tmp_list)]
+    file_headers = ["Group", "G_inf", "G_inf StD", "tau", "tau SE"]
+
+    if not os.path.isfile(fileout) or mode=="w":
+        if flag_add_header:
+            file_headers = list(additional_header) + file_headers
+        fm.write_csv(fileout, output, mode=mode, header=file_headers)
+    else:
+        fm.write_csv(fileout, output, mode=mode)
+
+def fit_shear_modulus(time, Gshear, Gshear_error, fit_limits=(None,None), show_plot=False, title=None, save_plot=False, plot_name="shear_modulus.png", verbose=False, fit_kwargs={}):
+    """
+    Fit an exponential decay to the time dependent shear modulus
+
+    Parameters
+    ----------
+    time : numpy.ndarray
+        Array of time values corresponding to pressure tensor data
+    Gshear : numpy.ndarray
+        Time dependent shear modulus at each time frame
+    Gshear_error : numpy.ndarray
+        Variation in shear modulus for each time frame. The inverse of these values are used to weight the fitting process.
+    fit_limits : tuple, Optional, default=(None,None)
+        Choose the time values to frame the area from which to estimate the viscosity so that, ``fit_limits[0] < time < fit_limits[1]``.
+    show_plot : bool, Optional, default=False
+        choose to show a plot of the fit
+    save_plot : bool, Optional, default=False
+        choose to save a plot of the fit
+    title : str, Optional, default=None
+        The title used in the Gshear plot, note that this str is also added as a prefix to the ``plot_name``.
+    plot_name : str, Optional, default="shear_modulus.png"
+        If ``save_plot==True`` the Gshear will be saved with the viscosity value marked in blue, The ``title`` is added as a prefix to this str
+    verbose : bool, Optional, default=False
+        Will print intermediate values or not
+    fit_kwargs : dict, Optional, default={}
+        Keyword arguements for exponential functions in :func:`custom_fit.exponential_decay`
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Parameters from :func:`custom_fit.exponential_decay` fit, G_inf and tau_Maxwell
+    uncertainties : numpy.ndarray
+        Standard error for parameters from ``lmfit``
+
+    """
+
+    if not dm.isiterable(time):
+        raise ValueError("Given distances, time, should be iterable")
+    else:
+        time = np.array(time)
+    if not dm.isiterable(Gshear):
+        raise ValueError("Given Gshear, should be iterable")
+    else:
+        Gshear = np.array(Gshear)
+
+    if len(fit_limits) != 2:
+        raise ValueError("`fit_limits` should be of length 2.")
+
+    if fit_limits[1] != None:
+        try:
+            Gshear = Gshear[time < fit_limits[1]]
+            Gshear_error = np.array(Gshear_error)[time < fit_limits[1]]
+            time = time[fit_limits[1] > time]
+        except:
+            pass
+    if fit_limits[0] != None:
+        try:
+            Gshear = Gshear[fit_limits[0] < time]
+            Gshear_error = np.array(Gshear_error)[fit_limits[0] < time]
+            time = time[fit_limits[0] < time]
+        except:
+            pass
+
+    Gshear0 = Gshear[0] if not np.isnan(Gshear[0]) else Gshear[1]
+    if np.isnan(Gshear0):
+        raise ValueError("Why are your first two values NaN???")
+
+    tmp_kwargs = copy.deepcopy(fit_kwargs)
+    if "weighting" not in tmp_kwargs:
+        tmp_kwargs["weighting"] = np.array([1/x if x > np.finfo(float).eps else 1/np.finfo(float).eps for x in Gshear_error/Gshear0])
+
+    if "verbose" not in tmp_kwargs:
+        tmp_kwargs["verbose"] = verbose
+
+    parameters, uncertainties = cfit.exponential_decay(time, Gshear/Gshear0, **tmp_kwargs)
+    parameters[0] *= Gshear0
+    uncertainties[0] *= Gshear0
+
+    if save_plot or show_plot:
+        plt.fill_between(time, Gshear-Gshear_error, Gshear+Gshear_error, edgecolor=None, alpha=0.15, facecolor="black")
+        plt.plot(
+            time, 
+            cfit._res_exponential_decay({"a1": parameters[0], "t1": parameters[1]}, time, np.zeros(len(time))),
+            "r--", label="Fit", linewidth=0.5
+        )
+        plt.plot(time,Gshear,"k",label="Data", linewidth=0.5)
+        plt.legend(loc="upper right")
+        plt.xlabel("time")
+        plt.ylabel("$G$")
+        plt.ylim((0,np.max(Gshear+Gshear_error)))
+        plt.xlim((0, 4*parameters[1]))
+        if title != None:
+            plt.title(title)
+        plt.tight_layout()
+        if save_plot:
+            if title != None:
+                tmp = os.path.split(plot_name)
+                plot_name = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
+            plt.savefig(plot_name,dpi=300)
+        if show_plot:
+            plt.show()
+        plt.close("all")
+
+    return parameters, uncertainties
+
+
 def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_limits=(None,None), weighting_method="b-exponent", b_exponent=None, tcut_fraction=0.4, show_plot=False, title=None, save_plot=False, plot_name="green-kubo_viscosity.png", verbose=False, fit_kwargs={}):
     """
     Extract the viscosity from the running integral of the autocorrelation function. 
@@ -447,7 +768,12 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
     -------
     viscosity : float
         Estimation of the viscosity from the fit of a double cumlulative exponential distribution to the running integral of 
-
+    parameters : numpy.ndarray
+        Parameters from :func:`custom_fit.double_viscosity_cumulative_exponential` fit
+    uncertainties : numpy.ndarray
+        Standard error for viscosity and parameters (the former propagated from the latter).
+    tcut : float
+        Value of time used as an upper bound in fitting process
 
     """
     if not dm.isiterable(time):
