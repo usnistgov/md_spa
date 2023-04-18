@@ -48,7 +48,7 @@ def find_header(filename, delimiter=",", comments="#"):
 
     return col_headers
 
-def find_csv_entries(filename, matching_entries=None, indices=None, convert_float=True):
+def find_csv_entries(filename, matching_entries=None, indices=None, convert_float=True, verbose=False):
     """
     This function will find a specific line in a csv file, and return the requested indices. The lines are specified by the `matching_entries` variable, that uses an iterable structure to narrow the number of rows down to those with the initial columns matching this list. The remaining matrix is then returned according to the `indices`.
 
@@ -59,9 +59,11 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
     matching_entries : list, Optional, default=None
         This list indicates the criteria for narrowing the selection of rows. The first columns of each considered row must match these entries. If ``None`` the column is skipped, and the value added to the resulting row.
     indices : float/list, Optional, default=None
-        The index of a column or a list of indices of the columns to extract from those rows that meet specification. A value of None returns all columns. WARNING! The indexing for this variable is ``np.shape(data)[1]-len(matching_entries)``, so the column after the columns that meet the matching criteria is specified with indices=0.
+        The index of a column or a list of indices of the columns to extract from those rows that meet specification. A value of None returns all columns. The column numbers begin at 0 and increase according to the number of columns in the file. 
     convert_float : bool, Optional, default=True
         Convert all applicable entries into floats
+    verbose : bool, default=False
+        If True, warnings will be provided.
 
     Returns
     -------
@@ -78,40 +80,32 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
         data = list(map(list, contents))
     data = [[ast.literal_eval(x.strip()) if x.strip().replace('.','',1).isdigit() else x.strip() for x in y] for y in data]
 
-    for j,match in enumerate(matching_entries):
-        row_indices = []
-        for i,row in enumerate(data):
-            if row[j] == match or match == None:
-                row_indices.append(i)
-        if not row_indices:
-            raise ValueError("Rows that meet your critera, {}, could not be found".format(matching_entries[:j+1]))
-        data = [data[x] for x in range(len(data)) if x in row_indices]
+    row_indices = [i for i,row in enumerate(data) if np.all([(row[j] == x or x is None) for j,x in enumerate(matching_entries)])]
+    if not row_indices:
+        if verbose:
+            warnings.warn("Matching entries : {} cannot be found in {}".format(matching_entries, filename))
+        return []
 
-    Nbuffer = len(matching_entries)
+    lx = len(matching_entries)
+    tmp_indices = [i for i,x in enumerate(matching_entries) if x is None]
     if dm.isiterable(indices):
-        output = [[y[Nbuffer+x] for x in indices] for y in data]
+        pass
+    elif indices != None:
+        indices = list(range(indices+lx, len(data[0])))
     else:
-        if indices != None:
-            tmp_slice = indices + Nbuffer
-            output = [y[tmp_slice] for y in data]
-        else:
-            output = [y[Nbuffer:] for y in data]
+        indices = tmp_indices + list(range(lx, len(data[0])))
 
+    output = [[data[x][y] for y in indices] for x in row_indices]
     if convert_float:
         for i in range(len(output)):
             output[i] = [float(x) if dm.isfloat(x) else x for x in output[i]]
-
-    # Add skipped matching entries to output
-    ind_None = [i for i,x in enumerate(matching_entries) if x == None]
-    for i, line in enumerate(data):
-        output[i] = [line[x] for x in ind_None] + output[i]
 
     if len(output) == 1:
         output = output[0]
 
     return output
 
-def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_standard_error=False):
+def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_error=False, error_kwargs={}):
     """
     Average multiple data files of the same type and size across eachother.
 
@@ -122,11 +116,14 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_sta
     file_out : str
         Output combined file
     headers : list[str], Optional, default=None
-        If the header for the new file is not given, the header of the first provided file is used.
+        If the header for the new file is not given, the header (first line) of the first provided file is used. Notice that headers for the error do not need to be provided.
     delimiter : str, Optional, default=","
         Data separating string used in ``numpy.genfromtxt``
-    calc_standard_error : bool, Optional, default=False
+    calc_error : bool, Optional, default=False
         If True, the standard error is calculated and interleaved into data.
+    error_kwargs : dict, Optional, default={"axis": 0}
+        Keyword arguments for :func:`data_manipulation.basic_stats`. The default takes the standard error for the corresponding elements across files. 
+        
 
     Returns
     -------
@@ -145,9 +142,10 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_sta
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        data = np.nanmean(data_in, axis=0)
-    if calc_standard_error:
-        data_se = np.nanstd(data_in, axis=0)/np.sqrt(len(data_in))
+        error_kwargs.update({"axis": 0})
+        data, data_se = dm.basic_stats(data_in, **error_kwargs)
+        data = np.transpose(data)
+        data_se = np.transpose(data_se)
     
     if headers == None:
         with open(filenames[0],"r") as f:
@@ -155,20 +153,16 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_sta
     elif dm.isiterable(headers):
         headers = "# {}".format([str(x) for x in headers])
 
-    data = np.transpose(data)
-    if calc_standard_error:
-        data_se = np.transpose(data_se)
-
     with open(file_out, "w") as f:
-        if calc_standard_error:
+        if calc_error:
             tmp_header = headers.split(",")
-            headers = [xx for x in tmp_header for xx in (x, x+" SE")]
+            headers = [xx for x in tmp_header for xx in (x, x+" Error")]
             f.write(", ".join(headers)+"\n")
         else:
             f.write(headers+"\n")
 
         for i in range(len(data)):
-            if calc_standard_error:
+            if calc_error:
                 f.write(", ".join([str(y) for y in [xx for x in zip(data[i],data_se[i]) for xx in x]])+"\n")    
             else:
                 f.write(", ".join([str(x) for x in data[i]])+"\n")
@@ -202,15 +196,14 @@ def write_csv(filename, array, mode="w", header=None, header_comment="#", delimi
     if not dm.isiterable(array) or not dm.isiterable(array[0]):
         raise ValueError("Input `array` must be an iterable type containing iterable elements.")
 
-    flag = not os.path.isfile(filename)
-
+    mode = "w" if not os.path.isfile(filename) else mode
     with open(filename,mode) as f:
-        if (header != None and flag) or ( header != None and "w" in mode):
+        if header != None and "w" in mode:
             f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")
 
-def csv2dict(filename, comment="#", tiers=1):
+def csv2dict(filename, comment="#", tiers=1, skip_cols=0):
     """ Create dict from csv file
 
     The last commented header line is assumed to be the categories and the first column the keys.
@@ -245,6 +238,8 @@ def csv2dict(filename, comment="#", tiers=1):
         String at the beginning of a line to denote a comment
     tiers : int, Optional, default=1
         Number of tiers in dictionary before the remaining entries are in a single dictionary with column header values as keys.
+    skip_cols : int, Optional, default=0
+        Number of columns to skip 
 
     Returns
     -------
@@ -265,9 +260,10 @@ def csv2dict(filename, comment="#", tiers=1):
     header = None
     output = {}
     for i,line in enumerate(data):
-        if comment in line[0]:
-            header = line[tiers:] # Column headers for tiers are irrelevant
+        if isinstance(line[0], str) and comment in line[0]:
+            header = line[skip_cols:][tiers:] # Column headers for tiers are irrelevant
         else:
+            line = line[skip_cols:]
             if header is None:
                 raise ValueError("Commented column headers were not found")
             if len(header) != len(line[tiers:]):
