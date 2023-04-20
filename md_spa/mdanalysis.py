@@ -638,7 +638,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         for tmp in np.transpose(np.array(output)):
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
-def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", stop_frame=None, tau_max=200, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
+def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv", kwargs_run={}):
     """
     Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -665,10 +665,6 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", st
         - "isolayer": ``type {select_target} and isolayer {zones[i][0]} {zones[i][1]} type {select_reference}``. This option will make "one" region, even if parts of it are fragmented (in this case the "around" is probably what you want). Consider this option where the backbone of a polymer is the reference and a uniform "shell" is desired.
         - "around": ``type {select_target} and around {zones[i][0]} type {select_reference}``. Useful for obtaining the residence time of ions around specific groups (https://nms.kcl.ac.uk/lorenz.lab/wp/?p=1045).
 
-    stop_frame : int, Optional, default=None
-        Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
-    tau_max : int, Optional, default=200
-        Number of timesteps to calculate the decay to, this value times dt is the maximum time. See mdanalysis ``waterdynamics.SurvivalProbability``
     intermittency : int, Optional, default=0
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
     verbose : bool, Optional, default=False
@@ -679,6 +675,8 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", st
         Path to save files
     filename : str, Optional, default="survival.csv"
         Prefix on filename to further differentiate
+    kwargs_run : dict, Optional, default={"intermittency": intermittency, :verbose": verbose}
+        Keyword arguments for ``MDAnalysis.analysis.base.AnalysisBase.run()``
 
     Returns
     -------
@@ -734,7 +732,9 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", st
             print("Analyzing Survival Time of Type {} within {} Units of Type {}".format(ind[0], zones[i], ind[1]))
 
         sp = SP(u, select.format(ind[1], *zones[i], ind[0]), verbose=verbose)
-        sp.run(stop=stop_frame, tau_max=tau_max, intermittency=intermittency, verbose=verbose)
+        tmp_kwargs = {"intermittency":intermittency, "verbose": verbose}
+        tmp_kwargs.update(kwargs_run)
+        sp.run(**kwargs_run)
 
         tau = np.array(sp.tau_timeseries)
         timeseries = np.array(sp.sp_timeseries)
@@ -759,7 +759,7 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", st
         for tmp in np.transpose(np.array(output)):
             f.write("{}\n".format(", ".join([str(x) for x in tmp])))
 
-def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, zones=[(2, 5)], select=None, stop_frame=None, tau_max=100, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv"):
+def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, zones=[(2, 5)], select=None, intermittency=0, verbose=False, show_plot=False, path="", filename="survival.csv", kwargs_run={}):
     """
     Calculate the survival probability for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in mobility.
 
@@ -784,10 +784,6 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
         List of tuples containing minimum and maximum zones to evaluate the survival probability
     select : str, Optional, default=None
         A string to overwrite the default selection criteria: ``type {type_target} and isolayer {zones[i][0]} {zones[i][1]} type {type_reference}``
-    stop_frame : int, Optional, default=None
-        Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
-    tau_max : int, Optional, default=100
-        Number of timesteps to calculate the decay to, this value times dt is the maximum time. See mdanalysis ``waterdynamics.SurvivalProbability``
     intermittency : int, Optional, default=0
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
     verbose : bool, Optional, default=False
@@ -798,6 +794,8 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
         Path to save files
     filename : str, Optional, default="survival.csv"
         Prefix on filename to further differentiate
+    kwargs_run : dict, Optional, default={"intermittency": intermittency, :verbose": verbose}
+        Keyword arguments for ``MDAnalysis.analysis.base.AnalysisBase.run()``
 
     Returns
     -------
@@ -827,7 +825,9 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
     titles = []
     for r_start, r_end in zones:
         sp = SP(u, select.format(r_start, r_end), verbose=verbose)
-        sp.run(stop=stop_frame, tau_max=tau_max, intermittency=intermittency, verbose=verbose)
+        tmp_kwargs = {"intermittency":intermittency, "verbose": verbose}
+        tmp_kwargs.update(kwargs_run)
+        sp.run(**tmp_kwargs)
 
         tau = np.array(sp.tau_timeseries)
         timeseries = np.array(sp.sp_timeseries)
