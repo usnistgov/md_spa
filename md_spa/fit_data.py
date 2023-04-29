@@ -205,5 +205,5 @@ def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cu
             plt.show()
         plt.close()
 
-    return np.array(minima), np.array(maxima), np.array(inflections)
+    return np.array(minima).T, np.array(maxima).T, np.array(inflections).T
 

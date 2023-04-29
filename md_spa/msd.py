@@ -1,5 +1,6 @@
 
 #import read_lammps as f
+import re
 import sys
 import numpy as np
 import warnings
@@ -10,6 +11,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 
 import md_spa_utils.data_manipulation as dm
 import md_spa_utils.file_manipulation as fm
+from . import fit_data as fd
 
 def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, kwargs_find_diffusivity={}, kwargs_debye_waller={}, file_header_kwargs={}):
     """
@@ -49,7 +51,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
     data = np.transpose(np.genfromtxt(filename, delimiter=delimiter))
 
     if titles == None:
-        titles = fm.find_header(filename, **file_header_kwargs)
+        titles = [re.split(",|\[|\(", x)[0] for x in fm.find_header(filename, **file_header_kwargs)]
     if len(titles) != len(data):
         raise ValueError("The number of titles does not equal the number of columns")
 
@@ -84,9 +86,93 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
             kwargs_debye_waller["title"] = titles[i]
         best, longest = find_diffusivity(t_tmp, data[i], **kwargs_find_diffusivity)
         dw, tau = debye_waller(t_tmp, data[i], **kwargs_debye_waller)
-        tmp_data.append(list(additional_entries)+[titles[i]]+list(dw)+list(tau)+list(best)+list(longest))
+        tmp_data.append(list(additional_entries)+[titles[i]]+[dw, tau]+list(best)+list(longest))
 
     file_headers = ["Group", "DW [Ang^2]", "tau [ps]", "Best D [Ang^2/ps]", "B D SE", "B t_bound1 [ps]", "B t_bound2 [ps]", "B Exponent", "B Intercept [Ang^2]", "B Npts", "Longest D [Ang^2/ps]", "L D SE", "L t_bound1 [ps]", "L t_bound2 [ps]", "L Exponent", "L Intercept [Ang^2]", "L Npts"]
+    if not os.path.isfile(fileout) or mode=="w":
+        if flag_add_header:
+            file_headers = list(additional_header) + file_headers
+        fm.write_csv(fileout, tmp_data, mode=mode, header=file_headers)
+    else:
+        fm.write_csv(fileout, tmp_data, mode=mode)
+
+
+def nongaussian2csv(filename, fileout="nongaussian.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, file_header_kwargs={}, kwargs_extrema={}):
+    """
+    Given the path to a csv file containing msd data, extract key values and save them to a .csv file. The file of msd data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
+
+    Parameters
+    ----------
+    filename : str
+        Input filename and path to lammps msd output file
+    fileout : str, Optional, default="msd.csv"
+        Filename of output .csv file
+    mode : str, Optional, default="a"
+        Mode used in writing the csv file, either "a" or "w".
+    delimiter : str, Optional, default=","
+        Delimiter between data in input file
+    titles : list[str], Optional, default=None
+        Titles for plots if that is specified in the ``kwargs_find_diffusivity`` or ``kwargs_debye_waller``
+    additional_entries : list, Optional, default=None
+        This iterable structure can contain additional information about this data to be added to the beginning of the row
+    additional_header : list, Optional, default=None
+        If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
+    file_header_kwargs : dict, Optional, default={}
+        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+    kwargs_extrema : dict, Optional, default={}
+        Keywords for :func:`fit_data.pull_extrema`
+
+    Returns
+    -------
+    csv file
+    
+    """
+
+    if not os.path.isfile(filename):
+        raise ValueError("The given file could not be found: {}".format(filename))
+
+    data = np.transpose(np.genfromtxt(filename, delimiter=delimiter, comments="#"))
+
+    if titles == None:
+        titles = [re.split(",|\[|\(", x)[0] for x in fm.find_header(filename, **file_header_kwargs)]
+    if len(titles) != len(data):
+        raise ValueError("The number of titles does not equal the number of columns")
+
+    if np.all(additional_entries != None):
+        flag_add_ent = True
+        if not dm.isiterable(additional_entries):
+            raise ValueError("The provided variable `additional_entries` must be iterable")
+    else:
+        flag_add_ent = False
+        additional_entries = []
+    if np.all(additional_header != None):
+        flag_add_header = True
+        if not dm.isiterable(additional_header):
+            raise ValueError("The provided variable `additional_header` must be iterable")
+    else:
+        flag_add_header = False
+
+    if flag_add_ent:
+        if flag_add_header:
+            if len(additional_entries) != len(additional_header):
+                raise ValueError("The variables `additional_entries` and `additional_header` must be of equal length")
+        else:
+            additional_header = ["-" for x in additional_entries]
+            flag_add_header = True
+
+    t_tmp = np.log10(data[0][1:])
+    tmp_data = []
+    for i in range(1,len(data)):
+        kwargs_tmp = kwargs_extrema.copy()
+        tmp = os.path.split(kwargs_tmp["plot_name"])
+        kwargs_tmp["plot_name"] = os.path.join(tmp[0],titles[i].replace(" ", "")+"_"+tmp[1])
+        _, maxima, _ = fd.pull_extrema(t_tmp, data[i][1:], **kwargs_tmp)
+        ind_min = np.where(maxima[1]==np.max(maxima[1]))[0][0]
+        tau, nongaussian = maxima[0][ind_min], maxima[1][ind_min]
+
+        tmp_data.append(list(additional_entries)+[titles[i]]+[tau, nongaussian])
+
+    file_headers = ["Group", "tau", "nongauss peak"]
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
             file_headers = list(additional_header) + file_headers
@@ -122,8 +208,8 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
     Returns
     -------
     debye-waller-parameter : float
-        Instances where there is a 
-    tau : numpy.ndarray
+        Instances where there is a minimum 
+    tau : float
         Characteristic times associated with the Debye-Waller parameter values
 
     """
@@ -144,7 +230,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
     msd = msd[:int(len(time)*use_frac)]
     logtime = np.log10(time)
     logmsd = np.log10(msd)
-    if np.isnan(logmsd[0]):
+    if np.isnan(logmsd[0]) or np.isinf(logtime[0]):
         logtime = logtime[1:]
         logmsd = logmsd[1:]
 
@@ -152,8 +238,8 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
     if np.all(np.isnan(logmsd)):
         raise ValueError("Spline could not be created with provided data:\n{}\n{}".format(time,msd))
     dspline = spline.derivative()
-
-    extrema = dspline.derivative().roots().tolist()
+    d2spline = dspline.derivative()
+    extrema = d2spline.roots().tolist()
     extrema_concavity = dspline.derivative().derivative()
     dw = np.ones(4)*np.nan
     tau = np.ones(4)*np.nan
@@ -170,25 +256,21 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
 
     # Cut off minima after deepest
     ind_min = np.where(min_value==np.min(min_value))[0][0]
-    for i in range(ind_min+1,4):
-        min_value[i] = np.inf
-        dw[i] = np.nan
-        tau[i] = np.nan
+    min_value, dw, tau = min_value[ind_min], dw[ind_min], tau[ind_min]
 
-    if np.all(np.isnan(dw)):
+    if np.isnan(dw):
         warnings.warn("This msd array does not contain a caged-region")
-    else:
-        tau = np.array([x for _,x in sorted(zip(min_value,tau))])
-        dw = np.array([x for _,x in sorted(zip(min_value,dw))])
-        if verbose:
+    elif verbose:
             print("Found debye waller factor to be {} at {}".format(dw, tau))
 
     if save_plot or show_plot:
         fig, axs = plt.subplots(1, 2, figsize=(6,4))
         axs[0].plot(time,msd,"k",label="Data", linewidth=0.5)
-        if not np.all(np.isnan(dw)):
-            for tmp_tau in tau:
-                axs[0].plot([tmp_tau,tmp_tau],[0,np.max(msd)], linewidth=0.5)
+        if not np.isnan(dw):
+            axs[0].plot([tau, tau],[0,np.max(msd)], linewidth=0.5)
+            axs[0].set_xlim((time[0], tau*2))
+            ind = np.where(time < tau*2)[0][-1]
+            axs[0].set_ylim((np.min(msd[:ind])*0.9, np.max(msd[:ind])))
         axs[0].set_xlabel("time")
         axs[0].set_ylabel("MSD")
         if title != None:
@@ -196,11 +278,15 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
         # log-log plot
         yarray = dspline(logtime)
         axs[1].plot(logtime, yarray,"k", linewidth=0.5)
-        if not np.all(np.isnan(dw)):
-            for tmp_tau in tau:
-                axs[1].plot(np.log10([tmp_tau,tmp_tau]),[0,np.max(yarray)], linewidth=0.5)
+        if not np.isnan(dw):
+            axs[1].plot(np.log10([tau, tau]),[0,np.max(yarray)], linewidth=0.5)
+            axs[1].set_xlim((logtime[0], np.log10(tau*2)))
+            ind = np.where(logtime < np.log10(tau*2))[0][-1]
+            axs[1].set_ylim((np.min(yarray[:ind])*0.9, np.max(yarray[:ind])))
         axs[1].set_xlabel("log(t)")
         axs[1].set_ylabel("$d log(MSD) / d log(t)$")
+        if title != None:
+            axs[1].set_title(title)
         # save plot
         fig.tight_layout()
         if save_plot:
