@@ -227,7 +227,7 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
 
     return rdf_output
 
-def calc_msds(u, groups, dt=1, verbose=False, fft=False, run_kwargs={}):
+def calc_msds(u, groups, dt=None, verbose=False, fft=False, run_kwargs={}):
     """
     Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
@@ -243,7 +243,7 @@ def calc_msds(u, groups, dt=1, verbose=False, fft=False, run_kwargs={}):
     group : list
         List of strings that identify a MDAnalysis AtomGroup with universe.select_atoms(group[i])
     dt : float, Optional, default=1
-        Define dt to convert frame numbers to time in picoseconds
+        Define dt to convert frame numbers to desired time unit. If nothing is provided, the dt of the universe is used.
     verbose : bool, Optional, default=False
         Set whether calculation will be run with comments
     fft : bool, Optional, default=False
@@ -261,6 +261,8 @@ def calc_msds(u, groups, dt=1, verbose=False, fft=False, run_kwargs={}):
     """
 
     u = check_universe(u)
+    if dt is None:
+        dt = u.trajectory.dt
 
     if not dm.isiterable(groups):
         raise ValueError("The entry `groups` must be an iterable structure with selection strings.")
@@ -1111,7 +1113,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
     return debye_waller_total, debye_waller_total_std
 
 
-def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, step=None, select=None, dr=1.0, r_start=2.0, nzones=5, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100, kwargs_metric={}, include_center=True):
+def tetrahedral_order_parameter_by_zone(universe, select_target, select_reference, select_neighbor, step=None, select=None, dr=1.0, r_start=2.0, nzones=5, start_frame=None, stop_frame=None, skip_frame=1, verbose=False, write_increment=100, bins=100, kwargs_metric={}, include_center=True):
     """
     Calculate the per atom tetrahedral order parameter for radially dependent zones from a specified bead type (or overwrite with other selection criteria) showing distance dependent changes in structure.
 
@@ -1135,7 +1137,7 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
     select_neighbor : str
         Selection string restricting the atom types to be included. For example, ``reference_select="type 2 and type 4"``, although one atom type is probably recommended.
     step : int, Optional, default=None
-        Optionally evaulate for a single step, this will overwrite ``r_cut, stop_frame, skip_frame``
+        Optionally evaulate for a single step, this will overwrite ``r_cut, stop_frame, skip_frame, and stop_frame``
     select : str, Optional, default=None
         A string to overwrite the default selection criteria: ``({select_target}) and around {r_start} {r_start+i_zone*dr} ({select_reference})``
     r_start : float, Optional, default=2.0
@@ -1144,6 +1146,8 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
         Thickness of the radial zones, for LAMMPS this is in angstroms
     nzones : int, Optional, default=5.0
         Number of zones, counting the central Zone 0
+    stop_frame : int, Optional, default=None
+        Frame at which to start calculation. This function can take a long time, so the entire trajectory may not be desired.
     stop_frame : int, Optional, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
     skip_frame : int, Optional, default=1
@@ -1189,7 +1193,11 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
             stop_frame = lx
             if verbose:
                 print("`stop_frame` has been reset to align with the trajectory length, {}".format(lx))
-        timesteps = range(0,int(stop_frame),int(skip_frame))
+        if start_frame == None:
+            start_frame = 0
+        elif start_frame > stop_frame:
+            raise ValueError("Provided `start_frame` is less then `stop_frame`")
+        timesteps = range(int(start_frame), int(stop_frame), int(skip_frame))
     else:
         timesteps = [step]
 
