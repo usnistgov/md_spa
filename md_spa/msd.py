@@ -88,7 +88,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
         dw, tau = debye_waller(t_tmp, data[i], **kwargs_debye_waller)
         tmp_data.append(list(additional_entries)+[titles[i]]+[dw, tau]+list(best)+list(longest))
 
-    file_headers = ["Group", "DW [Ang^2]", "tau [ps]", "Best D [Ang^2/ps]", "B D SE", "B t_bound1 [ps]", "B t_bound2 [ps]", "B Exponent", "B Intercept [Ang^2]", "B Npts", "Longest D [Ang^2/ps]", "L D SE", "L t_bound1 [ps]", "L t_bound2 [ps]", "L Exponent", "L Intercept [Ang^2]", "L Npts"]
+    file_headers = ["Group", "DW [l-unit^2]", "tau [t-unit]", "Best D [l-unit^2 / t-unit]", "B D SE", "B t_bound1 [t-unit]", "B t_bound2 [t-unit]", "B Exponent", "B Intercept [l-unit^2]", "B Npts", "Longest D [l-unit^2/t-unit]", "L D SE", "L t_bound1 [t-unit]", "L t_bound2 [t-unit]", "L Exponent", "L Intercept [l-unit^2]", "L Npts"]
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
             file_headers = list(additional_header) + file_headers
