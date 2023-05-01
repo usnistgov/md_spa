@@ -267,7 +267,10 @@ def calc_msds(u, groups, dt=None, verbose=False, fft=False, run_kwargs={}):
     if not dm.isiterable(groups):
         raise ValueError("The entry `groups` must be an iterable structure with selection strings.")
 
-    nbins = len(u.trajectory)
+    if "stop" in run_kwargs:
+        nbins = run_kwargs["stop"]
+    else:
+        nbins = len(u.trajectory)
     msd_output = np.zeros((len(groups)+1,nbins))
     if not fft:
         nongaussian_parameter = np.zeros((len(groups)+1,nbins))
