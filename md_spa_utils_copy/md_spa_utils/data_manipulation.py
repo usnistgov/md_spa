@@ -41,6 +41,10 @@ def basic_stats(data, axis=None, data_type="individuals", error_type="standard_d
         
     """
 
+    if verbose:
+        print("Evaluating {}, to describe the {} with the {} of a(n) {} population".format(
+            data_type, error_descriptor, error_type, population_dist_type))
+
     data = np.array(data, float)
     if not isiterable(data):
         raise ValueError("Input data is not iterable")

@@ -274,7 +274,7 @@ def csv2dict(filename, comment="#", tiers=1, skip_cols=0):
             for j, key in enumerate(tier_keys):
                 if j+1 == tiers:
                     if key in tmp_dict:
-                        warnings.warn("Overwriting entries for tiers: dict[{}]".format("][".join([str(x) for x in tier_keys])))
+                        warnings.warn("Overwriting entries for tiers: dict[{}]. Consider adding more Tiers.".format("][".join([str(x) for x in tier_keys])))
                     tmp_dict[key] = {header[x]: line[x+tiers] for x in range(len(header))}
                 else:
                     if key not in tmp_dict:
