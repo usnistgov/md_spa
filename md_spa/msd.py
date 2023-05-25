@@ -169,6 +169,7 @@ def nongaussian2csv(filename, fileout="nongaussian.csv", mode="a", delimiter=","
         _, maxima, _ = fd.pull_extrema(t_tmp, data[i][1:], **kwargs_tmp)
         ind_min = np.where(maxima[1]==np.max(maxima[1]))[0][0]
         tau, nongaussian = maxima[0][ind_min], maxima[1][ind_min]
+        tau = 10**tau
 
         tmp_data.append(list(additional_entries)+[titles[i]]+[tau, nongaussian])
 
