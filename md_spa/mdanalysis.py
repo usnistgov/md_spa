@@ -286,10 +286,10 @@ def calc_msds(u, groups, dt=None, verbose=False, fft=False, run_kwargs={}):
 
         if not flag_bins:
             flag_bins = True
-            msd_output[0,:MSD.n_frames] = np.arange(MSD.n_frames)*dt # ps
+            msd_output[0,:MSD.n_frames] = np.arange(MSD.n_frames)*dt # time
             if not fft:
-                nongaussian_parameter[0,:MSD.n_frames] = np.arange(MSD.n_frames)*dt # ps
-        msd_output[i+1,:MSD.n_frames] = MSD.results.timeseries # angstroms^2
+                nongaussian_parameter[0,:MSD.n_frames] = np.arange(MSD.n_frames)*dt # time
+        msd_output[i+1,:MSD.n_frames] = MSD.results.timeseries # distance^2
         if not fft:
             nongaussian_parameter[i+1,:MSD.n_frames] = MSD.results.nongaussian_parameter
 

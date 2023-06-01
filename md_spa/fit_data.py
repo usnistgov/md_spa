@@ -118,7 +118,7 @@ def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cu
     error_length : int, Optional, default=25
         The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
     extrema_cutoff : float, Optional, default=0.0
-        All peaks with an absolute value of gr that is less than this value are ignored.
+        All peaks with an absolute value of gr that is less than this value are ignored. If values that are expects are not returned, try adding a small value of `smooth_sigma` as minute fluculations in a noninteresting beginning part of the array may be at fault.
     show_plot : bool, Optional, default=False
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
     save_fit : bool, Optional, default=False
