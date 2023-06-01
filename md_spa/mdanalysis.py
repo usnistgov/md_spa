@@ -703,8 +703,8 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", in
     if verbose:
         print("Imported trajectory")
 
-    if tau_max > len(u.trajectory):
-        tau_max = len(u.trajectory)
+    if "tau_max" in kwargs_run and kwargs_run["tau_max"] > len(u.trajectory):
+        kwargs_run["tau_max"] = len(u.trajectory)
         warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
     if not dm.isiterable(zones) or not np.all([dm.isiterable(x) for x in zones]):
@@ -812,8 +812,8 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
     if verbose:
         print("Imported trajectory")
 
-    if tau_max > len(u.trajectory):
-        tau_max = len(u.trajectory)
+    if "tau_max" in kwargs_run and kwargs_run["tau_max"] > len(u.trajectory):
+        kwargs_run["tau_max"] = len(u.trajectory)
         warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
     if select == None:
