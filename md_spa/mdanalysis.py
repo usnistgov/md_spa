@@ -267,7 +267,10 @@ def calc_msds(u, groups, dt=None, verbose=False, fft=False, run_kwargs={}):
     if not dm.isiterable(groups):
         raise ValueError("The entry `groups` must be an iterable structure with selection strings.")
 
-    nbins = len(u.trajectory)
+    if "stop" in run_kwargs:
+        nbins = run_kwargs["stop"]
+    else:
+        nbins = len(u.trajectory)
     msd_output = np.zeros((len(groups)+1,nbins))
     if not fft:
         nongaussian_parameter = np.zeros((len(groups)+1,nbins))
@@ -700,8 +703,8 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", in
     if verbose:
         print("Imported trajectory")
 
-    if tau_max > len(u.trajectory):
-        tau_max = len(u.trajectory)
+    if "tau_max" in kwargs_run and kwargs_run["tau_max"] > len(u.trajectory):
+        kwargs_run["tau_max"] = len(u.trajectory)
         warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
     if not dm.isiterable(zones) or not np.all([dm.isiterable(x) for x in zones]):
@@ -809,8 +812,8 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
     if verbose:
         print("Imported trajectory")
 
-    if tau_max > len(u.trajectory):
-        tau_max = len(u.trajectory)
+    if "tau_max" in kwargs_run and kwargs_run["tau_max"] > len(u.trajectory):
+        kwargs_run["tau_max"] = len(u.trajectory)
         warnings.warn("tau_max is longer than given trajectory, resetting to {}".format(len(u.trajectory)))
 
     if select == None:

@@ -541,8 +541,8 @@ def self_van_hove(traj, r_max=7.0, dr=0.1, flag="python", group_ids=None):
         ValueError("Cython module is not yet available.")
     else:
         (nframes, natoms, ndims) = np.shape(traj)
-        r_array = np.arange(r_max+dr, dr)
-        nr = len(r_array)
+        r_array = np.arange(0, r_max+dr, dr)
+        nr = len(r_array)-1
         displacements = np.sqrt(np.sum(np.square(traj-traj[0,:,:][None,:,:]),axis=-1))
         gs = np.zeros((nr, nframes+1))
         gs[:,0] = r_array[:-1]+dr/2
