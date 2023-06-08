@@ -99,12 +99,12 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
 
 def nongaussian2csv(filename, fileout="nongaussian.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, file_header_kwargs={}, kwargs_extrema={}):
     """
-    Given the path to a csv file containing msd data, extract key values and save them to a .csv file. The file of msd data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
+    Given the path to a csv file containing nongaussian data, extract key values and save them to a .csv file. The file of nongaussian data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
 
     Parameters
     ----------
     filename : str
-        Input filename and path to lammps msd output file
+        Input filename and path to nongaussian output file created from :func:`md_spa.msd.calc_msds`
     fileout : str, Optional, default="msd.csv"
         Filename of output .csv file
     mode : str, Optional, default="a"
