@@ -1310,8 +1310,8 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
     )
 
     # Format output
-    output = np.zeros(5)
-    uncertainties = np.zeros(5)
+    output = np.zeros(4)
+    uncertainties = np.zeros(4)
     for i,(param, value) in enumerate(Result2.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
