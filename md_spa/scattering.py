@@ -134,9 +134,8 @@ def isotropic_weighted_incoherent_distances( displacements, f_values, q_values, 
     Parameters
     ----------
     displacements : numpy.ndarray
-        Atomic displacements. 2D array, the dimensions will be (nframes, natoms, natoms) where the 2nd
-        dimension represents the centers of spheres and the third dimension is the displacement between that
-        center and each atom within distance ``R``. If 2D, then the dimensions are for (nframes, natoms).
+        Atomic displacements. 2D array, the dimensions will be (nframes, natoms) where the 2nd
+        dimension represents the displacement of an atom in time within distance ``R``.
     f_values : numpy.ndarray or list
         Array of the same length as elements containing the scattering cross sectional area or a list 
     q_value : float
@@ -178,7 +177,7 @@ def isotropic_weighted_incoherent_distances( displacements, f_values, q_values, 
         qr = displacements * q_values
 
     weighting = np.sin(qr)/qr
-    weighting[qr < np.finfo(float).eps] = 1 # lim of sin(x)/x as x-> 0 equals 1
+    weighting[qr <= np.finfo(float).eps] = 1 # lim of sin(x)/x as x-> 0 equals 1
 
     avgf2 = np.nanmean(f_values**2)
     if nq is not None:
@@ -532,8 +531,10 @@ def self_van_hove(traj, r_max=7.0, dr=0.1, flag="python", group_ids=None):
 
     Returns
     -------
-    structure_factor : numpy.ndarray
-        Array the isotropic self (coherent) intermediate scattering function.
+    Gs : numpy.ndarray, list
+        Self van Hove for matrix, if no ``group_ids``, the output is a matrix of the distance values by the 
+        number of log spaced frames. If ``group_ids`` is not ``None``, then the output is a list of matrices
+        for each group.
 
     """
     if flag == "cython":
