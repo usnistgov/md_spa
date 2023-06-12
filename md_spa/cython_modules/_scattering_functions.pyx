@@ -58,7 +58,7 @@ def self_intermediate_scattering(traj, f_values, q_value, dims):
 
         return np.asarray(isf)
 
-def collective_intermediate_scattering(traj, f_values, q_value, dims):
+def collective_intermediate_scattering(traj, f_values, q_value, dims, include_self):
 
         if traj.shape[1] != f_values.shape[0]:
             raise ValueError("The number of atoms in `traj` does not equal the number of atoms in `f_values`")
@@ -76,9 +76,10 @@ def collective_intermediate_scattering(traj, f_values, q_value, dims):
         cdef int nframes_view = nframes
         cdef int natoms_view = natoms
         cdef int ndims_view = ndims
+        cdef bint flag_view = include_self 
 
         isf = _collective_intermediate_scattering(
-            traj_view, f_values_view, q_value_view, dims_view, isf0_view, nframes_view, natoms_view, ndims_view
+            traj_view, f_values_view, q_value_view, dims_view, isf0_view, nframes_view, natoms_view, ndims_view, flag_view
         )
 
         return np.asarray(isf)
@@ -250,6 +251,7 @@ cdef double[:] _collective_intermediate_scattering(
     int nframes,
     int natoms,
     int ndims,
+    bint include_self,
 ) nogil:
 
     cdef double avgf2
@@ -275,37 +277,22 @@ cdef double[:] _collective_intermediate_scattering(
         for j in range(natoms):
             count = 0
             for k in range(natoms):
-                disp = 0.0
-                for n in range(ndims):
-                    tmp = traj[i,j,n] - traj[0,k,n]
-                    image = <int> ((dims[n]/2 - tmp) // dims[n])
-                    disp = disp + (tmp + image * dims[n])**2
-                disp = sqrt(disp)
-                if disp < R:
-                    NR = NR + 1
-                    tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
-                    if isnan(tmp):
-                        isf[i] = isf[i] + 1
+                if j != k and not include_self:
+                    disp = 0.0
+                    for n in range(ndims):
+                        tmp = traj[i,j,n] - traj[0,k,n]
+                        image = <int> ((dims[n]/2 - tmp) // dims[n])
+                        disp = disp + (tmp + image * dims[n])**2
+                    disp = sqrt(disp)
+                    if disp < R:
+                        NR = NR + 1
+                        tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
+                        if isnan(tmp):
+                            isf[i] = isf[i] + 1
+                        else:
+                            isf[i] = isf[i] + tmp
                     else:
-                        isf[i] = isf[i] + tmp
-                else:
-                    count = count + 1
-#                if j != k:
-#                    disp = 0.0
-#                    for n in range(ndims):
-#                        tmp = traj[i,j,n] - traj[0,k,n]
-#                        image = <int> ((dims[n]/2 - tmp) // dims[n])
-#                        disp = disp + (tmp + image * dims[n])**2
-#                    disp = sqrt(disp)
-#                    if disp < R:
-#                        NR = NR + 1
-#                        tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
-#                        if isnan(tmp):
-#                            isf[i] = isf[i] + 1
-#                        else:
-#                            isf[i] = isf[i] + tmp
-#                    else:
-#                        count = count + 1
+                        count = count + 1
         isf[i] = isf[i] / ( avgf2 * natoms )
 
     NR = NR / nframes / natoms / avgf2

@@ -330,7 +330,7 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
     return sq, q_array
 
 
-def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="python", group_ids=None):
+def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="python", group_ids=None, include_self=True):
     """ Calculate the isotropic collective intermediate scattering function
 
     Taken from DOI: 10.1103/PhysRevE.64.051201
@@ -363,6 +363,8 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
         destinguished by the given ids.
     flag : str, Optional, default='python'
         Choose 'python' implementation or accelerated 'cython' option.
+    include_self : bool, Optional, default=True
+        If False, the self displacements are discarded leaving only the distinct signal
 
     Returns
     -------
@@ -383,15 +385,15 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
     if flag == "cython":
         if group_ids is not None:
             raise ValueError("The use of the group_ids keyword is not yet supported with cython.")
-        isf = scat.collective_intermediate_scattering(traj, f_values, q_value, dims)
+        isf = scat.collective_intermediate_scattering(traj, f_values, q_value, dims, include_self)
     else:
         isf = np.zeros(nframes)
         NR = np.zeros(nframes)
         for j in range(natoms):
             disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj[:,j,:][:, None, :]-traj[0,:,:][None, :, :], dims)),axis=-1))
             disp[disp > R] = np.nan
-            isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values, q_value, dims, R=R) #, include_self=False)
-            NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(natoms), 0.0, dims, R=R) #, include_self=False)
+            isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values, q_value, dims, R=R, include_self=include_self)
+            NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(natoms), 0.0, dims, R=R, include_self=include_self)
 
         isf = isf/natoms/np.nanmean(f_values) - n_particles_radius_R(q_value, natoms, dims, R=R)
         NR = np.nanmean(NR)/natoms/np.nanmean(f_values[:,None]*f_values[None,:])
@@ -411,8 +413,8 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
                     for j in ids1:
                         disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj[:,ids2,:]-traj[0,j,:][None, None, :], dims)),axis=-1))
                         disp[disp > R] = np.nan
-                        tmp_isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values[ids2], q_value, dims, R=R) #, include_self=False)
-                        NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(len(ids2)), 0.0, dims, R=R) #, include_self=False)
+                        tmp_isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values[ids2], q_value, dims, R=R, include_self=include_self)
+                        NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(len(ids2)), 0.0, dims, R=R, include_self=include_self)
                     tmp_isf = tmp_isf/tmp_N/np.mean(f_values[ids1])  - n_particles_radius_R(q_value, tmp_N, dims, R=R)
                     NR = np.nanmean(NR)/tmp_N//np.nanmean(f_values)
                     isf[i+1] = tmp_isf + finite_size_correction(q_value, NR, tmp_N, dims, R=R)
