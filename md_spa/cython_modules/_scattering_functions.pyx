@@ -275,22 +275,37 @@ cdef double[:] _collective_intermediate_scattering(
         for j in range(natoms):
             count = 0
             for k in range(natoms):
-                if j != k:
-                    disp = 0.0
-                    for n in range(ndims):
-                        tmp = traj[i,j,n] - traj[0,k,n]
-                        image = <int> ((dims[n]/2 - tmp) // dims[n])
-                        disp = disp + (tmp + image * dims[n])**2
-                    disp = sqrt(disp)
-                    if disp < R:
-                        NR = NR + 1
-                        tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
-                        if isnan(tmp):
-                            isf[i] = isf[i] + 1
-                        else:
-                            isf[i] = isf[i] + tmp
+                disp = 0.0
+                for n in range(ndims):
+                    tmp = traj[i,j,n] - traj[0,k,n]
+                    image = <int> ((dims[n]/2 - tmp) // dims[n])
+                    disp = disp + (tmp + image * dims[n])**2
+                disp = sqrt(disp)
+                if disp < R:
+                    NR = NR + 1
+                    tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
+                    if isnan(tmp):
+                        isf[i] = isf[i] + 1
                     else:
-                        count = count + 1
+                        isf[i] = isf[i] + tmp
+                else:
+                    count = count + 1
+#                if j != k:
+#                    disp = 0.0
+#                    for n in range(ndims):
+#                        tmp = traj[i,j,n] - traj[0,k,n]
+#                        image = <int> ((dims[n]/2 - tmp) // dims[n])
+#                        disp = disp + (tmp + image * dims[n])**2
+#                    disp = sqrt(disp)
+#                    if disp < R:
+#                        NR = NR + 1
+#                        tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
+#                        if isnan(tmp):
+#                            isf[i] = isf[i] + 1
+#                        else:
+#                            isf[i] = isf[i] + tmp
+#                    else:
+#                        count = count + 1
         isf[i] = isf[i] / ( avgf2 * natoms )
 
     NR = NR / nframes / natoms / avgf2

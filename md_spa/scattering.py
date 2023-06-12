@@ -249,7 +249,7 @@ def isotropic_weighted_coherent_distances( displacements, f_reference, f_values,
         qr = displacements * q_values
 
     weighting = np.sin(qr)/qr
-    weighting[qr < np.finfo(float).eps] = 1 # lim of sin(x)/x as x-> 0 equals 1
+    weighting[qr <= np.finfo(float).eps] = 1 # lim of sin(x)/x as x-> 0 equals 1
     if not include_self:
         ind_self = np.where(displacements[0] < np.finfo(float).eps)[0]
         weighting[:,ind_self] = np.nan
@@ -390,8 +390,8 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
         for j in range(natoms):
             disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj[:,j,:][:, None, :]-traj[0,:,:][None, :, :], dims)),axis=-1))
             disp[disp > R] = np.nan
-            isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values, q_value, dims, R=R, include_self=False)
-            NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(natoms), 0.0, dims, R=R, include_self=False)
+            isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values, q_value, dims, R=R) #, include_self=False)
+            NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(natoms), 0.0, dims, R=R) #, include_self=False)
 
         isf = isf/natoms/np.nanmean(f_values) - n_particles_radius_R(q_value, natoms, dims, R=R)
         NR = np.nanmean(NR)/natoms/np.nanmean(f_values[:,None]*f_values[None,:])
@@ -411,8 +411,8 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
                     for j in ids1:
                         disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj[:,ids2,:]-traj[0,j,:][None, None, :], dims)),axis=-1))
                         disp[disp > R] = np.nan
-                        tmp_isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values[ids2], q_value, dims, R=R, include_self=False)
-                        NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(len(ids2)), 0.0, dims, R=R, include_self=False)
+                        tmp_isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values[ids2], q_value, dims, R=R) #, include_self=False)
+                        NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(len(ids2)), 0.0, dims, R=R) #, include_self=False)
                     tmp_isf = tmp_isf/tmp_N/np.mean(f_values[ids1])  - n_particles_radius_R(q_value, tmp_N, dims, R=R)
                     NR = np.nanmean(NR)/tmp_N//np.nanmean(f_values)
                     isf[i+1] = tmp_isf + finite_size_correction(q_value, NR, tmp_N, dims, R=R)
