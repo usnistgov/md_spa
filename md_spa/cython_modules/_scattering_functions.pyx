@@ -277,7 +277,7 @@ cdef double[:] _collective_intermediate_scattering(
         for j in range(natoms):
             count = 0
             for k in range(natoms):
-                if j != k and not include_self:
+                if (j != k  or include_self):
                     disp = 0.0
                     for n in range(ndims):
                         tmp = traj[i,j,n] - traj[0,k,n]
