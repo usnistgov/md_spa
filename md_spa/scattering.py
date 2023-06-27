@@ -59,7 +59,7 @@ def finite_size_correction(q_value, NR, natoms, dims, R=None):
     Parameters
     ----------
     q_value : float/numpy.ndarray
-        The qvalue between 2*np.pi/L and 2*np.pi/sigma
+        The qvalue between 2*np.pi/(L/2) and 2*np.pi/sigma
     NR : float/numpy.ndarray
         Output from :func:`isotropic_weighted_coherent_distances` where q=0
     natoms : int
@@ -68,7 +68,7 @@ def finite_size_correction(q_value, NR, natoms, dims, R=None):
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
     R : float, Optional, default=None
-        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/L is used.        
+        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used.        
 
     Returns
     -------
@@ -100,14 +100,14 @@ def n_particles_radius_R(q_value, natoms, dims, R=None):
     Parameters
     ----------
     q_value : float/numpy.ndarray
-        The qvalue between 2*np.pi/L and 2*np.pi/sigma
+        The qvalue between 2*np.pi/(L/2) and 2*np.pi/sigma
     natoms : int
         Number of atoms in the system to calculate the number density
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
     R : float, Optional, default=None
-        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/L is used.        
+        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used.        
 
     Returns
     -------
@@ -139,12 +139,12 @@ def isotropic_weighted_incoherent_distances( displacements, f_values, q_values, 
     f_values : numpy.ndarray or list
         Array of the same length as elements containing the scattering cross sectional area or a list 
     q_value : float
-        The qvalue between 2*np.pi/L and 2*np.pi/sigma
+        The qvalue between 2*np.pi/(L/2) and 2*np.pi/sigma
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
     R : float, Optional, default=None
-        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/L is used. 
+        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used. 
 
     Returns
     -------
@@ -209,12 +209,12 @@ def isotropic_weighted_coherent_distances( displacements, f_reference, f_values,
     f_values : numpy.ndarray or list
         Array of the same length as elements containing the scattering cross sectional area or a list 
     q_values : float/numpy.ndarray
-        The qvalue between 2*np.pi/L and 2*np.pi/sigma
+        The qvalue between 2*np.pi/(L/2) and 2*np.pi/sigma
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
     R : float, Optional, default=None
-        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/L is used. 
+        Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used. 
     include_self : bool, Optional, default=True
         If False, the self displacements are discarded
 
@@ -264,7 +264,7 @@ def isotropic_weighted_coherent_distances( displacements, f_reference, f_values,
 
     return weighted_average
 
-def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace={}, flag="python", group_ids=[]):
+def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace={}, flag="python"):
     """ Calculate the isotropic static structure factor
 
     DOI: 10.1063/5.0074588, 10.1103/physreve.53.2390
@@ -286,6 +286,8 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
     kwargs_linspace : dict, Optional, default={"num":200}
         Keyword arguments for np.linspace function to produce q array to calculate the 
         structure factor 
+    flag : str, Optional, default='python'
+        Choose 'python' implementation or accelerated 'cython' option.
 
     Returns
     -------
@@ -297,7 +299,7 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
 
     """
 
-    qmin = 2*np.pi/(np.max(dims))
+    qmin = 2*np.pi/(np.max(dims)/2)
     qmax = 2*np.pi/(sigma/2)
     tmp_kwargs = {"num": 200}
     tmp_kwargs.update(kwargs_linspace)
@@ -375,8 +377,8 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
 
     R = np.min(dims)/2
 
-    if q_value < np.pi/R:
-        ValueError("Given the box size, this q-value requires a correction. See doi: 10.1103/PhysRevE.64.051201 for more detail")
+    if q_value < 2*np.pi/R:
+        ValueError("Given the box size, this q-value requires a correction. See doi: 10.1103/PhysRevE.64.051201 for more details")
     (nframes, natoms, ndims) = np.shape(traj)
     f_values = scattering_length(elements, natoms, "coherent")
     if not np.all(f_values == 1.0):
@@ -467,8 +469,8 @@ def self_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="
 
     R = np.min(dims)/2
 
-    if q_value < np.pi/R:
-        ValueError("Given the box size, this q-value requires a correction. See doi: 10.1103/PhysRevE.64.051201 for more detail")
+    if q_value < 2*np.pi/R:
+        ValueError("Given the box size, this q-value requires a correction. See doi: 10.1103/PhysRevE.64.051201 for more details")
     (nframes, natoms, ndims) = np.shape(traj)
     f_values = scattering_length(elements, natoms, "incoherent")
 
