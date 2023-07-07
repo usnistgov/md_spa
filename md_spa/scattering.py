@@ -313,23 +313,25 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
         raise ValueError("Corrections haven't been propagated to corrections")
 
     if flag == "cython":
-        sq = scat.static_structure_factor(traj, f_values, q_array, dims)
+        sq, sq_self = scat.static_structure_factor(traj, f_values, q_array, dims)
     else:
         s_n = np.zeros((nframes, nq))
+        s_n_self = np.zeros((nframes, nq))
         NR = np.zeros(nframes)
         for j in range(natoms): # Must reduce dimensions to fit in memory
-            disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj-traj[:,j,:][:, None, :], dims)), axis=-1))
+            disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj-traj[:,j,:][:, None, :], dims)), axis=-1)) # nframe, natoms
             disp[disp > R] = np.nan
             s_n += isotropic_weighted_coherent_distances( disp, f_values[j], f_values, q_array, dims, R=R)
             NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(natoms), 0.0, dims, R=R)
+            s_n_self += isotropic_weighted_incoherent_distances( disp[:, j][:, None], f_values[j][None], q_array, dims, R=R)
         sq = np.nanmean(s_n, axis=0)/natoms/np.nanmean(f_values)**2 - n_particles_radius_R(q_array, natoms, dims, R=R)
         NR = np.nanmean(NR)/natoms/np.nanmean(f_values)
         sq += finite_size_correction(q_array, NR, natoms, dims, R=R)
-      
-        tmp =  n_particles_radius_R(q_array, natoms, dims, R=R)
-        tmp2 = finite_size_correction(q_array, NR, natoms, dims, R=R)
 
-    return sq, q_array
+        sq_self = np.ones(nq)/np.nanmean(f_values**2) - n_particles_radius_R(q_array, 1, dims, R=R)
+        sq_self += finite_size_correction(q_array, 1, 1, dims, R=R)
+      
+    return sq, sq_self, q_array
 
 
 def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="python", group_ids=None, include_self=True):

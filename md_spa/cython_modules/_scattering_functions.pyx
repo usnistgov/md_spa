@@ -14,6 +14,7 @@ def static_structure_factor(traj, f_values, q_array, dims):
             raise ValueError("The number of dimensions in `traj` does not equal the number of entries in `dims`")
 
         sq0 = np.zeros(len(q_array))
+        sqself = np.zeros(len(q_array))
         nframes, natoms, ndims = np.shape(traj)
         nq = len(q_array)
 
@@ -22,6 +23,7 @@ def static_structure_factor(traj, f_values, q_array, dims):
         cdef double[:] q_array_view = q_array
         cdef double[:] dims_view = dims
         cdef double[:] sq0_view = sq0
+        cdef double[:] sqself_view = sqself
         cdef int nframes_view = nframes
         cdef int natoms_view = natoms
         cdef int ndims_view = ndims
@@ -30,8 +32,11 @@ def static_structure_factor(traj, f_values, q_array, dims):
         sq = _structure_factor(
             traj_view, f_values_view, q_array_view, dims_view, sq0_view, nframes_view, natoms_view, ndims_view, nq_view
         )
+        sq_self = _self_structure_factor(
+            traj_view, f_values_view, q_array_view, dims_view, sqself_view, nframes_view, natoms_view, ndims_view, nq_view
+        )
 
-        return np.asarray(sq)
+        return np.asarray(sq), np.asarray(sq_self)
 
 def self_intermediate_scattering(traj, f_values, q_value, dims):
 
@@ -141,6 +146,44 @@ cdef double[:] _structure_factor(
         sq[l] = sq[l] / avgf2 / nframes / natoms - tmp + tmp2
 
     return sq
+
+
+@cython.boundscheck(False)
+@cython.cdivision(True)
+cdef double[:] _self_structure_factor(
+    double[:,:,:] traj,
+    double[:] f_values,
+    double[:] q_array,
+    double[:] dims,
+    double[:] sq,
+    int nframes,
+    int natoms,
+    int ndims,
+    int nq,
+) nogil:
+
+    cdef double avgf2
+    cdef double tmp
+    cdef double tmp2
+    cdef double disp
+    cdef double R
+    cdef int image
+    cdef int i, j, k, l, n
+
+    R = dims[0] / 2
+
+    avgf2 = 0.0
+    for i in range(natoms):
+        avgf2 = avgf2 + f_values[i] * f_values[i]
+    avgf2 = avgf2 / natoms
+
+    for l in range(nq):
+        tmp = _n_particles_radius_R(q_array[l], 1, dims, R)
+        tmp2 = _finite_size_correction(q_array[l], 1, 1, dims, R)
+        sq[l] = 1 / avgf2 - tmp + tmp2 
+
+    return sq
+
 
 @cython.boundscheck(False)
 @cython.cdivision(True)
