@@ -390,7 +390,7 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
     kwargs_parameters : dict, Optional
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
 
-        - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3, "vary": False}``
+        - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3, "vary": False}`` Prefactor, one created for every q-value unless {"equal": True}
         - ``"D" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
 
     verbose : bool, Optional, default=False
@@ -430,9 +430,24 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
         raise ValueError("y-axis data is NaN")
 
     param_kwargs = {
-                    "A": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3, "vary": False},
                     "D": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3},
                    }
+    if "A" in kwargs_parameters:
+        if "equal" in kwargs_parameters["A"] and kwargs_parameters["A"]["equal"]:
+            param_kwargs["A"] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+            del kwargs_parameters["A"]["equal"]
+            param_kwargs["A"].update(kwargs_parameters["A"])
+        else:
+            for i in range(len(q_array)):
+                param_kwargs["A{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+                if "equal" in kwargs_parameters["A"]:
+                    del kwargs_parameters["A"]["equal"]
+                param_kwargs["A{}".format(i+1)].update(kwargs_parameters["A"])
+        del kwargs_parameters["A"]
+    else:
+        for i in range(len(q_array)):
+            param_kwargs["A{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
             param_kwargs[key].update(value)
@@ -447,15 +462,15 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
             switch[i] = False
 
     exp1 = Parameters()
-    exp1.add("A", **param_kwargs["A"])
-    exp1.add("D", **param_kwargs["D"])
+    for key, value in param_kwargs.items():
+        exp1.add(key, **value)
 
     Result1 = lmfit.minimize(_res_q_dependent_exponential_decay, exp1, method=minimizer, args=(xdata, ymatrix, q_array), 
         kws={"switch": switch, "weighting": weighting, "log_transform": log_transform, "ymax": ymax, "ymin": ymin}, **kwargs_min)
 
     # Format output
-    output = np.zeros(2)
-    uncertainties = np.zeros(2)
+    output = np.zeros(len(Result1.params))
+    uncertainties = np.zeros(len(Result1.params))
     for i,(param, value) in enumerate(Result1.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -477,16 +492,316 @@ def _res_q_dependent_exponential_decay(params, xdata, ymatrix, q_array, switch=N
     if ymin is not None:
         ymatrix[np.where(ymatrix < ymin)] = np.nan
 
-    if log_transform:
-        out = np.log(params["A"])-xdata[None, :] * (params["D"]*q_array[:,None]) - np.log(ymatrix)
+    if "A" in params:
+        A_array = params["A"]
     else:
-        out = params["A"]*np.exp(-xdata[None,:] * (params["D"]*q_array[:,None])) - ymatrix
+        A_array = np.array([params["A{}".format(i+1)] for i in range(len(q_array))])[:, None]
+
+    if log_transform:
+        out = np.log(A_array)-xdata[None, :] * (params["D"]*q_array[:,None]) - np.log(ymatrix)
+    else:
+        out = A_array * np.exp(-xdata[None,:] * (params["D"]*q_array[:,None])) - ymatrix
     if np.all(weighting != None):
         if len(weighting) != len(out):
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
         out = out*np.array(weighting)
 
-    return np.sum(out, axis=0)
+    return np.nansum(out, axis=0)
+
+
+def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False, ymax=None, ymin=None):
+    """
+    Provided data fit to:
+
+    Values of zero and NaN are ignored in the fit.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ymatrix : numpy.ndarray
+        dependent data set where each row is a function to be fit corresponding to each q_value. Shape is ``(len(q_array), len(xdata))``
+   q_array : numpy.ndarray
+        q-values associated with first dimension of ``ymatrix``
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same length as the provided data, contains the weights for each data point.
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+
+        - ``"D" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
+        - ``"tau" = {"value": 1e-2, "min": np.finfo(float).eps, "max": 100}``
+        - ``"beta" = {"value": 1.0, "min": np.finfo(float).eps, "max":2}``
+        - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1.0}`` Prefactor, one created for every q-value unless {"equal": True}
+
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+    ymax : float, Optional, default=None
+        Maximum value of the exponential decay to capture the long time relaxation only
+    ymin : float, Optional, default=None
+        Minimum value of the exponential decay to capture the short time relaxation only
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ["A", 'D']
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: ["A", D']
+        
+    """
+
+    xdata = np.array(xdata)
+    ymatrix = np.array(ymatrix)
+    q_array = np.array(q_array)
+
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
+
+    if np.all(weighting != None):
+        if minimizer == "emcee":
+            kwargs_min["is_weighted"] = True
+        if np.all(np.isnan(weighting[:,1:])):
+            weighting = None
+    elif minimizer == "emcee":
+        kwargs_min["is_weighted"] = False
+    kwargs_min.update({"nan_policy": "omit"})
+
+    if np.all(np.isnan(ymatrix[:,1:])):
+        raise ValueError("y-axis data is NaN")
+
+    param_kwargs = {
+                    "D": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3},
+                    "tau": {"value": 1e-2, "min": np.finfo(float).eps, "max": 100},
+                    "beta": {"value": 1.0, "min": np.finfo(float).eps, "max": 2},
+                   }
+    if "A" in kwargs_parameters:
+        if "equal" in kwargs_parameters["A"] and kwargs_parameters["A"]["equal"]:
+            param_kwargs["A"] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+            del kwargs_parameters["A"]["equal"]
+            param_kwargs["A"].update(kwargs_parameters["A"])
+        else:
+            for i in range(len(q_array)):
+                param_kwargs["A{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+                if "equal" in kwargs_parameters["A"]:
+                    del kwargs_parameters["A"]["equal"]
+                param_kwargs["A{}".format(i+1)].update(kwargs_parameters["A"])
+        del kwargs_parameters["A"]
+    else:
+        for i in range(len(q_array)):
+            param_kwargs["A{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'A' and 'D'".format(key))
+
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
+
+    exp1 = Parameters()
+    for key, value in param_kwargs.items():
+        exp1.add(key, **value)
+
+    Result1 = lmfit.minimize(_res_q_dependent_stretched_and_exponential_decay, exp1, method=minimizer, args=(xdata, ymatrix, q_array),
+        kws={"switch": switch, "weighting": weighting, "ymax": ymax, "ymin": ymin}, **kwargs_min)
+
+    # Format output
+    output = np.zeros(len(Result1.params))
+    uncertainties = np.zeros(len(Result1.params))
+    for i,(param, value) in enumerate(Result1.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        if minimizer == "leastsq":
+            print("Termination: {}".format(Result1.lmdif_message))
+        else:
+            print("Termination: {}".format(Result1.message))
+        lmfit.printfuncs.report_fit(Result1.params)
+
+    return output, uncertainties
+
+def _res_q_dependent_stretched_and_exponential_decay(params, xdata, ymatrix, q_array, switch=None, weighting=None, ymax=None, ymin=None):
+
+    if ymax is not None:
+        ymatrix[np.where(ymatrix > ymax)] = np.nan
+
+    if ymin is not None:
+        ymatrix[np.where(ymatrix < ymin)] = np.nan
+
+    if "A" in params:
+        A_array = params["A"]
+    else:
+        A_array = np.array([params["A{}".format(i+1)] for i in range(len(q_array))])[:, None]
+
+    out = A_array * np.exp(-xdata[None,:] * (params["D"]*q_array[:,None])) + (1 - A_array) * np.exp(-(xdata[None,:] / params["tau"])**params["beta"]) - ymatrix
+
+    if np.all(weighting != None):
+        if len(weighting) != len(out):
+            raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
+        out = out*np.array(weighting)
+
+    return np.nansum(out, axis=0)
+
+
+def q_dependent_hydrodynamic_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False, ymax=None, ymin=None):
+    """
+    Provided data fit to:
+
+    Values of zero and NaN are ignored in the fit.
+
+    The parameter ``C`` should be q-dependent, but for now we assume it's constant
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        independent data set
+    ymatrix : numpy.ndarray
+        dependent data set where each row is a function to be fit corresponding to each q_value. Shape is ``(len(q_array), len(xdata))``
+   q_array : numpy.ndarray
+        q-values associated with first dimension of ``ymatrix``
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same length as the provided data, contains the weights for each data point.
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+
+        - ``"C" = {"value": 0.5, "min": np.finfo(float).eps, "max":1}`` Prefactor, one created for every q-value unless {"equal": True}
+        - ``"G" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}`` The Acoustic Attenuation
+        - ``"c" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}``: The sound velocity
+        - ``"tau" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}`` Relaxation of Q0-mode
+
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+    ymax : float, Optional, default=None
+        Maximum value of the exponential decay to capture the long time relaxation only
+    ymin : float, Optional, default=None
+        Minimum value of the exponential decay to capture the short time relaxation only
+
+    Returns
+    -------
+    parameters : numpy.ndarray
+        Array containing parameters: ["A", 'D']
+    stnd_errors : numpy.ndarray
+        Array containing parameter standard errors: ["A", D']
+        
+    """
+
+    xdata = np.array(xdata)
+    ymatrix = np.array(ymatrix)
+    ymatrix /= ymatrix[:,0][:,None]
+    q_array = np.array(q_array)
+
+    kwargs_min = copy.deepcopy(kwargs_minimizer)
+
+    if np.all(weighting != None):
+        if minimizer == "emcee":
+            kwargs_min["is_weighted"] = True
+        if np.all(np.isnan(weighting[:,1:])):
+            weighting = None
+    elif minimizer == "emcee":
+        kwargs_min["is_weighted"] = False
+    kwargs_min.update({"nan_policy": "omit"})
+
+    if np.all(np.isnan(ymatrix[:,1:])):
+        raise ValueError("y-axis data is NaN")
+
+    param_kwargs = {
+        "G": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3},
+        "c": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3},
+        "tau": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3},
+    }
+
+    if "C" in kwargs_parameters:
+        if "equal" in kwargs_parameters["C"] and kwargs_parameters["C"]["equal"]:
+            param_kwargs["C"] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+            del kwargs_parameters["C"]["equal"]
+            param_kwargs["C"].update(kwargs_parameters["C"])
+        else:
+            for i in range(len(q_array)):
+                param_kwargs["C{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+                if "equal" in kwargs_parameters["C"]:
+                    del kwargs_parameters["C"]["equal"]
+                param_kwargs["C{}".format(i+1)].update(kwargs_parameters["C"])
+        del kwargs_parameters["C"]
+    else:
+        for i in range(len(q_array)):
+            param_kwargs["C{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'A' and 'D'".format(key))
+
+    switch = [True for x in range(len(param_kwargs))]
+    for i, (key, value) in enumerate(param_kwargs.items()):
+        if "vary" in value and value["vary"] == False:
+            switch[i] = False
+        if "expr" in value:
+            switch[i] = False
+
+    exp1 = Parameters()
+    for key, value in param_kwargs.items():
+        exp1.add(key, **value)
+
+    Result1 = lmfit.minimize(_res_q_dependent_hydrodynamic_exponential_decay, exp1, method=minimizer, args=(xdata, ymatrix, q_array),
+        kws={"switch": switch, "weighting": weighting, "ymax": ymax, "ymin": ymin}, **kwargs_min)
+
+    # Format output
+    output = np.zeros(len(Result1.params))
+    uncertainties = np.zeros(len(Result1.params))
+    for i,(param, value) in enumerate(Result1.params.items()):
+        output[i] = value.value
+        uncertainties[i] = value.stderr
+
+    if verbose:
+        if minimizer == "leastsq":
+            print("Termination: {}".format(Result1.lmdif_message))
+        else:
+            print("Termination: {}".format(Result1.message))
+        lmfit.printfuncs.report_fit(Result1.params)
+
+    return output, uncertainties
+
+def _res_q_dependent_hydrodynamic_exponential_decay(params, xdata, ymatrix, q_array, switch=None, weighting=None, ymax=None, ymin=None):
+
+    if ymax is not None:
+        ymatrix[np.where(ymatrix > ymax)] = np.nan
+
+    if ymin is not None:
+        ymatrix[np.where(ymatrix < ymin)] = np.nan
+
+    if "C" in params:
+        C_array = params["C"]
+    else:
+        C_array = np.array([params["C{}".format(i+1)] for i in range(len(q_array))])[:, None]
+
+    out_v = np.exp(-xdata[None,:] * params["G"] * q_array[:,None]**2) * (
+        np.cos(params["c"] * q_array[:,None] * xdata[None,:]) +
+        q_array[:,None] * xdata[None,:] / params["c"] * 
+        np.sin(params["c"] * q_array[:,None] * xdata[None,:])
+    ) 
+    out_l = np.exp(-xdata[None,:] / params["tau"])
+
+    out = (1-C_array) * out_v + C_array * out_l - ymatrix
+
+    if np.all(weighting != None):
+        if len(weighting) != len(out):
+            raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
+        out = out*np.array(weighting)
+
+    return np.nansum(out, axis=0)
 
 
 def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False):
