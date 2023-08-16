@@ -912,7 +912,7 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
     # Format output
     output = np.zeros(4)
     uncertainties = np.zeros(4)
-    for i,(param, value) in enumerate({key: value for key, value in Result2.params.items() if key[0] != "_"}):
+    for i,(param, value) in enumerate({key: value for key, value in Result2.params.items() if key[0] != "_"}.items()):
         if "log" in param:
             output[i] = np.exp(value.value)
             try:
