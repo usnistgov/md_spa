@@ -533,7 +533,7 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
 
         - ``"D" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
-        - ``"tau" = {"value": 1e-2, "min": np.finfo(float).eps, "max": 100}``
+        - ``"taubeta" = {"value": 1.0, "min": np.finfo(float).eps, "max": 1e+4}``
         - ``"beta" = {"value": 1.0, "min": np.finfo(float).eps, "max":2}``
         - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1.0}`` Prefactor, one created for every q-value unless {"equal": True}
 
@@ -573,7 +573,7 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
 
     param_kwargs = {
                     "D": {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3},
-                    "tau": {"value": 1e-2, "min": np.finfo(float).eps, "max": 100},
+                    "taubeta": {"value": 1, "min": np.finfo(float).eps, "max": 1e+4},
                     "beta": {"value": 1.0, "min": np.finfo(float).eps, "max": 2},
                    }
     if "A" in kwargs_parameters:
@@ -641,7 +641,7 @@ def _res_q_dependent_stretched_and_exponential_decay(params, xdata, ymatrix, q_a
     else:
         A_array = np.array([params["A{}".format(i+1)] for i in range(len(q_array))])[:, None]
 
-    out = A_array * np.exp(-xdata[None,:] * (params["D"]*q_array[:,None])) + (1 - A_array) * np.exp(-(xdata[None,:] / params["tau"])**params["beta"]) - ymatrix
+    out = A_array * np.exp(-xdata[None,:] * (params["D"]*q_array[:,None])) + (1 - A_array) * np.exp(-xdata[None,:]**params["beta"] / params["taubeta"]) - ymatrix
 
     if np.all(weighting != None):
         if len(weighting) != len(out):
@@ -1400,7 +1400,7 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     kwargs_parameters : dict, Optional
         Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
 
-        - ``"tau" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2}``
+        - ``"taubeta" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4}`` : Calculated as a constant, the time constant can be extract when beta is known.
         - ``"beta" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
     weighting : numpy.ndarray, Optional, default=None
@@ -1435,25 +1435,24 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
         raise ValueError("y-axis data is NaN")
 
     param_kwargs = {
-                    "tau": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+2},
+                    "taubeta": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4},
                     "beta": {"value": 0.1, "min": np.finfo(float).eps, "max":5},
                    }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
             param_kwargs[key].update(value)
         else:
-            raise ValueError("The parameter, {}, was given to custom_fit.stretched exponential_decay, which requires parameters: 'tau' and 'beta'".format(key))
+            raise ValueError("The parameter, {}, was given to custom_fit.stretched_exponential_decay, which requires parameters: 'tau' and 'beta'".format(key))
 
+    exp = Parameters()
     switch = [True for x in range(len(param_kwargs))]
     for i, (key, value) in enumerate(param_kwargs.items()):
+        exp.add(key, **param_kwargs[key])
         if "vary" in value and value["vary"] == False:
             switch[i] = False
         if "expr" in value:
             switch[i] = False
 
-    exp = Parameters()
-    exp.add("tau", **param_kwargs["tau"])
-    exp.add("beta", **param_kwargs["beta"])
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_stretched_exponential_decay
     Result1 = lmfit.minimize(_res_stretched_exponential_decay, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
@@ -1475,7 +1474,7 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     return output, uncertainties
 
 def _res_stretched_exponential_decay(params, xarray, yarray, switch=None, weighting=None,):
-    out =  np.exp(-(xarray/params["tau"])**params["beta"]) - yarray
+    out =  np.exp(-xarray**params["beta"]/params["taubeta"]) - yarray
     if np.all(weighting != None):
         if len(weighting) != len(out):
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
@@ -1486,8 +1485,10 @@ def _res_stretched_exponential_decay(params, xarray, yarray, switch=None, weight
 def _d_stretched_exponential_decay(params, xarray, yarray, switch=None, weighting=None,):
 
     tmp_output = []
-    tmp_output.append( params["beta"]/params["tau"] * (xarray/params["tau"])**params["beta"] * np.exp(-(xarray/params["tau"])**params["beta"] ) ) # tau
-    tmp_output.append( -np.log(xarray/params["tau"]) * (xarray/params["tau"])**params["beta"] * np.exp(-(xarray/params["tau"])**params["beta"] ) ) # tau
+    ratio = xarray**params["beta"]/params["taubeta"]
+    exp = np.exp(-ratio)
+    tmp_output.append( ratio / params["taubeta"] * exp )# taubeta
+    tmp_output.append( -np.log(xarray) * ratio * exp ) # beta
 
     output = []
     if np.all(switch != None):
@@ -1526,9 +1527,9 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
-        - ``"tau1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
+        - ``"tau1beta1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
         - ``"beta1" = {"value": 1/2, "min": np.finfo(float).eps, "max":5}``
-        - ``"tau2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
+        - ``"tau2beta2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
         - ``"beta2" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
     verbose : bool, Optional, default=False
@@ -1561,31 +1562,26 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         raise ValueError("y-axis data is NaN")
 
     param_kwargs = {
-        "A": {"value": 0.8, "min": 0, "max":1},
-        "tau1": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2},
+        "A": {"value": 0.8, "min": np.finfo(float).eps, "max":1},
+        "tau1beta1": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4},
         "beta1": {"value": 1/2, "min": np.finfo(float).eps, "max":5},
-        "tau2": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2},
+        "tau2beta2": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4},
         "beta2": {"value": 3/2, "min": np.finfo(float).eps, "max":5},
     }
     for key, value in kwargs_parameters.items():
         if key in param_kwargs:
             param_kwargs[key].update(value)
         else:
-            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'A', 'tau1', 'beta1', 'tau2' and 'beta2'".format(key))
+            raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: {}".format(key, ", ".join(param_kwargs.keys())))
 
+    exp = Parameters()
     switch = [True for x in range(len(param_kwargs))]
     for i, (key, value) in enumerate(param_kwargs.items()):
+        exp.add(key, **value)
         if "vary" in value and value["vary"] == False:
             switch[i] = False
         if "expr" in value:
             switch[i] = False
-
-    exp = Parameters()
-    exp.add("A", **param_kwargs["A"])
-    exp.add("tau1", **param_kwargs["tau1"])
-    exp.add("beta1", **param_kwargs["beta1"])
-    exp.add("tau2", **param_kwargs["tau2"])
-    exp.add("beta2", **param_kwargs["beta2"])
 
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_two_stretched_exponential_decays
@@ -1617,7 +1613,7 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
 
 def _res_two_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
    
-    out =  params["A"]*np.exp(-(xarray/params["tau1"])**params["beta1"]) + (1-params["A"])*np.exp(-(xarray/params["tau2"])**params["beta2"]) - yarray
+    out =  params["A"]*np.exp(-xarray**params["beta1"] / params["tau1beta1"]) + (1-params["A"])*np.exp(-xarray**params["beta2"] / params["tau2beta2"]) - yarray
     if np.all(weighting != None):
         if len(weighting) != len(out):
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
@@ -1628,15 +1624,15 @@ def _res_two_stretched_exponential_decays(params, xarray, yarray, switch=None, w
 def _d_two_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
 
     tmp_output = []
-    ratio1 = (xarray/params["tau1"])**params["beta1"]
-    ratio2 = (xarray/params["tau2"])**params["beta2"]
+    ratio1 = xarray**params["beta1"] / params["tau1beta1"]
+    ratio1 = xarray**params["beta2"] / params["tau2beta2"]
     exp1 = np.exp(-ratio1)
     exp2 = np.exp(-ratio2)
     tmp_output.append(exp1-exp2)
-    tmp_output.append( params["A"]*params["beta1"]/params["tau1"] * ratio1 * exp1 ) # tau1
-    tmp_output.append( -params["A"]*np.log(xarray/params["tau1"]) * ratio1 * exp1 ) # beta1 
-    tmp_output.append( -params["A"]*params["beta2"]/params["tau2"] * ratio2 * exp2 ) # tau2
-    tmp_output.append( params["A"]*np.log(xarray/params["tau2"]) * ratio2 * exp2 ) # beta2 
+    tmp_output.append( params["A"] * ratio1 / params["tau1beta1"] * exp1 ) # tau1
+    tmp_output.append( -params["A"]*np.log(xarray) * ratio1 * exp1 ) # beta1 
+    tmp_output.append( -params["A"] * ratio2 / params["tau2beta2"] * exp2 ) # tau2
+    tmp_output.append( params["A"]*np.log(xarray) * ratio2 * exp2 ) # beta2 
 
     output = []
     if np.all(switch != None):
@@ -1676,7 +1672,7 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
-        - ``"tau1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
+        - ``"tau1beta1" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
         - ``"beta1" = {"value": 1/2, "min": np.finfo(float).eps, "max":5}``
         - ``"tau2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
 
@@ -1711,7 +1707,7 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
 
     param_kwargs = {
         "A": {"value": 0.8, "min": 0, "max":1},
-        "tau1": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2},
+        "tau1beta1": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4},
         "beta1": {"value": 1/2, "min": np.finfo(float).eps, "max":5},
         "tau2": {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2},
     }
@@ -1721,18 +1717,14 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         else:
             raise ValueError("The parameter, {}, was given to custom_fit.exponential_decay, which requires parameters: 'A', 'tau1', 'beta1', 'tau2' and 'beta2'".format(key))
 
+    exp = Parameters()
     switch = [True for x in range(len(param_kwargs))]
     for i, (key, value) in enumerate(param_kwargs.items()):
+        exp.add(key, **value)
         if "vary" in value and value["vary"] == False:
             switch[i] = False
         if "expr" in value:
             switch[i] = False
-
-    exp = Parameters()
-    exp.add("A", **param_kwargs["A"])
-    exp.add("tau1", **param_kwargs["tau1"])
-    exp.add("beta1", **param_kwargs["beta1"])
-    exp.add("tau2", **param_kwargs["tau2"])
 
     if minimizer in ["leastsq"]:
         kwargs_min["Dfun"] = _d_reg_n_stretched_exponential_decays
@@ -1764,7 +1756,7 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
 
 def _res_reg_n_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
 
-    out =  params["A"]*np.exp(-(xarray/params["tau1"])**params["beta1"]) + (1-params["A"])*np.exp(-(xarray/params["tau2"])) - yarray
+    out =  params["A"]*np.exp(-xarray**params["beta1"]/params["tau1beta1"]) + (1-params["A"])*np.exp(-(xarray/params["tau2"])) - yarray
     if np.all(weighting != None):
         if len(weighting) != len(out):
             raise ValueError("Length of `weighting` array must be of equal length to input data arrays")
@@ -1775,12 +1767,12 @@ def _res_reg_n_stretched_exponential_decays(params, xarray, yarray, switch=None,
 def _d_reg_n_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
 
     tmp_output = []
-    ratio1 = (xarray/params["tau1"])**params["beta1"]
+    ratio1 = xarray**params["beta1"] / params["tau1beta1"]
     exp1 = np.exp(-ratio1)
     exp2 = np.exp(-xarray/params["tau2"])
     tmp_output.append(exp1-exp2)
-    tmp_output.append( params["A"]*params["beta1"]/params["tau1"] * ratio1 * exp1 ) # tau1
-    tmp_output.append( -params["A"]*np.log(xarray/params["tau1"]) * ratio1 * exp1 ) # beta1 
+    tmp_output.append( params["A"] * ratio1 / params["tau1beta1"] * exp1 ) # tau1beta1
+    tmp_output.append( -params["A"]*np.log(xarray) * ratio1 * exp1 ) # beta1 
     tmp_output.append( params["A"]*xarray/params["tau2"]**2 * exp2 ) # tau2
 
     output = []
