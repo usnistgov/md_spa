@@ -415,6 +415,9 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
     ymatrix = np.array(ymatrix)
     q_array = np.array(q_array)
 
+    ymatrix = ymatrix[np.argsort(q_array)]
+    q_array = q_array[np.argsort(q_array)]
+
     kwargs_min = copy.deepcopy(kwargs_minimizer)
 
     if np.all(weighting != None):
@@ -438,11 +441,19 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
             del kwargs_parameters["A"]["equal"]
             param_kwargs["A"].update(kwargs_parameters["A"])
         else:
-            for i in range(len(q_array)):
-                param_kwargs["A{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+            lq = len(q_array)
+            for i in range(lq):
+                tmp_dict = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+                if i > 0:
+                    param_kwargs["A{}minusA{}".format(i,i+1)] =  {"value": 0.01, "min": np.finfo(float).eps, "max":1}
+                    param_kwargs["A{}".format(i+1)] = tmp_dict
+                    param_kwargs["A{}".format(i+1)]["expr"] = "A{} - A{}minusA{}".format(i, i, i+1)
+                else:
+                    param_kwargs["A{}".format(i+1)] = tmp_dict
                 if "equal" in kwargs_parameters["A"]:
                     del kwargs_parameters["A"]["equal"]
                 param_kwargs["A{}".format(i+1)].update(kwargs_parameters["A"])
+
         del kwargs_parameters["A"]
     else:
         for i in range(len(q_array)):
@@ -469,11 +480,15 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
         kws={"switch": switch, "weighting": weighting, "log_transform": log_transform, "ymax": ymax, "ymin": ymin}, **kwargs_min)
 
     # Format output
-    output = np.zeros(len(Result1.params))
-    uncertainties = np.zeros(len(Result1.params))
+    lx = len([x for x in Result1.params.keys() if "minus" not in x])
+    output = np.zeros(lx)
+    uncertainties = np.zeros(lx)
+    ii = 0
     for i,(param, value) in enumerate(Result1.params.items()):
-        output[i] = value.value
-        uncertainties[i] = value.stderr
+        if "minus" not in param:
+            output[ii] = value.value
+            uncertainties[ii] = value.stderr
+            ii += 1
 
     if verbose:
         if minimizer == "leastsq":
@@ -536,6 +551,7 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
         - ``"taubeta" = {"value": 1.0, "min": np.finfo(float).eps, "max": 1e+4}``
         - ``"beta" = {"value": 1.0, "min": np.finfo(float).eps, "max":2}``
         - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1.0}`` Prefactor, one created for every q-value unless {"equal": True}
+        - ``"A*" = {"value": 1.0}`` May provide individual coefficients, value only. 
 
     verbose : bool, Optional, default=False
         Output fitting statistics
@@ -582,8 +598,18 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
             del kwargs_parameters["A"]["equal"]
             param_kwargs["A"].update(kwargs_parameters["A"])
         else:
-            for i in range(len(q_array)):
-                param_kwargs["A{}".format(i+1)] = {"value": 0.5, "min": np.finfo(float).eps, "max":1}
+            lq = len(q_array)
+            for i in range(lq):
+                tmp_dict = {"value": 0.9, "min": np.finfo(float).eps, "max": 1}
+                if "A{}".format(i+1) in kwargs_parameters:
+                    tmp_dict.update(kwargs_parameters["A{}".format(i+1)])
+                if i > 0:
+                    value = param_kwargs["A{}".format(i)]["value"] - tmp_dict["value"]
+                    param_kwargs["A{}minusA{}".format(i,i+1)] =  {"value": value, "min": np.finfo(float).eps, "max": 0.3}
+                    param_kwargs["A{}".format(i+1)] = tmp_dict
+                    param_kwargs["A{}".format(i+1)]["expr"] = "A{} - A{}minusA{}".format(i, i, i+1)
+                else:
+                    param_kwargs["A{}".format(i+1)] = tmp_dict
                 if "equal" in kwargs_parameters["A"]:
                     del kwargs_parameters["A"]["equal"]
                 param_kwargs["A{}".format(i+1)].update(kwargs_parameters["A"])
@@ -613,11 +639,15 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
         kws={"switch": switch, "weighting": weighting, "ymax": ymax, "ymin": ymin}, **kwargs_min)
 
     # Format output
-    output = np.zeros(len(Result1.params))
-    uncertainties = np.zeros(len(Result1.params))
+    lx = len([x for x in Result1.params.keys() if "minus" not in x])
+    output = np.zeros(lx)
+    uncertainties = np.zeros(lx)
+    ii = 0
     for i,(param, value) in enumerate(Result1.params.items()):
-        output[i] = value.value
-        uncertainties[i] = value.stderr
+        if "minus" not in param:
+            output[ii] = value.value
+            uncertainties[ii] = value.stderr
+            ii += 1
 
     if verbose:
         if minimizer == "leastsq":
@@ -1146,6 +1176,7 @@ def _res_three_exponential_decays(params0, xarray, yarray, switch=None):
     tmp1 = params["a1"]*np.exp(-xarray/params["t1"])
     tmp2 = params["a2"]*np.exp(-xarray/params["t2"])
     tmp3 = params["a3"]*np.exp(-xarray/params["t3"])
+
     return tmp1 + tmp2 + tmp3 - yarray
 
 def _d_three_exponential_decays(params0, xarray, yarray, switch=None):
