@@ -729,7 +729,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
 
     return output, uncertainties
 
-def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="diffusive_exponential_fit.png", kwargs_minimizer={}, kwargs_parameters={}, ydata_min=0.1, isf_max=None, isf_min=0.0, weighting=None, log_transform=False):
+def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="diffusive_exponential_fit.png", kwargs_minimizer={}, kwargs_parameters={}, ydata_min=0.1, isf_max=None, isf_min=0.0, weighting=None, log_transform=False, include_beta_relaxation=True):
     """
     Extract the diffusive characteristic time from the self-intermediate scattering function.
 
@@ -766,7 +766,9 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
     isf_min : float, Optional, default=0.0
         Minimum value of the exponential decay to capture the long time relaxation only
     log_transform : bool, Optional, default=False
-        Choose whether to transform the data with the log of both sides
+        Choose whether to transform the data with the log of both sides. Only for ``include_beta_relaxation==False``.
+    include_beta_relaxation : bool, Optional, default=True
+        If true, a stretched exponential is included to fit the beta relaxation time.
     weighting : numpy.ndarray, Optional, default=None
         Of the same size/shape as ``isf_matrix``, contains the weights for each data point. By default, the points are weighted
         by the negative of their derivative times scaled by maximum peak value.
@@ -790,43 +792,62 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
     if np.all(isf_matrix[:,-1] > ydata_min):
         warnings.warn("Exponential decays to {}, above threshold {}. Maximum tau value to evaluate the residence time, or increase the keyword value of ydata_min.".format(yarray[:,-1],ydata_min))
 
-    if weighting == None:
-        weighting = np.zeros(np.shape(isf_matrix))
-        factor = 0
-        
-        factor = None
-        color = "rb"
-        for i,tmp in enumerate(isf_matrix):
-            spline = InterpolatedUnivariateSpline(np.log(t_array),tmp, k=3)
-            dspline = spline.derivative()
-            weighting[i,:] = -dspline(np.log(t_array))
+    if include_beta_relaxation:
+        output, uncertainties = cfit.q_dependent_stretched_and_exponential_decay(t_array, isf_matrix, q_array,
+                                                         verbose=verbose,
+                                                         minimizer=minimizer,
+                                                         kwargs_minimizer=kwargs_minimizer,
+                                                         kwargs_parameters=kwargs_parameters,
+                                                         weighting=weighting,
+                                                         ymax=isf_max,
+                                                         ymin=isf_min,
+                                                        )
+    else:
+        if weighting == None:
+            weighting = np.zeros(np.shape(isf_matrix))
+            factor = 0
 
-#            weighting[i,:] = -np.gradient(tmp, np.log(t_array)[1]-np.log(t_array)[0])
+            factor = None
+            color = "rb"
+            for i,tmp in enumerate(isf_matrix):
+                spline = InterpolatedUnivariateSpline(np.log(t_array),tmp, k=3)
+                dspline = spline.derivative()
+                weighting[i,:] = -dspline(np.log(t_array))
 
-            if factor is None:
-                factor = np.max(weighting[i,:])
-            else:
-                factor = np.max(weighting[i,:]) if np.max(weighting[i,:]) > factor else factor
-      
-        weighting /= factor/2
-            
-    output, uncertainties = cfit.q_dependent_exponential_decay(t_array, isf_matrix, q_array,
-                                                     verbose=verbose,
-                                                     minimizer=minimizer,
-                                                     kwargs_minimizer=kwargs_minimizer,
-                                                     kwargs_parameters=kwargs_parameters,
-                                                     weighting=weighting,
-                                                     log_transform=log_transform,
-                                                     ymax=isf_max,
-                                                     ymin=isf_min,
-                                                    )
+#                weighting[i,:] = -np.gradient(tmp, np.log(t_array)[1]-np.log(t_array)[0])
+
+                if factor is None:
+                    factor = np.max(weighting[i,:])
+                else:
+                    factor = np.max(weighting[i,:]) if np.max(weighting[i,:]) > factor else factor
+
+            weighting /= factor/2
+        output, uncertainties = cfit.q_dependent_exponential_decay(t_array, isf_matrix, q_array,
+                                                         verbose=verbose,
+                                                         minimizer=minimizer,
+                                                         kwargs_minimizer=kwargs_minimizer,
+                                                         kwargs_parameters=kwargs_parameters,
+                                                         weighting=weighting,
+                                                         log_transform=log_transform,
+                                                         ymax=isf_max,
+                                                         ymin=isf_min,
+                                                        )
 
     if save_plot or show_plot:
         fig, ax = plt.subplots(1, 2, figsize=(6,4))
         for i, qvalue in enumerate(q_array):
             tfit = np.logspace(np.log10(t_array[0]), np.log10(t_array[-1]), num=1000)
-            tau = 1/(qvalue**2 * output[1])
-            yfit = output[0] * np.exp(-tfit / tau)
+            tau = 1/(qvalue**2 * output[0])
+            if include_beta_relaxation:
+                if len(output) > 4:
+                    yfit = output[i+3] * np.exp(-tfit / tau) + (1-output[i+3]) * np.exp(-(tfit / output[1])**output[2])
+                else: 
+                    yfit = output[3] * np.exp(-tfit / tau) + (1-output[3]) * np.exp(-(tfit / output[1])**output[2])
+            else:
+                if len(output) > 2:
+                    yfit = output[i+1] * np.exp(-tfit / tau)
+                else:
+                    yfit = output[1] * np.exp(-tfit / tau)
             if i == 0:
                 ax[0].plot(t_array, isf_matrix[i],".",label="Data")
                 ax[0].plot(tfit, yfit, label="Fit",linewidth=0.5)
@@ -850,5 +871,127 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
             plt.show()
         plt.close("all")
 
-    return output[1], uncertainties[1]
+    return output, uncertainties
 
+
+def intermediate_scattering_low_q_collective(t_array, isf_matrix, q_array, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="diffusive_exponential_fit.png", kwargs_minimizer={}, kwargs_parameters={}, ydata_min=0.1, isf_max=None, isf_min=0.0, weighting=None):
+    """
+    Extract the diffusive characteristic time from the distinct intermediate scattering function.
+
+    This function assumes the expected q-dependence and should only be used at q-values in the
+    level, constant region before the point where the static structure factor begins to increase.
+
+    Parameters
+    ----------
+    t_array : numpy.ndarray
+        1D array of tau values representing the x-axis of the intermediate scattering function
+    isf_matrix : numpy.ndarray
+        2D matrix of intermediate scattering functions with varied q-dependence, thus the dimensions
+        are ``(len(q_array), len(t_array))'`
+    q_array : numpy.ndarray
+        1D array of q-values representing the the first dimension of isf_matrix
+    minimizer : str, Optional, default="leastsq"
+        Fitting method supported by ``lmfit.minimize``
+    verbose : bool, Optional, default=False
+        Output fitting statistics
+    save_plot : bool, Optional, default=False
+        If not None, plots comparing the exponential fits will be saved to this filename 
+    plot_name : str, Optional, default=None
+        Plot filename and path
+    show_plot : bool, Optional, default=False
+        If true, the fits will be shown
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimize()``
+    kwargs_parameters : dict, Optional, default={}
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+    ydata_min : float, Optional, default=0.1
+        Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
+    isf_max : float, Optional, default=None
+        Maximum value of the exponential decay to capture the long time relaxation only
+    isf_min : float, Optional, default=0.0
+        Minimum value of the exponential decay to capture the long time relaxation only
+    weighting : numpy.ndarray, Optional, default=None
+        Of the same size/shape as ``isf_matrix``, contains the weights for each data point. By default, the points are weighted
+        by the negative of their derivative times scaled by maximum peak value.
+
+    Returns
+    -------
+    D : float
+        Value of the diffusion coefficient that represents the provided data
+    tau_D_standard_error : numpy.ndarray
+        standard error for D
+
+    """
+
+    if np.size(isf_matrix) == 0:
+        return np.nan*np.ones(2)
+
+    if np.all(np.isnan(isf_matrix[:,1:])):
+        raise ValueError("y-axis data is NaN")
+
+    isf_matrix /= isf_matrix[:,0][:,None]
+
+    if np.all(isf_matrix[:,-1] > ydata_min):
+        warnings.warn("Exponential decays to {}, above threshold {}. Maximum tau value to evaluate the residence time, or increase the keyword value of ydata_min.".format(yarray[:,-1],ydata_min))
+
+#    if weighting == None:
+#        weighting = np.zeros(np.shape(isf_matrix))
+#        factor = 0
+#
+#        factor = None
+#        color = "rb"
+#        for i,tmp in enumerate(isf_matrix):
+#            spline = InterpolatedUnivariateSpline(np.log(t_array),tmp, k=3)
+#            dspline = spline.derivative()
+#            weighting[i,:] = -dspline(np.log(t_array))
+#
+##            weighting[i,:] = -np.gradient(tmp, np.log(t_array)[1]-np.log(t_array)[0])
+#
+#            if factor is None:
+#                factor = np.max(weighting[i,:])
+#            else:
+#                factor = np.max(weighting[i,:]) if np.max(weighting[i,:]) > factor else factor
+#
+#        weighting /= factor/2
+
+    output, uncertainties = cfit.q_dependent_hydrodynamic_exponential_decay(t_array, isf_matrix, q_array,
+                                                     verbose=verbose,
+                                                     minimizer=minimizer,
+                                                     kwargs_minimizer=kwargs_minimizer,
+                                                     kwargs_parameters=kwargs_parameters,
+                                                     weighting=weighting,
+                                                     ymax=isf_max,
+                                                     ymin=isf_min,
+                                                    )
+
+    if save_plot or show_plot:
+        fig, ax = plt.subplots(1, 2, figsize=(6,4))
+        for i, qvalue in enumerate(q_array):
+            tfit = np.logspace(np.log10(t_array[0]), np.log10(t_array[-1]), num=1000)
+            params = {x: output[ii] for ii,x in enumerate(["G", "c", "tau"])}
+            params["C1"] = output[3+i]
+            yfit = cfit._res_q_dependent_hydrodynamic_exponential_decay(params, tfit, np.zeros((1, 1000)), np.array([qvalue]))
+            if i == 0:
+                ax[0].plot(t_array, isf_matrix[i],".",label="Data")
+                ax[0].plot(tfit, yfit, label="Fit",linewidth=0.5)
+            else:
+                ax[0].plot(t_array, isf_matrix[i],".")
+                ax[0].plot(tfit, yfit, linewidth=0.5)
+            ax[1].plot(t_array, isf_matrix[i],".")
+            ax[1].plot(tfit, yfit, linewidth=0.5)
+
+        ax[0].set_ylabel("$F_C(q,t)$")
+        ax[0].set_xlabel("Time")
+        ax[1].set_xlabel("Time")
+        ax[0].set_xscale('log')
+        ax[1].set_yscale('log')
+        ax[1].set_ylim(( isf_matrix[i][-1]*0.9, isf_matrix[i][0]*1.1))
+        plt.tight_layout()
+        if save_plot:
+            plt.savefig(plot_name,dpi=300)
+
+        if show_plot:
+            plt.show()
+        plt.close("all")
+
+    return output, uncertainties
