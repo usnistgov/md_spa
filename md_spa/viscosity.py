@@ -548,7 +548,7 @@ def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", ti
     else:
         fm.write_csv(fileout, output, mode=mode)
 
-def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter=",", title=None, additional_entries=None, additional_header=None, fit_exp_kwargs={}, fit_stretched_exp_kwargs={}, fit_two_exp_kwargs={}, fit_limits=(None,None), show_plot=False, save_plot=False, plot_name="shear_modulus.png", verbose=False,):
+def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter=",", title=None, additional_entries=None, additional_header=None, fit_exp_kwargs={}, fit_stretched_exp_kwargs={}, fit_two_stretched_exp_kwargs={}, fit_three_stretched_exp_kwargs={}, fit_limits=(None,None), show_plot=False, save_plot=False, plot_name="shear_modulus.png", verbose=False,):
     """
     Given the path to a csv file containing viscosity coefficient vs. time data, extract key values and save them to a .csv file. The file of cumulative_integral data should have a first column with distance values, followed by columns with radial distribution values. These data sets will be distinguished in the resulting csv file with the column headers
 
@@ -572,8 +572,10 @@ def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter
         Keywords for ``cfit.exponential_decay``
     fit_stretched_exp_kwargs : dict, Optional, default={}
         Keywords for ``cfit.stretched_exponential_decay``
-    fit_two_exp_kwargs : dict, Optional, default={}
-        Keywords for ``cfit.two_exponential_decays``
+    fit_two_stretched_exp_kwargs : dict, Optional, default={}
+        Keywords for ``cfit.two_stretched_exponential_decays``
+    fit_three_stretched_exp_kwargs : dict, Optional, default={}
+        Keywords for ``cfit.three_stretched_exponential_decays``
     fit_limits : tuple, Optional, default=(None,None)
         Choose the time values to frame the area from which to estimate the viscosity so that, ``fit_limits[0] < time < fit_limits[1]``.
     show_plot : bool, Optional, default=False
@@ -643,39 +645,51 @@ def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter
 
     tmp_kwargs = copy.deepcopy(fit_exp_kwargs)
     tmp2_kwargs = copy.deepcopy(fit_stretched_exp_kwargs)
-    tmp3_kwargs = copy.deepcopy(fit_two_exp_kwargs)
+    tmp3_kwargs = {"kwargs_parameters":{
+        "A": {"max": 0.4},
+        "beta1": {"min": 1.5, "max": 2, "value": 2},
+        "beta2": {"min": 0.9, "max": 1.5, "value": 1},
+    }}
+    tmp3_kwargs.update(copy.deepcopy(fit_two_stretched_exp_kwargs))
+    tmp4_kwargs = {"kwargs_parameters":{
+        "A1": {"max": 0.4},
+        "beta1": {"min": 1.5, "max": 2, "value": 2},
+        "A2": {"max": 0.6},
+        "beta1": {"min": 1, "max": 1.9, "value": 1.6},
+        "beta3": {"min": 0.9, "max": 1.5, "value": 1},
+    }}
+    tmp4_kwargs.update(copy.deepcopy(fit_three_stretched_exp_kwargs))
     if "weighting" not in tmp_kwargs:
         tmp_kwargs["weighting"] = np.array([1/x if x > np.finfo(float).eps else 1/np.finfo(float).eps for x in data[2]/Gshear0])
         tmp2_kwargs["weighting"] = np.array([1/x if x > np.finfo(float).eps else 1/np.finfo(float).eps for x in data[2]/Gshear0])
         tmp3_kwargs["weighting"] = np.array([1/x if x > np.finfo(float).eps else 1/np.finfo(float).eps for x in data[2]/Gshear0])
+        tmp4_kwargs["weighting"] = np.array([1/x if x > np.finfo(float).eps else 1/np.finfo(float).eps for x in data[2]/Gshear0])
 
     if "verbose" not in tmp_kwargs:
         tmp_kwargs["verbose"] = verbose
         tmp2_kwargs["verbose"] = verbose
         tmp3_kwargs["verbose"] = verbose
+        tmp4_kwargs["verbose"] = verbose
 
     # Maxwell Relaxation Exp Decay
     parameters, uncertainties = cfit.exponential_decay(data[0], data[1]/Gshear0, **tmp_kwargs)
-    parameters[0] *= Gshear0
-    uncertainties[0] *= Gshear0
-    tmp_list = [val for pair in zip(parameters, uncertainties) for val in pair]
+    tmp_list = [Gshear0] + [val for pair in zip(parameters, uncertainties) for val in pair]
+
     # Stretched Exp Decay
     parameters2, uncertainties2 = cfit.stretched_exponential_decay(data[0], data[1]/Gshear0, **tmp2_kwargs)
-    tmp_list += [Gshear0, None] + [val for pair in zip(parameters2, uncertainties2) for val in pair]
-    # Integral of Eq 10 in DOI: 10.33011/livecoms.1.1.6324
-    if "kwargs_parameters" not in tmp3_kwargs:
-        tmp3_kwargs["kwargs_parameters"] = {}
-    tmp3_kwargs["kwargs_parameters"].update({"t1": {"value": parameters[1], "vary": False}, "a1": {"vary": False}})
-    tmp_output2a, _ = cfit.two_exponential_decays(data[0], data[1]/Gshear0, **tmp3_kwargs)
-    tmp3_kwargs["kwargs_parameters"].update({
-        "t1": {"value": tmp_output2a[1], "vary": True}, 
-        "a1": {"value": tmp_output2a[0], "vary": True},
-        "t2": {"value": tmp_output2a[3], "vary": True}, 
-    })
-    parameters3, uncertainties3 = cfit.two_exponential_decays(data[0], data[1]/Gshear0, **tmp3_kwargs)
-    tmp_list += [Gshear0, None] + [val for pair in zip(np.delete(parameters3, 2), np.delete(uncertainties3, 2)) for val in pair]
+    tmp_list += [val for pair in zip(parameters2, uncertainties2) for val in pair]
+
+    # Two Stretched
+    parameters3, uncertainties3 = cfit.two_stretched_exponential_decays(data[0], data[1]/Gshear0, **tmp3_kwargs)
+    tmp_list += [val for pair in zip(parameters3, uncertainties3) for val in pair]
+
+    # Three Stretched
+    parameters4, uncertainties4 = cfit.three_stretched_exponential_decays(data[0], data[1]/Gshear0, **tmp4_kwargs)
+    tmp_list += [val for pair in zip(parameters4, uncertainties4) for val in pair]
+
+    # Output
     output = [list(additional_entries)+[title]+list(tmp_list)]
-    file_headers = ["Group", "exp G_inf", "exp G_inf StD", "exp tau", "exp tau SE", "str exp G_inf", "str exp G_inf StD", "str exp tau", "str exp tau SE", "str beta tau", "str exp beta SE", "exp G_inf", "exp G_inf StD", "2exp a1", "2exp a1 SE", "2exp tau1", "2exp tau1 SE", "2exp tau2", "2exp tau2 SE",]
+    file_headers = ["Group", "G_inf", "exp tau", "exp tau SE", "str exp taubeta", "str exp taubeta SE", "str exp beta tau", "str exp beta SE", "2 str exp A", "2 str exp A SE", "2 str exp tau1beta1", "2 str exp tau1beta1 SE", "2 str exp beta1", "2 str exp beta1 SE", "2 str exp tau2beta2", "2 str exp tau2beta2 SE", "2 str exp beta2", "2 str exp beta2 SE", "3 str exp A1", "3 str exp A1 SE", "3 str exp tau1beta1", "3 str exp tau1beta1 SE", "3 str exp beta1", "3 str exp beta1 SE", "3 str exp A2", "3 str exp A2 SE", "3 str exp tau2beta2", "3 str exp tau2beta2 SE", "3 str exp beta2", "3 str exp beta2 SE", "3 str exp tau3beta3", "3 str exp tau3beta3 SE", "3 str exp beta3", "3 str exp beta3 SE",]
 
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
@@ -684,34 +698,39 @@ def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter
     else:
         fm.write_csv(fileout, output, mode=mode)
 
-    print(data[0][:2], data[1][:2], data[1][:2]/Gshear0)
     if save_plot or show_plot:
+        linewidth = 0.75
         fig, axs = plt.subplots(1,2, figsize=(6,4))
         for i in range(2):
             axs[i].fill_between(data[0], data[1]-data[2], data[1]+data[2], edgecolor=None, alpha=0.15, facecolor="black")
             tmp = cfit._res_exponential_decay({"a1": parameters[0], "t1": parameters[1]}, data[0], np.zeros(len(data[0])))
+            axs[i].plot( data[0], data[1], "k", label="Data", marker=".", linestyle="None", ms=4)
             axs[i].plot(
                 data[0], tmp,
-                "r--", label="Exp Fit", linewidth=1
+                "r--", label="Exp Fit", linewidth=linewidth
             )
             axs[i].plot(
                 data[0],
-                Gshear0*cfit._res_stretched_exponential_decay({"tau": parameters2[0], "beta": parameters2[1]}, data[0], np.zeros(len(data[0]))),
-                "g-.", label="Stretched Exp Fit", linewidth=1
+                Gshear0*cfit._res_stretched_exponential_decay({"taubeta": parameters2[0], "beta": parameters2[1]}, data[0], np.zeros(len(data[0]))),
+                "g-.", label="Stretched Exp", linewidth=linewidth
             )
             axs[i].plot(
                 data[0],
-                Gshear0*cfit._res_two_exponential_decays({"a1": parameters3[0], "t1": parameters3[1], "a2": parameters3[2], "t2": parameters3[3]}, data[0], np.zeros(len(data[0]))),
-                color="b", linestyle=":", label="Two Exp Fit", linewidth=1
+                Gshear0*cfit._res_two_stretched_exponential_decays({"A": parameters3[0], "tau1beta1": parameters3[1], "beta1": parameters3[2], "tau2beta2": parameters3[3], "beta2": parameters3[4],}, data[0], np.zeros(len(data[0]))),
+                color="b", linestyle=":", label="2 Stretched Exp", linewidth=linewidth
             )
-            axs[i].plot( data[0], data[1], "k", label="Data", linewidth=1)
+            axs[i].plot(
+                data[0],
+                Gshear0*cfit._res_three_stretched_exponential_decays({"A1": parameters4[0], "tau1beta1": parameters4[1], "beta1": parameters4[2], "A2": parameters4[3], "tau2beta2": parameters4[4], "beta2": parameters4[5], "tau3beta3": parameters4[6], "beta3": parameters4[7],}, data[0], np.zeros(len(data[0]))),
+                color="c", linestyle=":", label="3 Stretched Exp", linewidth=linewidth
+            )
             if i == 0:
                 axs[i].legend(loc="upper right")
-                axs[i].set_ylim((0, np.max(data[1]+data[2])))
+                axs[i].set_ylim((0, Gshear0))
             else:
                 axs[i].set_yscale('log')
                 axs[i].set_xscale('log')
-                axs[i].set_ylim((tmp[np.where(data[0]<4*parameters[1])[0][-1]], np.max(data[1]+data[2])))
+                axs[i].set_ylim((1e-6, Gshear0))
             axs[i].set_xlabel("time")
             axs[i].set_ylabel("$G$")
             axs[i].set_xlim((0, 6*parameters[1]))
