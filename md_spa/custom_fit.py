@@ -208,9 +208,11 @@ def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_pa
 
     if verbose:
         if minimizer == "leastsq":
-            print("1 Exp. Termination: {}".format(Result1.lmdif_message))
+            print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
-            print("1 Exp. Termination: {}".format(Result1.message))
+            print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
     return output, uncertainties
@@ -331,9 +333,11 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_
 
     if verbose:
         if minimizer == "leastsq":
-            print("1 Exp. Termination: {}".format(Result1.lmdif_message))
+            print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
-            print("1 Exp. Termination: {}".format(Result1.message))
+            print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
     return output, uncertainties
@@ -493,6 +497,8 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
@@ -652,6 +658,8 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
@@ -798,6 +806,8 @@ def q_dependent_hydrodynamic_exponential_decay(xdata, ymatrix, q_array,  minimiz
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
@@ -955,9 +965,11 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
 
     if verbose:
         if minimizer == "leastsq":
-            print("2 Exp. Termination: {}".format(Result2.lmdif_message))
+            print("Termination: {}".format(Result2.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result2.success, Result2.aborted, Result2.chisqr))
         else:
-            print("2 Exp. Termination: {}".format(Result2.message))
+            print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
         print("Sum: {}".format(Result2.params["a1"]+Result2.params["a2"]))
 
@@ -1160,9 +1172,11 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
 
     if verbose:
         if minimizer == "leastsq":
-            print("3 Exp. Termination: {}".format(Result3.lmdif_message))
+            print("Termination: {}".format(Result3.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result3.success, Result3.aborted, Result3.chisqr))
         else:
-            print("3 Exp. Termination: {}".format(Result3.message))
+            print("Termination: {}".format(Result3.message))
         lmfit.printfuncs.report_fit(Result3.params, min_correl=0.5)
         print("Sum: {}".format(Result3.params["a1"]+Result3.params["a2"]+Result3.params["a3"]))
 
@@ -1364,7 +1378,9 @@ def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_mi
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result3.lmdif_message))
-        elif minimizer != "emcee":
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result3.success, Result3.aborted, Result3.chisqr))
+        else:
             print("Termination: {}".format(Result3.message))
         lmfit.printfuncs.report_fit(Result3.params, min_correl=0.5)
 
@@ -1515,6 +1531,8 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
@@ -1651,8 +1669,12 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         uncertainties[i] = value.stderr
 
     if verbose:
+        #for key, value in Result2.__dict__.items():
+        #    print("\n", key, value)
         if minimizer == "leastsq":
             print("Termination: {}".format(Result2.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result2.success, Result2.aborted, Result2.chisqr))
         else:
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
@@ -1796,6 +1818,8 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result2.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result2.success, Result2.aborted, Result2.chisqr))
         else:
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
@@ -1944,6 +1968,8 @@ def reg_n_two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kw
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result2.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result2.success, Result2.aborted, Result2.chisqr))
         else:
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
@@ -2093,6 +2119,7 @@ def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
     )
 
     # Format output
+    print(list(Result2.params.keys()))
     lp = len(param_kwargs)
     output = np.zeros(lp)
     uncertainties = np.zeros(lp)
@@ -2103,6 +2130,8 @@ def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result2.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result2.success, Result2.aborted, Result2.chisqr))
         else:
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
@@ -2293,9 +2322,11 @@ def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, k
 
     if verbose:
         if minimizer == "leastsq":
-            print("N-Gaussians. Termination: {}".format(Result1.lmdif_message))
+            print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
-            print("N-Gaussians. Termination: {}".format(Result1.message))
+            print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
     return output, uncertainties
@@ -2428,6 +2459,8 @@ def cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kw
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
@@ -2575,6 +2608,8 @@ def stretched_cumulative_exponential(xdata, ydata, minimizer="leastsq", weightin
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
@@ -2707,6 +2742,12 @@ def double_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=Fal
         uncertainties[i] = value.stderr
 
     if verbose:
+        if minimizer == "leastsq":
+            print("Termination: {}".format(result.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(result.success, result.aborted, result.chisqr))
+        else:
+            print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(result.params)
 
     return output, uncertainties
@@ -2816,6 +2857,8 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="leastsq", v
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(result.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(result.success, result.aborted, result.chisqr))
         else:
             print("Termination: {}".format(result.message))
         lmfit.printfuncs.report_fit(result.params)
@@ -2918,6 +2961,12 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
         uncertainties[i] = value.stderr
 
     if verbose:
+        if minimizer == "leastsq":
+            print("Termination: {}".format(result.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(result.success, result.aborted, result.chisqr))
+        else:
+            print("Termination: {}".format(result.message))
         lmfit.printfuncs.report_fit(result.params)
 
     return output, uncertainties
@@ -3010,6 +3059,8 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
     if verbose:
         if minimizer == "leastsq":
             print("Termination: {}".format(Result1.lmdif_message))
+        elif minimizer == "emcee":
+            print("Termination:  Success? {}, Aborted? {}, Chi^2: {}".format(Result1.success, Result1.aborted, Result1.chisqr))
         else:
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
