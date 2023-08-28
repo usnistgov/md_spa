@@ -200,8 +200,8 @@ def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_pa
     Result1 = lmfit.minimize(_res_jones_dole, Params, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
 
     # Format output
-    output = np.zeros(2)
-    uncertainties = np.zeros(2)
+    output = np.zeros(len(param_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result1.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -323,8 +323,8 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_
     Result1 = lmfit.minimize(_res_exponential_decay, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting, "log_transform": log_transform}, **kwargs_min)
 
     # Format output
-    output = np.zeros(2)
-    uncertainties = np.zeros(2)
+    output = np.zeros(len(params_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result1.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -940,8 +940,8 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
     Result2 = lmfit.minimize(_res_two_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting, "tau_logscale": tau_logscale}, **kwargs_min)
 
     # Format output
-    output = np.zeros(4)
-    uncertainties = np.zeros(4)
+    output = np.zeros(len(params_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate({key: value for key, value in Result2.params.items() if key[0] != "_"}.items()):
         if "log" in param:
             output[i] = np.exp(value.value)
@@ -1145,8 +1145,8 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
     Result3 = lmfit.minimize(_res_three_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
 
     # Format output
-    output = np.zeros(6)
-    uncertainties = np.zeros(6)
+    output = np.zeros(len(params_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result3.params.items()):
         if "log" in param:
             output[i] = np.exp(value.value)
@@ -1348,8 +1348,8 @@ def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_mi
     Result3 = lmfit.minimize(_res_scattering_3_exponential_decays, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch}, **kwargs_min)
 
     # Format output
-    output = np.zeros(6)
-    uncertainties = np.zeros(6)
+    output = np.zeros(len(params_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result3.params.items()):
         if "log" in param:
             output[i] = np.exp(value.value)
@@ -1506,8 +1506,8 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     Result1 = lmfit.minimize(_res_stretched_exponential_decay, exp, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
 
     # Format output
-    output = np.zeros(2)
-    uncertainties = np.zeros(2)
+    output = np.zeros(len(param_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result1.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -1644,8 +1644,8 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
     )
 
     # Format output
-    output = np.zeros(5)
-    uncertainties = np.zeros(5)
+    output = np.zeros(len(param_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result2.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -1787,8 +1787,8 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
     )
 
     # Format output
-    output = np.zeros(4)
-    uncertainties = np.zeros(4)
+    output = np.zeros(len(param_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result2.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -2415,8 +2415,8 @@ def cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kw
     Result1 = lmfit.minimize(_res_cumulative_exponential, cum_exp, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting, "switch": switch}, **kwargs_min)
 
     # Format output
-    output = np.zeros(3)
-    uncertainties = np.zeros(3)
+    output = np.zeros(len(param_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result1.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -2562,8 +2562,8 @@ def stretched_cumulative_exponential(xdata, ydata, minimizer="leastsq", weightin
     Result1 = lmfit.minimize(_res_stretched_cumulative_exponential, stretched_exp, method=minimizer, args=(xarray, yarray), kws={"weighting": weighting, "switch": switch}, **kwargs_min)
 
     # Format output
-    output = np.zeros(4)
-    uncertainties = np.zeros(4)
+    output = np.zeros(len(param_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result1.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
@@ -3001,8 +3001,8 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
     Result1 = lmfit.minimize(_res_gamma_distribution, exp1, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting,}, **kwargs_min)
 
     # Format output
-    output = np.zeros(2)
-    uncertainties = np.zeros(2)
+    output = np.zeros(len(param_kwargs))
+    uncertainties = np.zeros(len(param_kwargs))
     for i,(param, value) in enumerate(Result1.params.items()):
         output[i] = value.value
         uncertainties[i] = value.stderr
