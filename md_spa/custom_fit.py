@@ -2931,7 +2931,7 @@ def _d_double_viscosity_cumulative_exponential(params, xarray, yarray, weighting
 
 
 
-def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_minimizer={}):
+def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_parameters={}, kwargs_minimizer={}):
     """
     Provided data fit to: ..math:`A*x^{b}` after linearizing with a log transform.
 
@@ -2945,6 +2945,14 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
         dependent data set
     minimizer : str, Optional, default="nelder"
         Fitting method supported by ``lmfit.minimize``
+    kwargs_minimizer : dict, Optional, default={}
+        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_parameters : dict, Optional
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+
+        - ``"A" = {"value": 1, "min": 0, "max":1e+4}``
+        - ``"b" = {"value": 2, "min": 0, "max":100}``
+
     verbose : bool, Optional, default=False
         Output fitting statistics
 
@@ -2973,6 +2981,16 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
     yarray = ydata[ydata>0]
     if np.all(np.isnan(ydata[1:])):
         raise ValueError("y-axis data is NaN")
+
+    param_kwargs = {
+                    "A": {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4},
+                    "b": {"value": 2, "min": np.finfo(float).eps, "max":1e+2},
+                   }
+    for key, value in kwargs_parameters.items():
+        if key in param_kwargs:
+            param_kwargs[key].update(value)
+        else:
+            raise ValueError("The parameter, {}, was given to custom_fit.power_law, which requires parameters: {}".format(key, ", ".join(list(param_kwargs.keys()))))
     
     def power_law(x):
         return x["A"]*xarray**x["b"] - yarray
@@ -2983,8 +3001,8 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
         return error
 
     exp1 = Parameters()
-    exp1.add("A", min=0, max=1e+4, value=1.0)
-    exp1.add("b", min=0, max=100, value=2)
+    exp1.add("A", **param_kwargs["A"])
+    exp1.add("b", **param_kwargs["b"])
     result = lmfit.minimize(power_law, exp1, method=minimizer, **kwargs_min)
 
     # Format output
