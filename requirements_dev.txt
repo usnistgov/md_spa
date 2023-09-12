@@ -27,5 +27,5 @@ pygments==2.6.1
 matplotlib
 numpy
 scipy
-lmfit
+lmfit>=1.1
 md_spa_utils
