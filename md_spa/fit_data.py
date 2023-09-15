@@ -37,6 +37,11 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
     -------
     parameters : numpy.ndarray
         An array of the dimensions (n_gaussians, 3) containing the parameters to define the gaussian functions that describe the input data.
+    parameters : numpy.ndarray
+        An array of the dimensions (n_gaussians, 3) containing the standard error for parameters
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+
     """
 
     if n_gaussians == None:
@@ -55,7 +60,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
 
     if n_gaussians == None:
         # Fit parameters to set peak locations
-        parameters, uncertainty = cfit.n_gaussians(xdata, ydata, len(maxima), **kwargs_fit)
+        parameters, uncertainty, redchi = cfit.n_gaussians(xdata, ydata, len(maxima), **kwargs_fit)
         parameters = np.reshape(parameters, (len(maxima), 3))
         # Fit parameters with all free peak locations
         for n, (a,b,c) in enumerate(parameters):
@@ -64,7 +69,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
             kwargs_fit["kwargs_parameters"]["c{}".format(i+1)]["value"] = c
 
     n_gaussians = len(maxima)    
-    parameters, uncertainty = cfit.n_gaussians(xdata, ydata, n_gaussians, **kwargs_fit)
+    parameters, uncertainty, redchi = cfit.n_gaussians(xdata, ydata, n_gaussians, **kwargs_fit)
     parameters = np.reshape(parameters, (n_gaussians, 3))
     uncertainties = np.reshape(uncertainty, (n_gaussians, 3))
 
@@ -101,7 +106,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
             plt.show()
         plt.close()
 
-    return parameters, uncertainties
+    return parameters, uncertainties, redchi
 
 def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cutoff=0.0, show_plot=False, save_plot=False, plot_name="extrema.png"):
     """

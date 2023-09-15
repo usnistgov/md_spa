@@ -672,24 +672,24 @@ def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter
         tmp4_kwargs["verbose"] = verbose
 
     # Maxwell Relaxation Exp Decay
-    parameters, uncertainties = cfit.exponential_decay(data[0], data[1]/Gshear0, **tmp_kwargs)
-    tmp_list = [Gshear0] + [val for pair in zip(parameters, uncertainties) for val in pair]
+    parameters, uncertainties, redchi = cfit.exponential_decay(data[0], data[1]/Gshear0, **tmp_kwargs)
+    tmp_list = [Gshear0] + [val for pair in zip(parameters, uncertainties) for val in pair] + [redchi]
 
     # Stretched Exp Decay
-    parameters2, uncertainties2 = cfit.stretched_exponential_decay(data[0], data[1]/Gshear0, **tmp2_kwargs)
-    tmp_list += [val for pair in zip(parameters2, uncertainties2) for val in pair]
+    parameters2, uncertainties2, redchi = cfit.stretched_exponential_decay(data[0], data[1]/Gshear0, **tmp2_kwargs)
+    tmp_list += [val for pair in zip(parameters2, uncertainties2) for val in pair] + [redchi]
 
     # Two Stretched
-    parameters3, uncertainties3 = cfit.two_stretched_exponential_decays(data[0], data[1]/Gshear0, **tmp3_kwargs)
-    tmp_list += [val for pair in zip(parameters3, uncertainties3) for val in pair]
+    parameters3, uncertainties3, redchi = cfit.two_stretched_exponential_decays(data[0], data[1]/Gshear0, **tmp3_kwargs)
+    tmp_list += [val for pair in zip(parameters3, uncertainties3) for val in pair] + [redchi]
 
     # Three Stretched
-    parameters4, uncertainties4 = cfit.three_stretched_exponential_decays(data[0], data[1]/Gshear0, **tmp4_kwargs)
-    tmp_list += [val for pair in zip(parameters4, uncertainties4) for val in pair]
+    parameters4, uncertainties4, redchi = cfit.three_stretched_exponential_decays(data[0], data[1]/Gshear0, **tmp4_kwargs)
+    tmp_list += [val for pair in zip(parameters4, uncertainties4) for val in pair] + [redchi]
 
     # Output
     output = [list(additional_entries)+[title]+list(tmp_list)]
-    file_headers = ["Group", "G_inf", "exp tau", "exp tau SE", "str exp taubeta", "str exp taubeta SE", "str exp beta tau", "str exp beta SE", "2 str exp A", "2 str exp A SE", "2 str exp tau1beta1", "2 str exp tau1beta1 SE", "2 str exp beta1", "2 str exp beta1 SE", "2 str exp tau2beta2", "2 str exp tau2beta2 SE", "2 str exp beta2", "2 str exp beta2 SE", "3 str exp A1", "3 str exp A1 SE", "3 str exp tau1beta1", "3 str exp tau1beta1 SE", "3 str exp beta1", "3 str exp beta1 SE", "3 str exp A2", "3 str exp A2 SE", "3 str exp tau2beta2", "3 str exp tau2beta2 SE", "3 str exp beta2", "3 str exp beta2 SE", "3 str exp tau3beta3", "3 str exp tau3beta3 SE", "3 str exp beta3", "3 str exp beta3 SE",]
+    file_headers = ["Group", "G_inf", "exp tau", "exp tau SE", "exp red chi^2", "str exp taubeta", "str exp taubeta SE", "str exp beta tau", "str exp beta SE", "str exp red chi^2", "2 str exp A", "2 str exp A SE", "2 str exp tau1beta1", "2 str exp tau1beta1 SE", "2 str exp beta1", "2 str exp beta1 SE", "2 str exp tau2beta2", "2 str exp tau2beta2 SE", "2 str exp beta2", "2 str exp beta2 SE", "2 str exp red chi^2", "3 str exp A1", "3 str exp A1 SE", "3 str exp tau1beta1", "3 str exp tau1beta1 SE", "3 str exp beta1", "3 str exp beta1 SE", "3 str exp A2", "3 str exp A2 SE", "3 str exp tau2beta2", "3 str exp tau2beta2 SE", "3 str exp beta2", "3 str exp beta2 SE", "3 str exp tau3beta3", "3 str exp tau3beta3 SE", "3 str exp beta3", "3 str exp beta3 SE", "3 str exp red chi^2", "4 str exp A1", "4 str exp A1 SE", "4 str exp tau1beta1", "4 str exp tau1beta1 SE", "4 str exp beta1", "4 str exp beta1 SE", "4 str exp A2", "4 str exp A2 SE", "4 str exp tau2beta2", "4 str exp tau2beta2 SE", "4 str exp beta2", "4 str exp beta2 SE", "4 str exp A3", "4 str exp A3 SE", "4 str exp tau3beta3", "4 str exp tau3beta3 SE", "4 str exp beta3", "4 str exp beta3 SE", "4 str exp tau4beta4", "4 str exp tau4beta4 SE", "4 str exp beta4", "4 str exp beta4 SE", "4 str exp red chi^2",]
 
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
@@ -794,6 +794,8 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
         Standard error for viscosity and parameters (the former propagated from the latter).
     tcut : float
         Value of time used as an upper bound in fitting process
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
 
     """
     if not dm.isiterable(time):
@@ -851,7 +853,7 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
     if "verbose" not in tmp_kwargs:
         tmp_kwargs["verbose"] = verbose
 
-    parameters, uncertainties = cfit.double_viscosity_cumulative_exponential(time, cumulative_integral, **tmp_kwargs)
+    parameters, uncertainties, redchi = cfit.double_viscosity_cumulative_exponential(time, cumulative_integral, **tmp_kwargs)
 
     # Assuming parameters = [A, alpha, 1, tau2]
     viscosity =  parameters[0]*parameters[1]*parameters[2] + parameters[0]*(1-parameters[1])*parameters[3]
@@ -887,7 +889,7 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
             plt.show()
         plt.close("all")
 
-    return viscosity, parameters, np.insert(uncertainties, 0, visc_error), tcut
+    return viscosity, parameters, np.insert(uncertainties, 0, visc_error), tcut, redchi
 
 def fit_standard_deviation_exponent(time, standard_deviation, fit_kwargs={}, show_plot=False, title=None, save_plot=False, plot_name="power-law_fit.png"):
     """
@@ -923,7 +925,7 @@ def fit_standard_deviation_exponent(time, standard_deviation, fit_kwargs={}, sho
 
     """
 
-    parameters, uncertainties = cfit.power_law(time, standard_deviation, **fit_kwargs)
+    parameters, uncertainties, redchi = cfit.power_law(time, standard_deviation, **fit_kwargs)
 
     def power_law(x):
         return x[0]*time**x[1]

@@ -154,6 +154,8 @@ def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_pa
         Array containing parameters: ['A', 'B']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'B']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
     kwargs_min = copy.deepcopy(kwargs_minimizer)
@@ -217,7 +219,7 @@ def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_pa
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_jones_dole(params, xarray, yarray, switch=None, weighting=None):
     ynew = (yarray - 1.0) / np.sqrt(xarray)
@@ -282,6 +284,8 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_
         Array containing parameters: ["a1", 't1']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["a1", t1']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -344,7 +348,7 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_exponential_decay(params, xarray, yarray, switch=None, weighting=None, log_transform=False):
     if log_transform:
@@ -416,6 +420,8 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
         Array containing parameters: ["A", 'D']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", D']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -507,7 +513,7 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_q_dependent_exponential_decay(params, xdata, ymatrix, q_array, switch=None, weighting=None, log_transform=False, ymax=None, ymin=None):
 
@@ -576,6 +582,8 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
         Array containing parameters: ["A", 'D']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", D']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -668,7 +676,7 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_q_dependent_stretched_and_exponential_decay(params, xdata, ymatrix, q_array, switch=None, weighting=None, ymax=None, ymin=None):
 
@@ -736,6 +744,8 @@ def q_dependent_hydrodynamic_exponential_decay(xdata, ymatrix, q_array,  minimiz
         Array containing parameters: ["A", 'D']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", D']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -818,7 +828,7 @@ def q_dependent_hydrodynamic_exponential_decay(xdata, ymatrix, q_array,  minimiz
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_q_dependent_hydrodynamic_exponential_decay(params, xdata, ymatrix, q_array, switch=None, weighting=None, ymax=None, ymin=None):
 
@@ -888,6 +898,8 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
         Array containing parameters: ['a1', 't1', 'a2', 't2']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['a1', 't1', 'a2', 't2']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -981,7 +993,7 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
         print("Sum: {}".format(Result2.params["a1"]+Result2.params["a2"]))
 
-    return output, uncertainties
+    return output, uncertainties, Result2.redchi
 
 def _res_two_exponential_decays(params0, xarray, yarray, switch=None, weighting=None, tau_logscale=False):
     params = copy.deepcopy(params0)
@@ -1084,6 +1096,8 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
         Array containing parameters: ['a1', 't1', 'a2', 't2', 'a3', 't3']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['a1', 't1', 'a2', 't2', 'a3', 't3']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -1190,7 +1204,7 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
         lmfit.printfuncs.report_fit(Result3.params, min_correl=0.5)
         print("Sum: {}".format(Result3.params["a1"]+Result3.params["a2"]+Result3.params["a3"]))
 
-    return output, uncertainties
+    return output, uncertainties, Result3.redchi
 
 def _res_three_exponential_decays(params0, xarray, yarray, switch=None, weighting=None):
     params = copy.deepcopy(params0)
@@ -1318,6 +1332,8 @@ def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_mi
         Array containing parameters: ['C', 'A', 't1', 't2', 't3']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['C', 'A', 't1', 't2', 't3']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -1396,7 +1412,7 @@ def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_mi
             print("Termination: {}".format(Result3.message))
         lmfit.printfuncs.report_fit(Result3.params, min_correl=0.5)
 
-    return output, uncertainties
+    return output, uncertainties, Result3.redchi
 
 def _res_scattering_3_exponential_decays(params0, xarray, yarray, switch=None):
 
@@ -1490,6 +1506,8 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
         Array containing parameters: ['tau']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: [beta']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -1551,7 +1569,7 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_stretched_exponential_decay(params, xarray, yarray, switch=None, weighting=None,):
     out =  np.exp(-xarray**params["beta"]/params["taubeta"]) - yarray
@@ -1621,6 +1639,8 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         Array containing parameters: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -1695,7 +1715,7 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
 
-    return output, uncertainties
+    return output, uncertainties, Result2.redchi
 
 def _res_two_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
    
@@ -1771,6 +1791,8 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         Array containing parameters: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -1842,7 +1864,7 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
 
-    return output, uncertainties
+    return output, uncertainties, Result2.redchi
 
 def _res_reg_n_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
 
@@ -1919,6 +1941,8 @@ def reg_n_two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kw
         Array containing parameters: ['A', 'tau1beta1', 'beta1', 'tau2beta2', 'beta2', 'tau3']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1beta1', 'beta1', 'tau2beta2', 'beta2', 'tau3']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -1994,7 +2018,7 @@ def reg_n_two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kw
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
 
-    return output, uncertainties
+    return output, uncertainties, Result2.redchi
 
 def _res_reg_n_two_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
 
@@ -2081,6 +2105,8 @@ def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         Array containing parameters: ['A', 'tau1beta1', 'beta1', 'tau2beta2', 'beta2', 'tau2beta3', 'beta3',]
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1beta1', 'beta1', 'tau2beta2', 'beta2', 'tau3beta3', 'beta3',]
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -2158,7 +2184,7 @@ def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
             print("Termination: {}".format(Result2.message))
         lmfit.printfuncs.report_fit(Result2.params, min_correl=0.5)
 
-    return output, uncertainties
+    return output, uncertainties, Result2.redchi
 
 def _res_three_stretched_exponential_decays(params, xarray, yarray, switch=None, weighting=None,):
 
@@ -2229,6 +2255,8 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
         Array containing parameters: ["amplitude", "center", "sigma", "fwhm", "height"]
     stnd_errors : numpy.ndarray
         Array containing uncertainties for parameters
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
     
     """
 
@@ -2259,7 +2287,7 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
         output[i] = value.value
         uncertainties[i] = value.stderr
 
-    return output, uncertainties
+    return output, uncertainties, result.redchi
 
 
 def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
@@ -2296,6 +2324,8 @@ def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, k
         Array containing parameters: ['t1']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: [t1']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -2355,7 +2385,7 @@ def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, k
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_n_gaussians(params, xarray, yarray, num):
 
@@ -2414,6 +2444,8 @@ def cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kw
         Array containing parameters: ['A', 'lc', 'C']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'lc', 'C']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -2493,7 +2525,7 @@ def cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kw
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_cumulative_exponential(params, xarray, yarray, weighting=None, switch=None):
 
@@ -2564,6 +2596,8 @@ def stretched_cumulative_exponential(xdata, ydata, minimizer="leastsq", weightin
         Array containing parameters: ['A', 'lc', 'beta', 'C']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'lc', 'beta', 'C']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -2644,7 +2678,7 @@ def stretched_cumulative_exponential(xdata, ydata, minimizer="leastsq", weightin
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_stretched_cumulative_exponential(params, xarray, yarray, weighting=None, switch=None):
 
@@ -2719,6 +2753,8 @@ def double_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=Fal
         Array containing parameters: ["A", "alpha", "tau1", "tau2"]
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", "alpha", "tau1", "tau2"]
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -2782,7 +2818,7 @@ def double_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=Fal
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(result.params)
 
-    return output, uncertainties
+    return output, uncertainties, Result1.redchi
 
 def _res_double_cumulative_exponential(x, xarray, yarray, weighting=None):
     error = x["A"]*x["alpha"]*(1-np.exp(-(xarray/x["tau1"]))) \
@@ -2831,6 +2867,8 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="leastsq", v
         Array containing parameters: ["A", "alpha", "tau1", "tau2"]
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", "alpha", "tau1", "tau2"]
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -2897,7 +2935,7 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="leastsq", v
             print("Termination: {}".format(result.message))
         lmfit.printfuncs.report_fit(result.params)
 
-    return output, uncertainties
+    return output, uncertainties, result.redchi
 
 def _res_double_viscosity_cumulative_exponential(x, xarray, yarray, weighting=None):
     error = x["A"]*x["alpha"]*x["tau1"]*(1-np.exp(-(xarray/x["tau1"]))) \
@@ -2962,6 +3000,8 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
         Array containing parameters: ["A", "b"]
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", "b"]
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -3023,7 +3063,7 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
             print("Termination: {}".format(result.message))
         lmfit.printfuncs.report_fit(result.params)
 
-    return output, uncertainties
+    return output, uncertainties, result.redchi
 
 
 def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False,):
@@ -3059,6 +3099,8 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
         Array containing parameters: ["alpha", "beta"]
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["alpha", "beta"]
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
         
     """
 
@@ -3121,7 +3163,7 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
             print("Termination: {}".format(Result1.message))
         lmfit.printfuncs.report_fit(Result1.params)
 
-    return output, uncertainties, 1 - Result1.residual.var() / np.var(yarray)
+    return output, uncertainties, Result1.redchi
 
 def _res_gamma_distribution(params, xarray, yarray, switch=None, weighting=None,):
     term1 = params["beta"]**params["alpha"] / sps.gamma(params["alpha"])

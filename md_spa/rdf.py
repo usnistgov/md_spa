@@ -435,6 +435,8 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
         Array containing parameters: ["amplitude", "center", "sigma", "fwhm", "height"] where sigma is the debye-waller factor and the amplitude is equal to N_0/rho_0, (coordination number) / (number density)
     stnd_errors : numpy.ndarray
         Array containing uncertainties for parameters
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
 
     """
 
@@ -550,7 +552,7 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
                   #"sigma": {}, # debye-waller factor
                  }
 
-    output, uncertainty = cfit.gaussian( r_array, y_array, set_params=set_params, verbose=verbose)
+    output, uncertainty, redchi = cfit.gaussian( r_array, y_array, set_params=set_params, verbose=verbose)
     # "amplitude", "center", "sigma", "fwhm", "height"
     output[-1] = output[-1]/(4*np.pi*r_array[np.where(y_array==np.max(y_array))[0][0]]**2)
 
@@ -604,7 +606,7 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
             plt.show()
         plt.close("all")
 
-    return output, uncertainty
+    return output, uncertainty, redchi
 
 def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, extract_debye_waller_kwargs={}, file_header_kwargs={}):
     """

@@ -61,7 +61,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     output = np.zeros(12)
     uncertainties = np.zeros(12)
     # One Exp
-    tmp_output1, tmp_error1 = cfit.exponential_decay(xarray, yarray,
+    tmp_output1, tmp_error1, redchi1 = cfit.exponential_decay(xarray, yarray,
                                                      verbose=verbose,
                                                      minimizer=minimizer,
                                                      kwargs_minimizer=kwargs_minimizer,
@@ -71,7 +71,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     uncertainties[:2] = tmp_error1
     # Two Exp
     if minimizer != "differential_evolution":
-        tmp_output2a, _ = cfit.two_exponential_decays(xarray, yarray,
+        tmp_output2a, _, _ = cfit.two_exponential_decays(xarray, yarray,
                                                       verbose=verbose,
                                                       minimizer=minimizer,
                                                       kwargs_minimizer=kwargs_minimizer,
@@ -81,7 +81,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                                          "a1": {"vary": False}
                                                                         }
                                                      )
-        tmp_output2, tmp_error2 = cfit.two_exponential_decays(xarray, yarray, 
+        tmp_output2, tmp_error2, redchi2 = cfit.two_exponential_decays(xarray, yarray, 
                                                          verbose=verbose,
                                                          minimizer=minimizer,
                                                          kwargs_minimizer=kwargs_minimizer,
@@ -93,7 +93,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                                            }
                                                         )
     else:
-        tmp_output2, tmp_error2 = cfit.two_exponential_decays(xarray, yarray,
+        tmp_output2, tmp_error2, redchi2 = cfit.two_exponential_decays(xarray, yarray,
                                                          verbose=verbose,
                                                          minimizer=minimizer,
                                                          kwargs_minimizer=kwargs_minimizer,
@@ -108,7 +108,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         uncertainties[6:] = np.ones(6)*np.nan
     else:
         if minimizer != "differential_evolution":
-            tmp_output3a, _ = cfit.three_exponential_decays(xarray, yarray,
+            tmp_output3a, _, _ = cfit.three_exponential_decays(xarray, yarray,
                                                           verbose=verbose,
                                                           minimizer=minimizer,
                                                           kwargs_minimizer=kwargs_minimizer,
@@ -119,7 +119,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                                              "t3": {"value": np.exp((np.log(10*tmp_output2[1])+np.log(tmp_output2[3]))/2)},
                                                                             }  
                                                          )  
-            tmp_output3, tmp_error3 = cfit.three_exponential_decays(xarray, yarray,
+            tmp_output3, tmp_error3, redchi3 = cfit.three_exponential_decays(xarray, yarray,
                                                              verbose=verbose,
                                                              minimizer=minimizer,
                                                              kwargs_minimizer=kwargs_minimizer,
@@ -133,7 +133,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                                                                                }
                                                             )
         else:
-            tmp_output3, tmp_error3 = cfit.three_exponential_decays(xarray, yarray,
+            tmp_output3, tmp_error3, redchi3 = cfit.three_exponential_decays(xarray, yarray,
                                                              verbose=verbose,
                                                              minimizer=minimizer,
                                                              kwargs_minimizer=kwargs_minimizer,

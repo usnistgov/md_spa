@@ -607,6 +607,8 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         Array containing parameters: ['tau', 'beta'] or ['A', 'tau1', 'beta1', 'tau2', 'beta2']
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors from lmfit: ['tau'] or ['A', 'tau1', 'beta1', 'tau2', 'beta2']
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
 
     """
 
@@ -647,7 +649,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
                 raise ValueError("Beta must be an int or float")
         else:
             kwargs_parameters = {}
-        output, uncertainties = cfit.stretched_exponential_decay(xarray, yarray,
+        output, uncertainties, redchi = cfit.stretched_exponential_decay(xarray, yarray,
                                                          verbose=verbose,
                                                          minimizer=minimizer,
                                                          kwargs_minimizer=kwargs_minimizer,
@@ -673,7 +675,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         else:
             kwargs_parameters={"beta1": {"value": 3/2, "vary": False}}
         # Make function to guess starting parameters based on the derivative of spline from data?
-        output, uncertainties = cfit.two_stretched_exponential_decays(xarray, yarray,
+        output, uncertainties, redchi = cfit.two_stretched_exponential_decays(xarray, yarray,
                                                       verbose=verbose,
                                                       minimizer=minimizer,
                                                       kwargs_minimizer=kwargs_minimizer,
@@ -727,7 +729,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
             plt.show()
         plt.close("all")
 
-    return output, uncertainties
+    return output, uncertainties, redchi
 
 def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="diffusive_exponential_fit.png", kwargs_minimizer={}, kwargs_parameters={}, ydata_min=0.1, isf_max=None, isf_min=0.0, weighting=None, log_transform=False, include_beta_relaxation=True):
     """
@@ -779,6 +781,8 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
         Value of the diffusion coefficient that represents the provided data
     tau_D_standard_error : numpy.ndarray
         standard error for D
+    redchi : float
+        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
 
     """
 
@@ -793,7 +797,7 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
         warnings.warn("Exponential decays to {}, above threshold {}. Maximum tau value to evaluate the residence time, or increase the keyword value of ydata_min.".format(yarray[:,-1],ydata_min))
 
     if include_beta_relaxation:
-        output, uncertainties = cfit.q_dependent_stretched_and_exponential_decay(t_array, isf_matrix, q_array,
+        output, uncertainties, redchi = cfit.q_dependent_stretched_and_exponential_decay(t_array, isf_matrix, q_array,
                                                          verbose=verbose,
                                                          minimizer=minimizer,
                                                          kwargs_minimizer=kwargs_minimizer,
@@ -822,7 +826,7 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
                     factor = np.max(weighting[i,:]) if np.max(weighting[i,:]) > factor else factor
 
             weighting /= factor/2
-        output, uncertainties = cfit.q_dependent_exponential_decay(t_array, isf_matrix, q_array,
+        output, uncertainties, redchi = cfit.q_dependent_exponential_decay(t_array, isf_matrix, q_array,
                                                          verbose=verbose,
                                                          minimizer=minimizer,
                                                          kwargs_minimizer=kwargs_minimizer,
@@ -871,7 +875,7 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
             plt.show()
         plt.close("all")
 
-    return output, uncertainties
+    return output, uncertainties, redchi
 
 
 def intermediate_scattering_low_q_collective(t_array, isf_matrix, q_array, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="diffusive_exponential_fit.png", kwargs_minimizer={}, kwargs_parameters={}, ydata_min=0.1, isf_max=None, isf_min=0.0, weighting=None):
@@ -954,7 +958,7 @@ def intermediate_scattering_low_q_collective(t_array, isf_matrix, q_array, minim
 #
 #        weighting /= factor/2
 
-    output, uncertainties = cfit.q_dependent_hydrodynamic_exponential_decay(t_array, isf_matrix, q_array,
+    output, uncertainties, redchi = cfit.q_dependent_hydrodynamic_exponential_decay(t_array, isf_matrix, q_array,
                                                      verbose=verbose,
                                                      minimizer=minimizer,
                                                      kwargs_minimizer=kwargs_minimizer,
@@ -994,4 +998,4 @@ def intermediate_scattering_low_q_collective(t_array, isf_matrix, q_array, minim
             plt.show()
         plt.close("all")
 
-    return output, uncertainties
+    return output, uncertainties, redchi
