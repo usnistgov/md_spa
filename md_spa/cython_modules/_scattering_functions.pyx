@@ -1,6 +1,7 @@
 # distutils: language=gcc
 
 import cython
+from cython.parallel import prange
 import numpy as np
 cimport numpy as np
 from libc.math cimport sin, cos, sqrt, M_PI, isnan
@@ -16,10 +17,12 @@ def static_structure_factor(traj, f_values, q_array, dims):
         sq0 = np.zeros(len(q_array))
         sqself = np.zeros(len(q_array))
         nframes, natoms, ndims = np.shape(traj)
+        NR_values = np.zeros(natoms)
         nq = len(q_array)
 
         cdef double[:,:,:] traj_view = traj
         cdef double[:] f_values_view = f_values
+        cdef double[:] NR_values_view = NR_values
         cdef double[:] q_array_view = q_array
         cdef double[:] dims_view = dims
         cdef double[:] sq0_view = sq0
@@ -30,7 +33,7 @@ def static_structure_factor(traj, f_values, q_array, dims):
         cdef int nq_view = nq
 
         sq = _structure_factor(
-            traj_view, f_values_view, q_array_view, dims_view, sq0_view, nframes_view, natoms_view, ndims_view, nq_view
+            traj_view, f_values_view, NR_values_view, q_array_view, dims_view, sq0_view, nframes_view, natoms_view, ndims_view, nq_view
         )
         sq_self = _self_structure_factor(
             traj_view, f_values_view, q_array_view, dims_view, sqself_view, nframes_view, natoms_view, ndims_view, nq_view
@@ -72,9 +75,11 @@ def collective_intermediate_scattering(traj, f_values, q_value, dims, include_se
 
         isf0 = np.zeros(traj.shape[0])
         nframes, natoms, ndims = np.shape(traj)
+        NR_values = np.zeros(natoms)
 
         cdef double[:,:,:] traj_view = traj
         cdef double[:] f_values_view = f_values
+        cdef double[:] NR_values_view = NR_values
         cdef double q_value_view = q_value
         cdef double[:] dims_view = dims
         cdef double[:] isf0_view = isf0
@@ -84,7 +89,7 @@ def collective_intermediate_scattering(traj, f_values, q_value, dims, include_se
         cdef bint flag_view = include_self 
 
         isf = _collective_intermediate_scattering(
-            traj_view, f_values_view, q_value_view, dims_view, isf0_view, nframes_view, natoms_view, ndims_view, flag_view
+            traj_view, f_values_view, NR_values_view, q_value_view, dims_view, isf0_view, nframes_view, natoms_view, ndims_view, flag_view
         )
 
         return np.asarray(isf)
@@ -94,6 +99,7 @@ def collective_intermediate_scattering(traj, f_values, q_value, dims, include_se
 cdef double[:] _structure_factor(
     double[:,:,:] traj, 
     double[:] f_values, 
+    double[:] NR,
     double[:] q_array,
     double[:] dims,
     double[:] sq,
@@ -108,7 +114,7 @@ cdef double[:] _structure_factor(
     cdef double tmp2
     cdef double disp
     cdef double R
-    cdef double NR
+    cdef double NRavg
     cdef int image
     cdef int i, j, k, l, n
 
@@ -120,8 +126,7 @@ cdef double[:] _structure_factor(
             avgf2 = avgf2 + f_values[i] * f_values[j]
     avgf2 = avgf2 / natoms**2
 
-    NR = 0
-    for i in range(nframes):
+    for i in prange(nframes, nogil=True):
         for j in range(natoms):
             for k in range(natoms):
                 disp = 0.0
@@ -137,12 +142,15 @@ cdef double[:] _structure_factor(
                             sq[l] = sq[l] + 1
                         else:
                             sq[l] = sq[l] + tmp
-                    NR = NR + 1
+                    NR[j] = NR[j] + 1
 
-    NR = NR / nframes / natoms / avgf2
-    for l in range(nq):
+    NRavg = 0.0
+    for i in range(natoms):
+        NRavg = NRavg + NR[i]
+    NRavg = NRavg / nframes / natoms / avgf2
+    for l in prange(nq, nogil=True):
         tmp = _n_particles_radius_R(q_array[l], natoms, dims, R)
-        tmp2 = _finite_size_correction(q_array[l], NR, natoms, dims, R)
+        tmp2 = _finite_size_correction(q_array[l], NRavg, natoms, dims, R)
         sq[l] = sq[l] / avgf2 / nframes / natoms - tmp + tmp2
 
     return sq
@@ -177,7 +185,7 @@ cdef double[:] _self_structure_factor(
         avgf2 = avgf2 + f_values[i] * f_values[i]
     avgf2 = avgf2 / natoms
 
-    for l in range(nq):
+    for l in prange(nq, nogil=True):
         tmp = _n_particles_radius_R(q_array[l], 1, dims, R)
         tmp2 = _finite_size_correction(q_array[l], 1, 1, dims, R)
         sq[l] = 1 / avgf2 - tmp + tmp2 
@@ -263,7 +271,7 @@ cdef double[:] _self_intermediate_scattering(
 
     R = dims[0] / 2
 
-    for i in range(nframes):
+    for i in prange(nframes, nogil=True):
         for j in range(natoms):
             disp = 0.0
             for n in range(ndims):
@@ -288,6 +296,7 @@ cdef double[:] _self_intermediate_scattering(
 cdef double[:] _collective_intermediate_scattering( 
     double[:,:,:] traj,
     double[:] f_values,
+    double[:] NR,
     double q_value,
     double[:] dims,
     double[:] isf,
@@ -301,10 +310,9 @@ cdef double[:] _collective_intermediate_scattering(
     cdef double tmp
     cdef double tmp2
     cdef double disp
+    cdef double NRavg
     cdef double R
-    cdef double NR
     cdef int image
-    cdef int count
     cdef int i, j, k, l, n
 
     R = dims[0] / 2
@@ -315,10 +323,8 @@ cdef double[:] _collective_intermediate_scattering(
             avgf2 = avgf2 + f_values[i] * f_values[j]
     avgf2 = avgf2 / natoms**2
 
-    NR = 0
-    for i in range(nframes):
+    for i in prange(nframes, nogil=True):
         for j in range(natoms):
-            count = 0
             for k in range(natoms):
                 if (j != k  or include_self):
                     disp = 0.0
@@ -328,19 +334,21 @@ cdef double[:] _collective_intermediate_scattering(
                         disp = disp + (tmp + image * dims[n])**2
                     disp = sqrt(disp)
                     if disp < R:
-                        NR = NR + 1
+                        NR[j] = NR[j] + 1.0
                         tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
                         if isnan(tmp):
                             isf[i] = isf[i] + 1
                         else:
                             isf[i] = isf[i] + tmp
-                    else:
-                        count = count + 1
+
         isf[i] = isf[i] / ( avgf2 * natoms )
 
-    NR = NR / nframes / natoms / avgf2
+    NRavg = 0.0
+    for i in range(natoms):
+        NRavg = NRavg + NR[i]
+    NRavg = NRavg / nframes / natoms / avgf2
     tmp = _n_particles_radius_R(q_value, natoms, dims, R)
-    tmp2 = _finite_size_correction(q_value, NR, natoms, dims, R)
+    tmp2 = _finite_size_correction(q_value, NRavg, natoms, dims, R)
     for i in range(nframes):
         isf[i] = isf[i] - tmp + tmp2
 

@@ -3,9 +3,12 @@
 """The setup script."""
 
 import os
+import sys
 import glob
 from distutils.core import setup, Extension
 from setuptools import setup, find_packages
+
+import _setup_funcs as sf
 
 # Find and prepare cython modules
 try:
@@ -17,6 +20,7 @@ except Exception:
         'Cython not available on your system. Proceeding without C-extensions.'
     )
     flag_cython = False
+
 if flag_cython:
     fpath = os.path.join("md_spa", "cython_modules")
     cython_list = glob.glob(os.path.join(fpath, "*.pyx"))
@@ -24,11 +28,19 @@ if flag_cython:
     for cyext in cython_list:
         cypath = list(os.path.split(cyext))
         cypath[-1] = cypath[-1].split(".")[-2]
-        cy_ext_1 = Extension(name=".".join(cypath).replace(os.path.sep,"."), 
-                             sources=[cyext], 
-                             include_dirs=[fpath, np.get_include()],
-                             extra_compile_args=['-Wno-deprecated-declarations'],
-                            )
+        extension_kwargs = {
+            "sources": [cyext],
+            "include_dirs": [fpath, np.get_include()],
+            "extra_compile_args": ['-Wno-deprecated-declarations'],
+        }
+        if sf.check_for_openmp():
+            openmp = '/openmp' if "win" == sys.platform[:3] else '-fopenmp'
+            extension_kwargs.update({
+                "extra_compile_args": ['-Wno-deprecated-declarations', openmp],
+                "extra_link_args": [openmp], 
+            })
+        cy_ext_1 = Extension(name=".".join(cypath).replace(os.path.sep,"."), **extension_kwargs)
+
         extensions.extend(
             cythonize([cy_ext_1],
                       compiler_directives={
