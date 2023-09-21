@@ -532,7 +532,7 @@ def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", ti
         tmp_kwargs["title"] = title
 
     if method == "Green-Kubo":
-        viscosity, parameters, stnderror, tcut = find_green_kubo_viscosity(data[0], data[1], data[2], **tmp_kwargs)
+        viscosity, parameters, stnderror, tcut, redchi = find_green_kubo_viscosity(data[0], data[1], data[2], **tmp_kwargs)
         tmp_list = [val for pair in zip([viscosity]+list(parameters), list(stnderror)) for val in pair]
         output = [list(additional_entries)+[title, *G_inf, tcut]+list(tmp_list)]
         file_headers = ["Group", "G_inf", "G_inf StD", "tcut", "eta", "eta SE", "A", "A SE", "alpha", "alpha SE", "tau1", "tau1 SE", "tau2", "tau2 SE"]
