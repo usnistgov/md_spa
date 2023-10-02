@@ -34,11 +34,11 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
     additional_header : list, Optional, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
     kwargs_find_diffusivity : dict, Optional, default={}
-        Keywords for `find_diffusivity` function
+        Keywords for :func:`md_spa.msd.find_diffusivity` function
     kwargs_debye_waller : dict, Optional, default={}
-        Keywords for `debye_waller` function
+        Keywords for :func:`md_spa.msd.debye_waller` function
     file_header_kwargs : dict, Optional, default={}
-        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
+        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
 
     Returns
     -------
@@ -80,12 +80,19 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
     t_tmp = data[0]
     tmp_data = []
     for i in range(1,len(data)):
-        if "title" not in kwargs_find_diffusivity:
-            kwargs_find_diffusivity["title"] = titles[i]
-        if "title" not in kwargs_debye_waller:
-            kwargs_debye_waller["title"] = titles[i]
-        best, longest = find_diffusivity(t_tmp, data[i], **kwargs_find_diffusivity)
-        dw, tau = debye_waller(t_tmp, data[i], **kwargs_debye_waller)
+        tmp_kwargs_diff = kwargs_find_diffusivity.copy()
+        tmp_kwargs_dw = kwargs_debye_waller.copy()
+        if "title" not in tmp_kwargs_diff:
+            tmp_kwargs_diff["title"] = titles[i]
+        if "title" not in tmp_kwargs_dw:
+            tmp_kwargs_dw["title"] = titles[i]
+        dw, tau = debye_waller(t_tmp, data[i], **tmp_kwargs_dw)
+        if ("bounds" not in tmp_kwargs_diff or (tmp_kwargs_diff["bounds"][0] is not None or np.isnan(bounds[0]))) and not np.isnan(tau):
+            if "bounds" not in tmp_kwargs_diff:
+                tmp_kwargs_diff["bounds"] = (10*tau, None)
+            else:
+                tmp_kwargs_diff["bounds"] = (10*tau, tmp_kwargs_diff["bounds"][1])
+        best, longest = find_diffusivity(t_tmp, data[i], **tmp_kwargs_diff)
         tmp_data.append(list(additional_entries)+[titles[i]]+[dw, tau]+list(best)+list(longest))
 
     file_headers = ["Group", "DW [l-unit^2]", "tau [t-unit]", "Best D [l-unit^2 / t-unit]", "B D SE", "B t_bound1 [t-unit]", "B t_bound2 [t-unit]", "B Exponent", "B Intercept [l-unit^2]", "B Npts", "Longest D [l-unit^2/t-unit]", "L D SE", "L t_bound1 [t-unit]", "L t_bound2 [t-unit]", "L Exponent", "L Intercept [l-unit^2]", "L Npts"]
@@ -269,7 +276,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
         axs[0].plot(time,msd,"k",label="Data", linewidth=0.5)
         if not np.isnan(dw):
             axs[0].plot([tau, tau],[0,np.max(msd)], linewidth=0.5)
-            axs[0].set_xlim((time[0], tau*2))
+            axs[0].set_xlim((time[0], 2*tau))
             ind = np.where(time < tau*2)[0][-1]
             axs[0].set_ylim((np.min(msd[:ind])*0.9, np.max(msd[:ind])))
         axs[0].set_xlabel("time")
@@ -281,7 +288,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
         axs[1].plot(logtime, yarray,"k", linewidth=0.5)
         if not np.isnan(dw):
             axs[1].plot(np.log10([tau, tau]),[0,np.max(yarray)], linewidth=0.5)
-            axs[1].set_xlim((logtime[0], np.log10(tau*2)))
+            axs[1].set_xlim((logtime[0], np.log10(tau*2))) 
             ind = np.where(logtime < np.log10(tau*2))[0][-1]
             axs[1].set_ylim((np.min(yarray[:ind])*0.9, np.max(yarray[:ind])))
         axs[1].set_xlabel("log(t)")
@@ -301,7 +308,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
 
     return dw, tau
 
-def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, title=None, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1, min_R2=0.97):
+def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=False, title=None, save_plot=False, plot_name="diffusivity.png", verbose=False, dim=3, use_frac=1, min_R2=0.97, bounds=(None,None)):
     """
     Analyzing the long-time msd, to extract the diffusivity.
 
@@ -333,6 +340,8 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         Will print intermediate values or not
     use_frac : float, Optional, default=1
         Choose what fraction of the msd to use. This will cut down on comutational time in spending time on regions with poor statistics.
+    bounds : tuple, Optional, default=(None,None)
+        Values of time to act as the minimum or maximum of searching. It is recommended that the lower bound be ten times the timescale for the debye-waller parameter, see :func:`md_spa.msd.debye_waller`. This is applied after ``use_frac``
     
     Returns
     -------
@@ -372,6 +381,22 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
 
     msd = msd[:int(len(time)*use_frac)]
     time = time[:int(len(time)*use_frac)]
+    if bounds[0] is not None and not np.isnan(bounds[0]):
+        inds = np.where(time > bounds[0])[0]
+        if len(inds) > 0:
+            ind = inds[0]
+            msd = msd[ind:]
+            time = time[ind:]
+        else:
+            raise ValueError("Provided minimum in time is greater that the time interval provided")
+    if bounds[1] is not None and not np.isnan(bounds[1]):
+        inds = np.where(time < bounds[1])[0]
+        if len(inds) > 0:
+            ind = inds[0]
+            msd = msd[:ind]
+            time = time[:ind]
+        else:
+            raise ValueError("Provided maximum in time is greater that the time interval provided")
 
     if min_Npts > len(time):
         warning.warn("Resetting minimum number of points, {}, to be within length of provided data * use_frac, {}".format(min_Npts,len(time)))
