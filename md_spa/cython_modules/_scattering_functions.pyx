@@ -66,7 +66,7 @@ def self_intermediate_scattering(traj, f_values, q_value, dims):
 
         return np.asarray(isf)
 
-def collective_intermediate_scattering(traj, f_values, q_value, dims, include_self):
+def collective_intermediate_scattering(traj1, traj2, f_values1, f_values2, q_value, dims, include_self):
 
         if traj.shape[1] != f_values.shape[0]:
             raise ValueError("The number of atoms in `traj` does not equal the number of atoms in `f_values`")
@@ -74,22 +74,26 @@ def collective_intermediate_scattering(traj, f_values, q_value, dims, include_se
             raise ValueError("The number of dimensions in `traj` does not equal the number of entries in `dims`")
 
         isf0 = np.zeros(traj.shape[0])
-        nframes, natoms, ndims = np.shape(traj)
+        nframes, natoms1, ndims = np.shape(traj1)
+        _, natoms2, _ = np.shape(traj2)
         NR_values = np.zeros(natoms)
 
-        cdef double[:,:,:] traj_view = traj
-        cdef double[:] f_values_view = f_values
+        cdef double[:,:,:] traj_view1 = traj1
+        cdef double[:,:,:] traj_view2 = traj2
+        cdef double[:] f_values_view1 = f_values1
+        cdef double[:] f_values_view2 = f_values2
         cdef double[:] NR_values_view = NR_values
         cdef double q_value_view = q_value
         cdef double[:] dims_view = dims
         cdef double[:] isf0_view = isf0
         cdef int nframes_view = nframes
-        cdef int natoms_view = natoms
+        cdef int natoms_view1 = natoms1
+        cdef int natoms_view2 = natoms2
         cdef int ndims_view = ndims
         cdef bint flag_view = include_self 
 
         isf = _collective_intermediate_scattering(
-            traj_view, f_values_view, NR_values_view, q_value_view, dims_view, isf0_view, nframes_view, natoms_view, ndims_view, flag_view
+            traj_view1, traj_view2, f_values_view1, f_values_view2, NR_values_view, q_value_view, dims_view, isf0_view, nframes_view, natoms_view1, natoms_view2, ndims_view, flag_view
         )
 
         return np.asarray(isf)
@@ -294,14 +298,17 @@ cdef double[:] _self_intermediate_scattering(
 @cython.boundscheck(False)
 @cython.cdivision(True)
 cdef double[:] _collective_intermediate_scattering( 
-    double[:,:,:] traj,
-    double[:] f_values,
+    double[:,:,:] traj1,
+    double[:,:,:] traj2,
+    double[:] f_values1,
+    double[:] f_values2,
     double[:] NR,
     double q_value,
     double[:] dims,
     double[:] isf,
     int nframes,
-    int natoms,
+    int natoms1,
+    int natoms2,
     int ndims,
     bint include_self,
 ) nogil:
@@ -318,24 +325,24 @@ cdef double[:] _collective_intermediate_scattering(
     R = dims[0] / 2
 
     avgf2 = 0.0
-    for i in range(natoms):
-        for j in range(natoms):
-            avgf2 = avgf2 + f_values[i] * f_values[j]
+    for i in range(natoms1):
+        for j in range(natoms2):
+            avgf2 = avgf2 + f_values1[i] * f_values2[j]
     avgf2 = avgf2 / natoms**2
 
     for i in prange(nframes, nogil=True):
-        for j in range(natoms):
-            for k in range(natoms):
+        for j in range(natoms1):
+            for k in range(natoms2):
                 if (j != k  or include_self):
                     disp = 0.0
                     for n in range(ndims):
-                        tmp = traj[i,j,n] - traj[0,k,n]
+                        tmp = traj1[i,j,n] - traj2[0,k,n]
                         image = <int> ((dims[n]/2 - tmp) // dims[n])
                         disp = disp + (tmp + image * dims[n])**2
                     disp = sqrt(disp)
                     if disp < R:
                         NR[j] = NR[j] + 1.0
-                        tmp = f_values[j] * f_values[k] *  sin( q_value * disp ) / ( q_value * disp )
+                        tmp = f_values1[j] * f_values2[k] *  sin( q_value * disp ) / ( q_value * disp )
                         if isnan(tmp):
                             isf[i] = isf[i] + 1
                         else:
@@ -344,11 +351,11 @@ cdef double[:] _collective_intermediate_scattering(
         isf[i] = isf[i] / ( avgf2 * natoms )
 
     NRavg = 0.0
-    for i in range(natoms):
+    for i in range(natoms1):
         NRavg = NRavg + NR[i]
-    NRavg = NRavg / nframes / natoms / avgf2
-    tmp = _n_particles_radius_R(q_value, natoms, dims, R)
-    tmp2 = _finite_size_correction(q_value, NRavg, natoms, dims, R)
+    NRavg = NRavg / nframes / natoms1 / avgf2
+    tmp = _n_particles_radius_R(q_value, natoms2, dims, R) # Correction for the number of atoms interacting with central atom
+    tmp2 = _finite_size_correction(q_value, NRavg, natoms2, dims, R)  # Correction for the number of atoms interacting with central atom
     for i in range(nframes):
         isf[i] = isf[i] - tmp + tmp2
 
