@@ -109,6 +109,13 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="out.csv",
         filename = os.path.join(target_dir.format(box),file_in) if file_in is not None else target_dir.format(box)
         if os.path.isfile(filename):
             tmp_boxes.append(np.transpose(np.genfromtxt(filename, delimiter=" ", skip_header=4)))
+            if np.size(tmp_boxes[-1]) == 0:
+                warnings.warn("File empty: {}".format(filename))
+                tmp_boxes = tmp_boxes[:-1]
+
+    if len(set([np.shape(x) for x in tmp_boxes])) > 1:
+        raise ValueError("Provided files are not the same size: {}".format(filename))
+
     if not tmp_boxes:
         warnings.warn("Files from: {}, could not be found.".format(filename))
         return
@@ -140,7 +147,7 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="out.csv",
     fm.write_csv( fout.format("rdf"), rdf_data, header=tmp_header)
     fm.write_csv( fout.format("coord"), coord_data, header=tmp_header)
 
-def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=25, save_fit=False, plotname="rdf.png",title="Pair-RDF", extrema_cutoff=0.01):
+def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fit=False, plotname="rdf.png",title="Pair-RDF", extrema_cutoff=0.01):
     """
     From rdf, extract key points of interest.
 
@@ -156,7 +163,7 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
     smooth_sigma : float, default=None
         If the data should be smoothed, provide a value of sigma used in ``scipy gaussian_filter1d``
-    error_length : int, Optional, default=25
+    error_length : int, Optional, default=8
         The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
     save_fit : bool, Optional, default=False
         Save comparison plot of each rdf being analyzed. With the name ``plotname``
@@ -237,7 +244,8 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
                 plt.plot([tmp,tmp],[0,np.max(gr)],"c",linewidth=0.5)
             plt.plot(r2,gr2,"r",label="Spline",linewidth=0.5)
             plt.show()
-        raise ValueError("Found {} extrema, consider smoothing the data with `smooth_sigma` option.".format(len(extrema)))
+        warnings.warn("Found {} extrema, consider smoothing the data with `smooth_sigma` option.".format(len(extrema)))
+
     tmp_spline = InterpolatedUnivariateSpline(rfit,grfit, k=5).derivative().derivative()
     concavity = tmp_spline(extrema)
 
@@ -256,17 +264,17 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
 
     if len(r_peaks) < 3:
         for i in range(3-len(r_peaks)):
-            r_peaks.append(None)
-            gr_peaks.append(None)
+            r_peaks.append(np.nan)
+            gr_peaks.append(np.nan)
     elif len(r_peaks) > 3:
         r_peaks = r_peaks[:3]
         gr_peaks = gr_peaks[:3]
     if len(r_mins) != 3:
         for i in range(3-len(r_mins)):
-            r_mins.append(None)
+            r_mins.append(np.nan)
 
     if len(roots) < 2:
-        if (len(roots) == 1 and r_peaks[0] != None) and roots[0] > r_peaks[0]:
+        if (len(roots) == 1 and r_peaks[0] != np.nan) and roots[0] > r_peaks[0]:
                 r_clust = roots[0]
         else:
             if title != "Pair-RDF":
@@ -276,7 +284,7 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
             else:
                 tmp = ""
             warnings.warn("{} RDF has not decayed to unity. Consider regenerating data with a larger cutoff.".format(tmp))
-            r_clust = None
+            r_clust = np.nan
     else:
         r_clust = roots[1]
 
@@ -306,7 +314,10 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
             plt.show()
         plt.close()
 
-    return np.array(r_peaks), np.array(gr_peaks), np.array(r_mins), r_0, r_clust
+    if len(extrema) > error_length:
+        return np.ones(3)*np.nan, np.ones(3)*np.nan, np.ones(3)*np.nan, np.nan, np.nan
+    else:
+        return np.array(r_peaks), np.array(gr_peaks), np.array(r_mins), r_0, r_clust
 
 
 def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional_entries=None, additional_header=None, extract_keypoints_kwargs={}, file_header_kwargs={}, column_list=None, kwargs_genfromtxt={}):
@@ -349,7 +360,12 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
         titles = fm.find_header(filename, **file_header_kwargs)
         if column_list is not None:
             titles = titles[column_list]
+
     data = np.transpose(np.genfromtxt(filename, **kwargs_genfromtxt))
+    if np.size(data) == 0:
+        warnings.warn("File empty: {}".format(filename))
+        return
+
     if column_list is not None:
         try:
             data = data[column_list]
@@ -387,10 +403,13 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
         if "title" not in tmp_extract_keypoints_kwargs:
             tmp_extract_keypoints_kwargs["title"] = titles[i]
         tmp = extract_keypoints(r,data[i], **tmp_extract_keypoints_kwargs)
-        tmp_data.append(list(additional_entries)
-            +[titles[i]]+list(tmp[0])+list(tmp[1])+list(tmp[2])+list(tmp[3:]))
+        if not np.all(np.isnan(np.array(tmp[0]))):
+            tmp_data.append(list(additional_entries)
+                +[titles[i]]+list(tmp[0])+list(tmp[1])+list(tmp[2])+list(tmp[3:]))
 
     file_headers = ["Pairs", "r_peak1", "r_peak2", "r_peak3", "gr_peak1", "gr_peak2", "gr_peak3", "r_min1", "r_min2", "r_min3", "r_0", "r_clust"]
+    if len(tmp_data) == 0:
+        return
     if not os.path.isfile(fileout) or mode=="w":
         if flag_add_header:
             file_headers = list(additional_header) + file_headers
@@ -399,7 +418,7 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
         fm.write_csv(fileout, tmp_data, mode=mode)
 
 
-def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=25, save_fit=False, plotname="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
+def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fit=False, plotname="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
     """ Extract Debye-Waller FACTOR (not parameter like from MSD)
 
     Based on the work found at `DOI: 10.1021/jp064661f <https://doi.org/10.1021/jp064661f>`_
@@ -416,7 +435,7 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
     smooth_sigma : float, default=None
         If the data should be smoothed, provide a value of sigma used in ``scipy gaussian_filter1d``
-    error_length : int, Optional, default=25
+    error_length : int, Optional, default=8
         The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
     save_fit : bool, Optional, default=False
         Save comparison plot of each rdf being analyzed. With the name ``plotname``
