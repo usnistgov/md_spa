@@ -68,15 +68,19 @@ def self_intermediate_scattering(traj, f_values, q_value, dims):
 
 def collective_intermediate_scattering(traj1, traj2, f_values1, f_values2, q_value, dims, include_self):
 
-        if traj.shape[1] != f_values.shape[0]:
-            raise ValueError("The number of atoms in `traj` does not equal the number of atoms in `f_values`")
-        if traj.shape[2] != dims.shape[0]:
-            raise ValueError("The number of dimensions in `traj` does not equal the number of entries in `dims`")
+        if traj1.shape[1] != f_values1.shape[0]:
+            raise ValueError("The number of atoms in `traj1` does not equal the number of atoms in `f_values1`")
+        if traj1.shape[2] != dims.shape[0]:
+            raise ValueError("The number of dimensions in `traj1` does not equal the number of entries in `dims`")
+        if traj2.shape[1] != f_values2.shape[0]:
+            raise ValueError("The number of atoms in `traj2` does not equal the number of atoms in `f_values2`")
+        if traj2.shape[2] != dims.shape[0]:
+            raise ValueError("The number of dimensions in `traj2` does not equal the number of entries in `dims`")
 
-        isf0 = np.zeros(traj.shape[0])
+        isf0 = np.zeros(traj1.shape[0])
         nframes, natoms1, ndims = np.shape(traj1)
         _, natoms2, _ = np.shape(traj2)
-        NR_values = np.zeros(natoms)
+        NR_values = np.zeros(natoms1)
 
         cdef double[:,:,:] traj_view1 = traj1
         cdef double[:,:,:] traj_view2 = traj2
@@ -328,7 +332,7 @@ cdef double[:] _collective_intermediate_scattering(
     for i in range(natoms1):
         for j in range(natoms2):
             avgf2 = avgf2 + f_values1[i] * f_values2[j]
-    avgf2 = avgf2 / natoms**2
+    avgf2 = avgf2 / natoms1 / natoms2
 
     for i in prange(nframes, nogil=True):
         for j in range(natoms1):
@@ -348,7 +352,7 @@ cdef double[:] _collective_intermediate_scattering(
                         else:
                             isf[i] = isf[i] + tmp
 
-        isf[i] = isf[i] / ( avgf2 * natoms )
+        isf[i] = isf[i] / ( avgf2 * natoms1 )
 
     NRavg = 0.0
     for i in range(natoms1):
