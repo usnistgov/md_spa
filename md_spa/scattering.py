@@ -336,7 +336,7 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
     return sq, sq_self, q_array
 
 
-def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="python", group_ids=None, include_self=True):
+def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="python", group_ids=None, include_self=True, group_cross_interaction=False, include_all=True):
     """ Calculate the isotropic collective intermediate scattering function
 
     Taken from DOI: 10.1103/PhysRevE.64.051201
@@ -365,8 +365,13 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
         The qvalue at which to calculate the isotropic static structure factor. The default
         value of 2.25 inverse angstroms comes from DOI:10.1063/1.4941946
     group_ids : list[lists], Optional, default=None
-        Optional list of group ids will produce the total isf, in addition to isf of other groups
-        destinguished by the given ids.
+        Optional list of group ids will produce the total c-isf, in addition to c-isf of other groups 
+        (if any) as determined by ``group_cross_interaction``.
+    group_cross_interaction : bool, Optional, default=False
+        If True, the group_id list is computed between all permutations of itself and other group_ids lists. The use of 
+        the theory we applied in these functions is for homogenous systems and this option may not be mathematically 
+        valid.
+        If False, each group_id list is computed between itself and all other particles
     flag : str, Optional, default='python'
         Choose 'python' implementation or accelerated 'cython' option.
     include_self : bool, Optional, default=True
@@ -389,9 +394,31 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
         raise ValueError("Corrections haven't been propagated to corrections")
 
     if flag == "cython":
+        isf = scat.collective_intermediate_scattering(traj, traj, f_values, f_values, q_value, dims, include_self)
         if group_ids is not None:
-            raise ValueError("The use of the group_ids keyword is not yet supported with cython.")
-        isf = scat.collective_intermediate_scattering(traj, f_values, q_value, dims, include_self)
+            if group_cross_interaction:
+                group_pairs = [(i,y) for i,x in enumerate(group_ids) for y in range(len(group_ids))]
+                group_combinations = [(x,y) for i,x in enumerate(group_ids) for y in group_ids]
+                tmp_isf = isf.copy()
+                isf = np.zeros((len(group_combinations)+1, len(isf)))
+                isf[0] = tmp_isf
+                for i, (ids1, ids2) in enumerate(group_combinations):
+                    if ids1 and ids2:
+                        tmp_isf = scat.collective_intermediate_scattering( traj[:, ids1, :], traj[:, ids2, :], f_values[ids1], f_values[ids2], q_value, dims, include_self)
+                        isf[i+1] = tmp_isf
+                    else:
+                        isf[i+1] = np.nan*np.ones(nframes)
+            else:
+                tmp_isf = isf.copy()
+                isf = np.zeros((len(group_ids)+1, len(isf)))
+                isf[0] = tmp_isf
+                for i,tmp_ids in enumerate(group_ids):
+                    if tmp_ids:
+              #  whole traj and the group of ids?
+                        tmp_isf = scat.collective_intermediate_scattering( traj[:, tmp_ids, :], traj, f_values[tmp_ids], f_values, q_value, dims, include_self)
+                        isf[i+1] = tmp_isf
+                    else:
+                        isf[i+1] = np.nan*np.ones(nframes)
     else:
         isf = np.zeros(nframes)
         NR = np.zeros(nframes)
@@ -406,27 +433,47 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
         isf += finite_size_correction(q_value, NR, natoms, dims, R=R)
 
         if group_ids is not None:
-            group_pairs = [(i,y) for i,x in enumerate(group_ids) for y in range(len(group_ids))]
-            group_combinations = [(x,y) for i,x in enumerate(group_ids) for y in group_ids]
-            tmp_isf = isf.copy()
-            isf = np.zeros((len(group_combinations)+1, len(isf)))
-            isf[0] = tmp_isf
-            for i, (ids1, ids2) in enumerate(group_combinations):
-                if ids1 and ids2:
-                    tmp_N = len(ids1)
-                    tmp_isf = np.zeros(nframes)
-                    NR = np.zeros(nframes)
-                    for j in ids1:
-                        disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj[:,ids2,:]-traj[0,j,:][None, None, :], dims)),axis=-1))
-                        disp[disp > R] = np.nan
-                        tmp_isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values[ids2], q_value, dims, R=R, include_self=include_self)
-                        NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(len(ids2)), 0.0, dims, R=R, include_self=include_self)
-                    tmp_isf = tmp_isf/tmp_N/np.mean(f_values[ids1])  - n_particles_radius_R(q_value, tmp_N, dims, R=R)
-                    NR = np.nanmean(NR)/tmp_N//np.nanmean(f_values)
-                    isf[i+1] = tmp_isf + finite_size_correction(q_value, NR, tmp_N, dims, R=R)
-                 #   print(group_pairs[i], "\n", isf[i+1])
-                else:
-                    isf[i+1] = np.nan*np.ones(nframes)
+            if group_cross_interaction:
+                group_pairs = [(i,y) for i,x in enumerate(group_ids) for y in range(len(group_ids))]
+                group_combinations = [(x,y) for i,x in enumerate(group_ids) for y in group_ids]
+                tmp_isf = isf.copy()
+                isf = np.zeros((len(group_combinations)+1, len(isf)))
+                isf[0] = tmp_isf
+                for i, (ids1, ids2) in enumerate(group_combinations):
+                    if ids1 and ids2:
+                        tmp_N = len(ids1)
+                        tmp_isf = np.zeros(nframes)
+                        NR = np.zeros(nframes)
+                        for j in ids1:
+                            disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj[:,ids2,:]-traj[0,j,:][None, None, :], dims)),axis=-1))
+                            disp[disp > R] = np.nan
+                            tmp_isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values[ids2], q_value, dims, R=R, include_self=include_self)
+                            NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(len(ids2)), 0.0, dims, R=R, include_self=include_self)
+                        tmp_isf = tmp_isf/tmp_N/np.mean(f_values[ids1])  - n_particles_radius_R(q_value, tmp_N, dims, R=R)
+                        NR = np.nanmean(NR)/tmp_N//np.nanmean(f_values)
+                        isf[i+1] = tmp_isf + finite_size_correction(q_value, NR, tmp_N, dims, R=R)
+                     #   print(group_pairs[i], "\n", isf[i+1])
+                    else:
+                        isf[i+1] = np.nan*np.ones(nframes)
+            else:
+                tmp_isf = isf.copy()
+                isf = np.zeros((len(group_ids)+1, len(isf)))
+                isf[0] = tmp_isf
+                for i, ids in enumerate(groups_ids):
+                    if ids:
+                        tmp_N = len(ids)
+                        tmp_isf = np.zeros(nframes)
+                        NR = np.zeros(nframes)
+                        for j in ids:
+                            disp = np.sqrt(np.sum(np.square(mf.check_wrap(traj-traj[0,j,:][None, None, :], dims)),axis=-1))
+                            disp[disp > R] = np.nan
+                            tmp_isf += isotropic_weighted_coherent_distances( disp, f_values[j], f_values, q_value, dims, R=R, include_self=include_self)
+                            NR += isotropic_weighted_coherent_distances( disp, 1.0, np.ones(natoms), 0.0, dims, R=R, include_self=include_self)
+                        tmp_isf = tmp_isf/tmp_N/np.mean(f_values[ids1])  - n_particles_radius_R(q_value, tmp_N, dims, R=R)
+                        NR = np.nanmean(NR)/tmp_N//np.nanmean(f_values)
+                        isf[i+1] = tmp_isf + finite_size_correction(q_value, NR, tmp_N, dims, R=R)
+                    else:
+                        isf[i+1] = np.nan*np.ones(nframes)
 
     return np.array(isf)
 
