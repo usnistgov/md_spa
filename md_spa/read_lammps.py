@@ -1,6 +1,7 @@
 
 
 import numpy as np
+import warnings
 import fileinput
 import os
 import matplotlib as mpl
@@ -234,7 +235,7 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
                     arr = np.ones((num_matrix, len(fields)-1), dtype=dtype)
 
                 if dtype != str:
-                    arr *= np.nan
+                    arr = arr * np.nan
 
                 if unwrap:
                     if image_cols is None:
@@ -242,30 +243,47 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
                     elif not all([s in col_name for s in ["x", "y", "z"]]):
                         raise ValueError("The given trajectory cannot be unwrapped without x, y, z columns")
                     
+                dat = []
+                ind_array = []
                 for i in range(natoms):
-                    dat = [x if not dm.isfloat(x) else float(x) for x in f.readline().strip().split()]
-                    ind = int(dat[0])-1
+                    dat.append([x if not dm.isfloat(x) else float(x) for x in f.readline().strip().split()])
+                    ind_array.append(int(dat[-1][0])-1)
+
+                dat = [x for _, x in sorted(zip(ind_array, dat))]
+                ind_array = sorted(ind_array)
+                for i in range(natoms):
+                    ind = i
                     if atom_indices is not None:
-                        if ind in atom_indices:
+                        if ind_array[i] in atom_indices:
                             ind = atom_indices.index(ind)
                         else:
                             continue
 
                     if flag == 'matrix':
-                        arr[ind] = [dat[c] for c in col]
+                        arr[ind] = [dat[i][c] for c in col]
                     elif flag == 'single':
-                        arr[ind] = dat[col]
+                        arr[ind] = dat[i][col]
                     else:
-                        arr[ind] = dat[1:]
+                        arr[ind] = dat[i][1:]
 
                     if unwrap:
-                        arr[ind][coord_cols] +=  np.array([dat[c] for c in image_cols]) * box_dims
+                        arr[ind][coord_cols] +=  np.array([dat[i][c] for c in image_cols]) * box_dims
                     if coord_cols is not None:
                         arr[ind][coord_cols] -= np.array([xlo, ylo, zlo])
                 
                 arr_all.append(arr)
     
-    return np.array(arr_all, dtype=dtype), box_dims, np.array(steps)
+#    print(np.array(arr_all, dtype=dtype))
+    try:
+        arr_out = np.array(arr_all, dtype=dtype)
+    except:
+        warnings.warn("Number of atoms changes between frames")
+        lx = np.max([np.shape(x)[0] for x in arr_all])
+        arr_out = np.nan*np.ones((len(arr_all), lx), dtype=dtype)
+        for i,tmp in enumerate(arr_all):
+            arr_out[i, :len(tmp)] = np.squeeze(tmp)
+
+    return arr_out, box_dims, np.array(steps)
 
 def read_lammps_data(filename, section="atoms"):
     """Read specific section from LAMMPS data file. Written By Lauren Abbott"""
@@ -401,7 +419,11 @@ def read_files(files, func, **kwargs):
     
     data = [0]*len(files)
     for i, f in enumerate(files):
-        data[i] = func(f, **kwargs)
+        tmp = func(f, **kwargs)
+        if isinstance(tmp, tuple):
+            data[i] = tmp[0]
+        else:
+            data[i] = tmp
         
     return np.array(data)
 

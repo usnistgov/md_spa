@@ -72,7 +72,12 @@ def consolidate(target_dir, boxes, column_names, file_in="coord.lammpstrj", file
     boxes = [b for b in boxes if b not in remove]
 
     # Consolidate data
-    coord_matrix = f.read_files([os.path.join(target_dir.format(i),file_in) for i in boxes],f.read_lammps_dump,col_name=column_names, dtype=int)
+    coord_matrix = f.read_files(
+        [os.path.join(target_dir.format(i),file_in) for i in boxes],
+        f.read_lammps_dump,
+        col_name=column_names,
+        dtype=int
+    )
     coord_sets = np.transpose(np.reshape(coord_matrix, (-1,Nsets)))
 
     if np.size(coord_sets)==0:
@@ -101,7 +106,8 @@ def consolidate(target_dir, boxes, column_names, file_in="coord.lammpstrj", file
     mean_coord = []
     stderr_coord = []
     for i in range(Nsets):
-        mean, stderr = dm.basic_stats([np.mean(coord_sets[x,:,i]) for x in range(Nboxes)])        
+        print([np.mean(coord_sets[x,:,i]) for x in range(Nboxes)])
+        mean, stderr = dm.basic_stats([np.nanmean(coord_sets[x,:,i]) for x in range(Nboxes)])        
         mean_coord.append(mean)
         stderr_coord.append(stderr)
 
