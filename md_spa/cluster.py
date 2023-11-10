@@ -68,9 +68,9 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
         
 
     bins = np.arange(maxparticles+1)
-    output = [bins[:-1]+(bins[1:]-bins[:-1]/2)] + [np.histogram(x.flatten(), bins=bins)[0] for x in cluster_array]
+    output = [bins[:-1]+(bins[1:]-bins[:-1]/2)] + [np.histogram(x.flatten(), bins=bins)[0] for x in cluster_arrays]
     header = ",".join(["#Avg number of nonpercolated beads: {}\n#Particles/Cluster".format(avg_nparticles)]+["Box {}".format(box) for box in boxes])
-    np.savetxt(output.T, delimiter=",", header=header)
+    fm.write_csv(output.T, delimiter=",", header=[header])
 
 def analyze_clustering(cluster_array, ncut=1, show_plot=False):
     """
