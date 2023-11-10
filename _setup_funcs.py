@@ -19,6 +19,8 @@ def check_for_openmp():
     curdir = os.getcwd()
     os.chdir(tmpdir)
     compiler = os.getenv('CC')
+    if compiler is None:
+        compiler = "gcc"
     openmp = '/openmp' if "win" == sys.platform[:3] else '-fopenmp'
 
     filename = r'test.c'
