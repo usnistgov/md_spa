@@ -8,12 +8,13 @@ from scipy.interpolate import CubicSpline
 from scipy.interpolate import UnivariateSpline
 import matplotlib.pyplot as plt
 
+from .cython_modules import _clustering as clust
 import md_spa_utils.data_manipulation as dm
 import md_spa_utils.file_manipulation as fm
 
 from . import read_lammps as rl
 
-def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_out="cluster_histogram.txt", max_frames=None, kwargs_analysis={}, kwargs_read_file={}):
+def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_out="cluster_histogram.csv", max_frames=None, kwargs_analysis={}, kwargs_read_file={}, flag="python"):
     """
     This function will take equivalent lammps dump files that contain coordination data and write out a consolidated histogram.
 
@@ -33,6 +34,8 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
         Keyword arguments for :func:`md_spa.read_lammps.read_lammps_dump`
     kwargs_analysis : dict, Optional, default={}
         Keyword arguments for :func:`md_spa.cluster.analyze_clustering`    
+    flag : str, Optional, default="python"
+        Choose to calculate via python or cython
 
     """
     
@@ -60,17 +63,22 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
     maxparticles = 0
     for i, box in enumerate(boxes):
         cluster_array = rl.read_lammps_dump( os.path.join(target_dir.format(box),file_in), **tmp_kwargs)[0]
-        clust_sizes, nparticles = analyze_clustering(cluster_array, **kwargs_analysis)
+        if flag == "python":
+            clust_sizes, nparticles = analyze_clustering(cluster_array, **kwargs_analysis)
+        elif flag == "cython":
+            ncut = kwargs_analysis["ncut"] if "ncut" in kwargs_analysis else 1
+            clust_sizes, nparticles = clust.analyze_clustering(cluster_array, float(ncut))
+        else:
+            raise ValueError("The flag, {}, is not recognized. Choose: 'python' or 'cython'.".format(flag))
         cluster_arrays.append(clust_sizes)
         avg_nparticles.append(np.nanmean(nparticles))
         if np.nanmax(clust_sizes) > maxparticles:
             maxparticles = np.nanmax(clust_sizes)
         
-
-    bins = np.arange(maxparticles+1)
-    output = [bins[:-1]+(bins[1:]-bins[:-1]/2)] + [np.histogram(x.flatten(), bins=bins)[0] for x in cluster_arrays]
+    bins = np.arange(0.5, maxparticles+1.5, 1)
+    output = [bins[:-1]+0.5] + [np.histogram(x.flatten(), bins=bins)[0] for x in cluster_arrays]
     header = ",".join(["#Avg number of nonpercolated beads: {}\n#Particles/Cluster".format(avg_nparticles)]+["Box {}".format(box) for box in boxes])
-    fm.write_csv(output.T, delimiter=",", header=[header])
+    fm.write_csv(file_out, np.array(output).T, delimiter=",", header=[header])
 
 def analyze_clustering(cluster_array, ncut=1, show_plot=False):
     """
@@ -102,14 +110,18 @@ def analyze_clustering(cluster_array, ncut=1, show_plot=False):
 
     nclusters = int(np.nanmax(cluster_array))
     nparticles = np.zeros(len(cluster_array))
-    cluster_output = np.nan*np.ones(( len(cluster_array), nclusters))
+    cluster_list = []
     for i,tmp in enumerate(cluster_array):
-        clusters = np.sort(np.array([np.sum([x==y for x in tmp]) for y in range(1,nclusters+1)]))
-        nparticles[i] = len(np.where(np.logical_and(clusters < ncut+1, clusters > 0))[0])
-        clusters = clusters[np.where(clusters > ncut)]
-        cluster_output[i, :len(clusters)] = clusters
+        clusters = np.array([np.sum([x==y for x in tmp]) for y in range(1,nclusters+1)])
+        nparticles[i] = np.sum([clusters[x] for x in np.where(np.logical_and(clusters < ncut+1, clusters > 0))[0]])
+        cluster_list.append(clusters[np.where(clusters > ncut)])
         if show_plot:
             plt.plot(clusters, label=str(i))
+
+    lx = max([len(x) for x in cluster_list])
+    cluster_output = np.zeros((len(cluster_list), lx))
+    for i, tmp in enumerate(cluster_list):
+        cluster_output[i, :len(tmp)] = tmp
 
     if show_plot:
         plt.xlabel("Cluster Number")
@@ -124,7 +136,7 @@ def analyze_clustering(cluster_array, ncut=1, show_plot=False):
         plt.xlabel("Number of Single Particles")
         plt.show()
 
-    return clusters, nparticles
+    return cluster_output, nparticles
 
 def write_vmd(filename, column_name, frame=0, file_xyz="cluster_{}.xyz", file_vmd="cluster_{}.vmd", sigma=1, kwargs_read_file={}, cmap="tab20", npixels=600):
     """
