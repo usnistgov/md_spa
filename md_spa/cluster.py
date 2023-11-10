@@ -105,7 +105,6 @@ def analyze_clustering(cluster_array, ncut=1, show_plot=False):
     cluster_output = np.nan*np.ones(( len(cluster_array), nclusters))
     for i,tmp in enumerate(cluster_array):
         clusters = np.sort(np.array([np.sum([x==y for x in tmp]) for y in range(1,nclusters+1)]))
-        print(i, clusters, np.where(clusters == 1))
         nparticles[i] = len(np.where(np.logical_and(clusters < ncut+1, clusters > 0))[0])
         clusters = clusters[np.where(clusters > ncut)]
         cluster_output[i, :len(clusters)] = clusters
@@ -170,7 +169,6 @@ def write_vmd(filename, column_name, frame=0, file_xyz="cluster_{}.xyz", file_vm
 
     Cmap = plt.get_cmap(name=cmap)
     colors = Cmap(np.linspace(0, 1, len(cluster_ids)))
-    print(colors)
     for i, color in enumerate(colors):
         plt.plot([0, 10],[i, i], color=color)
     plt.show()
