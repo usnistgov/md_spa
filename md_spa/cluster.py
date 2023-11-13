@@ -60,6 +60,7 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
     tmp_kwargs.update(kwargs_read_file)
     cluster_arrays = []
     avg_nparticles = []
+    largest_cluster = []
     maxparticles = 0
     for i, box in enumerate(boxes):
         cluster_array = rl.read_lammps_dump( os.path.join(target_dir.format(box),file_in), **tmp_kwargs)[0]
@@ -72,12 +73,14 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
             raise ValueError("The flag, {}, is not recognized. Choose: 'python' or 'cython'.".format(flag))
         cluster_arrays.append(clust_sizes)
         avg_nparticles.append(np.nanmean(nparticles))
+        tmp = np.array([np.nanmax(x) for x in clust_sizes])
+        largest_cluster.append(list(dm.basic_stats(tmp)))
         if np.nanmax(clust_sizes) > maxparticles:
             maxparticles = np.nanmax(clust_sizes)
         
     bins = np.arange(0.5, maxparticles+1.5, 1)
     output = [bins[:-1]+0.5] + [np.histogram(x.flatten(), bins=bins)[0] for x in cluster_arrays]
-    header = ",".join(["#Avg number of nonpercolated beads: {}\n#Particles/Cluster".format(avg_nparticles)]+["Box {}".format(box) for box in boxes])
+    header = ",".join(["#Avg number of nonpercolated beads: {}\n#Average size and standard deviation of largest cluster: {}\n#Particles/Cluster".format(avg_nparticles, largest_cluster)]+["Box {}".format(box) for box in boxes])
     fm.write_csv(file_out, np.array(output).T, delimiter=",", header=[header])
 
 def analyze_clustering(cluster_array, ncut=1, show_plot=False):
