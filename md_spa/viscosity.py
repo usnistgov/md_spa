@@ -1,3 +1,9 @@
+""" Calculate viscosity and infinite shear modulus from pressure tensor data.
+
+    Recommend loading with:
+    ``import md_spa.viscosity as visc``
+
+"""
 
 import sys
 import copy
@@ -29,18 +35,21 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", calc_kwa
         Array of time values corresponding to pressure tensor data
     p_xy : numpy.ndarray
         Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
-    filename : str, Optional, default="viscosity_running_integral.csv"
+    filename : str, default="viscosity_running_integral.csv"
         Filename for csv file
-    calc_kwargs : dict, Optional, default={}
-        Keyword arguements for :func:`viscosity.running_acf_integral` or :func:`viscosity.running_einstein`
-    csv_kwargs : dict, Optional, default={}
-        Keywords for ``md_spa_utils.file_manipulation.write_csv``
-    method : str, Optional, default="Einstein"
-        Method of extracting viscosity from equilibrium MD calculation
+    calc_kwargs : dict, default={}
+        Keyword arguements for :func:`md_spa.viscosity.running_acf_integral` or :func:`md_spa.viscosity.running_einstein`
+    csv_kwargs : dict, default={}
+        Keywords for :func:`md_spa_utils.file_manipulation.write_csv`
+    method : str, default="Green-Kubo"
+        Method of extracting viscosity from equilibrium MD calculation, kwargs adjusted with ``calc_kwargs``
+
+        - "Einstein": See :func:`md_spa.viscosity.running_einstein`
+        - "Green-Kubo": See :func:`md_spa.viscosity.running_acf_integral`
         
     Returns
     -------
-    Saved file with the viscosity coefficient at each time frame. [Units of pressure]^2*[units of time]
+    Saved file with the viscosity coefficient at each time frame. See ``method`` for units, default according to :math:`\eta k_{B}T/V` with units of ``pressure**2 * time``.
 
     """
 
@@ -75,7 +84,7 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", calc_kwa
 
 def pressure2shear_modulus_csv(time, p_xy, filename="shear_modulus_values.csv", calc_kwargs={}, csv_kwargs={}):
     """
-    Calculate the viscosity of an equilibrium molecular dynamics simulation from the pressure tensor.
+    Calculate the shear autocorrelation function of an equilibrium molecular dynamics simulation from the pressure tensor.
 
     DOI: 10.1063/5.0098265
 
@@ -85,16 +94,16 @@ def pressure2shear_modulus_csv(time, p_xy, filename="shear_modulus_values.csv", 
         Array of time values corresponding to pressure tensor data
     p_xy : numpy.ndarray
         Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
-    filename : str, Optional, default="shear_modulus_values.csv"
+    filename : str, default="shear_modulus_values.csv"
         Filename for csv file
-    calc_kwargs : dict, Optional, default={}
-        Keyword arguements for :func:`viscosity.dynamic_shear_modulus`
-    csv_kwargs : dict, Optional, default={}
-        Keywords for ``md_spa_utils.file_manipulation.write_csv``
+    calc_kwargs : dict, default={}
+        Keyword arguements for :func:`md_spa.viscosity.dynamic_shear_modulus`
+    csv_kwargs : dict, default={}
+        Keywords for :func:`md_spa_utils.file_manipulation.write_csv`
         
     Returns
     -------
-    Saved file with the viscosity coefficient at each time frame. [Units of pressure]^2*[units of time]
+    Saved file with the shear autocorrelation function according to :math:`G k_{B}T/V` with units of ``pressure**2 * time``.
 
     """
 
@@ -130,17 +139,17 @@ def high_freq_shear_modulus(p_xy, error_type="standard error", scale_coefficient
     ----------
     p_xy : numpy.ndarray
         Pressure tensor data at each time step. The first dimension can be of either length 6, representing the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
-    scale_coefficient : float, Optional, default=1.0
-        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`G_{\infty} k_{B}T/V`
-    error_type : str, Optional, default="standard error"
+    scale_coefficient : float, default=1.0
+        Prefactor to scale the viscosity coefficient. The default results in a value of :math:`G_{\infty} k_{B}T/V`
+    error_type : str, default="standard error"
         Type of error to be saved, either "standard error" or "standard deviation"
 
     Returns
     -------
     G_inf : float
-        High frequency shear modulus in units of pressure**2 * units of time.
+        High frequency shear modulus. If ``scale_coefficient`` is unchanged, units are :math:`G_{\infty} k_{B}T/V` with units of ``pressure**2 * time``. 
     G_inf_st : float
-        Standard error or standard deviation of the high frequency shear modulus in units of pressure**2 * units of time.
+        Standard error or standard deviation of the high frequency shear modulus
 
     """
 
@@ -159,7 +168,7 @@ def high_freq_shear_modulus(p_xy, error_type="standard error", scale_coefficient
     else:
          raise ValueError("The `error_type`, {}, is not supported".format(error_type))
 
-    return G_inf, stnderror
+    return scale_coefficient*G_inf, scale_coefficient*stnderror
 
 def running_einstein(time, p_xy, error_type="standard error", scale_coefficient=1, skip=1, show_plot=False, title=None, save_plot=False, plot_name="einstein_viscosity_components.png"):
     """
@@ -174,25 +183,25 @@ def running_einstein(time, p_xy, error_type="standard error", scale_coefficient=
         Array of time values corresponding to pressure tensor data
     p_xy : numpy.ndarray
         Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
-    scale_coefficient : float, Optional, default=1.0
-        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`2\eta k_{B}T/V`
-    error_type : str, Optional, default="standard error"
+    scale_coefficient : float, default=1.0
+        Prefactor to scale the viscosity coefficient. The default results in a value of :math:`2\eta k_{B}T/V`
+    error_type : str, default="standard error"
         Type of error to be saved, either "standard error" or "standard deviation"
-    skip : int, Optional, default=1
+    skip : int, default=1
         Number of frame to skip to obtain an independent trajectory
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
-        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plotname``.
-    plot_name : str, Optional, default="einstein_viscosity_components.png"
+    title : str, default=None
+        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plot_name``.
+    plot_name : str, default="einstein_viscosity_components.png"
         If ``save_plot==True`` the cumulative_integral will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
 
     Returns
     -------
     cumulative_integral : numpy.ndarray
-        Viscosity coefficient at each time frame units of pressure**2 * units of time.
+        Viscosity coefficient at each time frame according to :math:`2\eta k_{B}T/V` with units of ``pressure**2 * time``. 
         
     """
     if not dm.isiterable(time) or dm.isiterable(time[0]):
@@ -279,25 +288,25 @@ def running_acf_integral(time, p_xy, error_type="standard error", scale_coeffici
         Array of time values corresponding to pressure tensor data
     p_xy : numpy.ndarray
         Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
-    scale_coefficient : float, Optional, default=1.0
-        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`\eta k_{B}T/V`
-    error_type : str, Optional, default="standard error"
+    scale_coefficient : float, default=1.0
+        Prefactor to scale the viscosity coefficient. The default results in a value of :math:`\eta k_{B}T/V`
+    error_type : str, default="standard error"
         Type of error to be saved, either "standard error" or "standard deviation"
-    skip : int, Optional, default=1
+    skip : int, default=1
         Number of frame to skip to obtain an independent trajectory
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
-        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plotname``.
-    plot_name : str, Optional, default="green-kubo_viscosity_components.png"
+    title : str, default=None
+        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plot_name``.
+    plot_name : str, default="green-kubo_viscosity_components.png"
         If ``save_plot==True`` the cumulative_integral will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
 
     Returns
     -------
     cumulative_integral : numpy.ndarray
-        Viscosity coefficient at each time frame. Units of pressure**2 * units of time.
+        Viscosity coefficient at each time frame. Units of ``pressure**2 * time``.
         
     """
     if not dm.isiterable(time) or dm.isiterable(time[0]):
@@ -371,25 +380,25 @@ def dynamic_shear_modulus(time, p_xy, error_type="standard error", scale_coeffic
         Array of time values corresponding to pressure tensor data
     p_xy : numpy.ndarray
         Pressure tensor data at each time step. The first dimension can be of either length 3 or 6, representing the three off diagonals (xy, xz, yz) or the entire pressure tensor (xx, yy, zz, xy, xz, yz). The second dimension is of the same length as ``time``.
-    scale_coefficient : float, Optional, default=1.0
-        Prefactor to scale the viscosity coefficient. The default results in a value of .. math::`G k_{B}T/V`
-    error_type : str, Optional, default="standard error"
+    scale_coefficient : float, default=1.0
+        Prefactor to scale the viscosity coefficient. The default results in a value of :math:`G k_{B}T/V`
+    error_type : str, default="standard error"
         Type of error to be saved, either "standard error" or "standard deviation"
-    skip : int, Optional, default=1
+    skip : int, default=1
         Number of frame to skip to obtain an independent trajectory
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
-        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plotname``.
-    plot_name : str, Optional, default="green-kubo_viscosity_components.png"
+    title : str, default=None
+        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plot_name``.
+    plot_name : str, default="green-kubo_viscosity_components.png"
         If ``save_plot==True`` the cumulative_integral will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
 
     Returns
     -------
     cumulative_integral : numpy.ndarray
-        Time dependent shear modulus at each time frame. Units of pressure**2 * units of time.
+        Time dependent shear modulus at each time frame. Units of ``pressure**2 * time``.
         
     """
     if not dm.isiterable(time) or dm.isiterable(time[0]):
@@ -461,24 +470,24 @@ def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", ti
     ----------
     filename : str
         Input filename and path to lammps cumulative_integral output file
-    fileout : str, Optional, default="viscosity.csv"
+    fileout : str, default="viscosity.csv"
         Filename of output .csv file
-    mode : str, Optional, default="a"
+    mode : str, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    delimiter : str, Optional, default=","
+    delimiter : str, default=","
         Delimiter between data in input file
-    title : list[str], Optional, default=None
+    title : list[str], default=None
         Titles for plots if that is specified in the ``kwargs_find_viscosity``
-    additional_entries : list, Optional, default=None
+    additional_entries : list, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
-    additional_header : list, Optional, default=None
+    additional_header : list, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
-    kwargs_find_viscosity : dict, Optional, default={}
-        Keywords for ``find_green_kubo_viscosity`` or ``find_einstein_viscosity`` functions depending on ``method``
-    file_header_kwargs : dict, Optional, default={}
-        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
-    method : str, Optional, default=None
-        Can be 'Einstein' or 'Green-Kubo', specifies the type of data to be analyzed. If ``pressure2viscosity_csv`` was used to generate the data, the method is extracted from the header.
+    kwargs_find_viscosity : dict, default={}
+        Keywords for :func:`md_spa.viscosity.find_green_kubo_viscosity` or :func:`md_spa.viscosity.find_einstein_viscosity` functions depending on ``method``
+    file_header_kwargs : dict, default={}
+        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+    method : str, default=None
+        Can be 'Einstein' or 'Green-Kubo', specifies the type of data to be analyzed. If :func:`md_spa.viscosity.pressure2viscosity_csv` was used to generate the data, the method is extracted from the header.
 
     Returns
     -------
@@ -556,37 +565,35 @@ def shear_modulus2csv(filename, fileout="shear_modulus.csv", mode="a", delimiter
     ----------
     filename : str
         Input filename and path to lammps cumulative_integral output file
-    fileout : str, Optional, default="viscosity.csv"
+    fileout : str, default="viscosity.csv"
         Filename of output .csv file
-    mode : str, Optional, default="a"
+    mode : str, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    delimiter : str, Optional, default=","
+    delimiter : str, default=","
         Delimiter between data in input file
-    title : list[str], Optional, default=None
-        Titles for plots if that is specified in the ``kwargs_find_viscosity``
-    additional_entries : list, Optional, default=None
+    additional_entries : list, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
-    additional_header : list, Optional, default=None
+    additional_header : list, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
-    fit_exp_kwargs : dict, Optional, default={}
-        Keywords for ``cfit.exponential_decay``
-    fit_stretched_exp_kwargs : dict, Optional, default={}
-        Keywords for ``cfit.stretched_exponential_decay``
-    fit_two_stretched_exp_kwargs : dict, Optional, default={}
-        Keywords for ``cfit.two_stretched_exponential_decays``
-    fit_three_stretched_exp_kwargs : dict, Optional, default={}
-        Keywords for ``cfit.three_stretched_exponential_decays``
-    fit_limits : tuple, Optional, default=(None,None)
+    fit_exp_kwargs : dict, default={}
+        Keywords for :func:`md_spa.custom_fit.exponential_decay`
+    fit_stretched_exp_kwargs : dict, default={}
+        Keywords for :func:`md_spa.custom_fit.stretched_exponential_decay`
+    fit_two_stretched_exp_kwargs : dict, default={}
+        Keywords for :func:`md_spa.custom_fit.two_stretched_exponential_decays`
+    fit_three_stretched_exp_kwargs : dict, default={}
+        Keywords for :func:`md_spa.custom_fit.three_stretched_exponential_decays`
+    fit_limits : tuple, default=(None,None)
         Choose the time values to frame the area from which to estimate the viscosity so that, ``fit_limits[0] < time < fit_limits[1]``.
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
+    title : str, default=None
         The title used in the Gshear plot, note that this str is also added as a prefix to the ``plot_name``.
-    plot_name : str, Optional, default="shear_modulus.png"
+    plot_name : str, default="shear_modulus.png"
         If ``save_plot==True`` the Gshear will be saved with the viscosity value marked in blue, The ``title`` is added as a prefix to this str
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Will print intermediate values or not
 
     Returns
@@ -759,43 +766,43 @@ def find_green_kubo_viscosity(time, cumulative_integral, integral_error, fit_lim
         Viscosity coefficient at each time frame
     integral_error : numpy.ndarray
         Viscosity coefficient error for each time frame. The inverse of these values are used to weight the fitting process. See ``weighting_method`` to specify how this is handled.
-    fit_limits : tuple, Optional, default=(None,None)
+    fit_limits : tuple, default=(None,None)
         Choose the time values to frame the area from which to estimate the viscosity so that, ``fit_limits[0] < time < fit_limits[1]``.
-    weighting_method : str, Optional, default="b-exponent"
+    weighting_method : str, default="b-exponent"
         The error of the cumulative integral increases with time as does the autocorrelation function from which it is computed. Method options include:
 
         - "b-exponent": Calculates weighing from the function ``time**(-b)`` where b is defined in ``b_exponent``
         - "inverse": Takes the inverse of the provided standard deviation
 
-    b_exponent : float, Optional, default=None
-        Exponent used if ``weighting_method == "b-exponent"``. This value can be calculated in ``md_spa.viscosity.fit_standard_deviation_exponent``
-    tcut_fraction : float, Optional, default=0.4
+    b_exponent : float, default=None
+        Exponent used if ``weighting_method == "b-exponent"``. This value can be calculated in :func:`md_spa.viscosity.fit_standard_deviation_exponent`
+    tcut_fraction : float, default=0.4
         Choose a maximum cut-off in time at ``np.where(integral_error > tcut_fraction*np.mean(cumulative_integral))[0][0]`` where these arrays have been bound with ``fit_limits``. If this feature is not desired, set ``tcut_fraction=None``
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
+    title : str, default=None
         The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plot_name``.
-    plot_name : str, Optional, default="green-kubo_viscosity.png"
+    plot_name : str, default="green-kubo_viscosity.png"
         If ``save_plot==True`` the cumulative_integral will be saved with the viscosity value marked in blue, The ``title`` is added as a prefix to this str
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Will print intermediate values or not
-    fit_kwargs : dict, Optional, default={}
-        Keyword arguements for exponential functions in :func:`custom_fit.double_viscosity_cumulative_exponential`
+    fit_kwargs : dict, default={}
+        Keyword arguements for exponential functions in :func:`md_spa.custom_fit.double_viscosity_cumulative_exponential`
 
     Returns
     -------
     viscosity : float
         Estimation of the viscosity from the fit of a double cumlulative exponential distribution to the running integral of 
     parameters : numpy.ndarray
-        Parameters from :func:`custom_fit.double_viscosity_cumulative_exponential` fit
+        Parameters from :func:`md_spa.custom_fit.double_viscosity_cumulative_exponential` fit
     uncertainties : numpy.ndarray
         Standard error for viscosity and parameters (the former propagated from the latter).
     tcut : float
         Value of time used as an upper bound in fitting process
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
 
     """
     if not dm.isiterable(time):
@@ -903,15 +910,15 @@ def fit_standard_deviation_exponent(time, standard_deviation, fit_kwargs={}, sho
         Array of time values corresponding to standard deviation of autocorrelation running integral
     standard_deviation : numpy.ndarray
         Viscosity coefficient error for each time frame.
-    fit_kwargs : dict, Optional, default={}
-        Keyword arguements for power law function in ``custom_fit``
-    show_plot : bool, Optional, default=False
+    fit_kwargs : dict, default={}
+        Keyword arguements in :func:`md_spa.custom_fit.power_law`
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
+    title : str, default=None
         The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plot_name``.
-    plot_name : str, Optional, default="power-law_fit.png"
+    plot_name : str, default="power-law_fit.png"
         If ``save_plot==True`` the cumulative_integral will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
 
     Returns
@@ -953,7 +960,7 @@ def fit_standard_deviation_exponent(time, standard_deviation, fit_kwargs={}, sho
 
 def find_einstein_viscosity(time, cumulative_integral,  min_exp=0.991, min_Npts=10, skip=1, show_plot=False, title=None, save_plot=False, plot_name="einstein_viscosity.png", verbose=False, fit_limits=(None,None), min_R2=0.97):
     """
-    Extract the viscosity from the Einstein relation: :math:`2\eta = d (cumulative_integral)/dt` where the ``cumulative_integral`` is the square of the average running integral of the pressure tensor components vs time.
+    Extract the viscosity from the Einstein relation: :math:`2\eta = d (cumulative\_integral)/dt` where the ``cumulative_integral`` is the square of the average running integral of the pressure tensor components vs time.
 
     Parameters
     ----------
@@ -961,28 +968,28 @@ def find_einstein_viscosity(time, cumulative_integral,  min_exp=0.991, min_Npts=
         Array of time values corresponding to pressure tensor data
     cumulative_integral : numpy.ndarray
         Viscosity coefficient at each time frame
-    min_exp : float, Optional, default=0.991
+    min_exp : float, default=0.991
         Minimum exponent value used to determine the longest acceptably linear region.
-    min_Npts : int, Optional, default=10
+    min_Npts : int, default=10
         Minimum number of points in the "best" region outputted.
-    skip : int, Optional, default=1
+    skip : int, default=1
         Number of points to skip over in scanning different regions. A value of 1 will be most thorough, but a larger value will decrease computation time.
-    min_R2 : float, Optional, default=0.97
+    min_R2 : float, default=0.97
         Minimum allowed coefficient of determination to consider proposed exponent. This prevents linearity from skipping over curves.
-    fit_limits : tuple, Optional, default=(None,None)
-        Choose the indices to frame the area from which to estimate the viscosity. This window tends to be less than 100ps. This will cut down on comutational time in spending time on regions with poor statistics.
-    show_plot : bool, Optional, default=False
+    fit_limits : tuple, default=(None,None)
+        Choose the indices to frame the area from which to estimate the viscosity. This window tends to be less than 100 ps. This will cut down on comutational time in spending time on regions with poor statistics.
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
-        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plotname``.
-    plot_name : str, Optional, default="einstein_viscosity.png"
+    title : str, default=None
+        The title used in the cumulative_integral plot, note that this str is also added as a prefix to the ``plot_name``.
+    plot_name : str, default="einstein_viscosity.png"
         If ``save_plot==True`` the cumulative_integral will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Will print intermediate values or not
-    fit_kwargs : dict, Optional, default={}
-        Keyword arguements for exponential functions in ``custom_fit``
+    fit_kwargs : dict, default={}
+        Keyword arguements for exponential functions in :mod:`md_spa.custom_fit`
 
     Returns
     -------
@@ -1101,7 +1108,7 @@ def slope_viscosity(time, cumulative_integral, verbose=False):
         Time array of the same length at MSD in picoseconds.
     cumulative_integral : numpy.ndarray
         Cumulative integral representing the mean squared pressure displacement.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Will print intermediate values or not
     
     Returns

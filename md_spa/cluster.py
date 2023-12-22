@@ -1,3 +1,10 @@
+""" Functions for analyzing clusters from LAMMPS calculations
+
+    Recommend loading with:
+    ``import md_spa.cluster as clust``
+
+"""
+
 import numpy as np
 import os
 import sys
@@ -26,15 +33,15 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
         List of entries that individually complete the path to a lammps data.
     column_name : string
        Lammps dump file column name used the lammps dump file to indicate coordination data
-    file_in : str, Optional, default='coord.lammpstrj'
+    file_in : str, default='coord.lammpstrj'
         Name of lammps dump file with coordination information
-    file_out : str, Optional, default='coord_histogram.txt'
+    file_out : str, default='coord_histogram.txt'
         Filename for consolidated data file
-    kwargs_read_file : dict, Optional, default={"col_name": column_name, "dtype": int}
+    kwargs_read_file : dict, default={"col_name": column_name, "dtype": int}
         Keyword arguments for :func:`md_spa.read_lammps.read_lammps_dump`
-    kwargs_analysis : dict, Optional, default={}
+    kwargs_analysis : dict, default={}
         Keyword arguments for :func:`md_spa.cluster.analyze_clustering`    
-    flag : str, Optional, default="python"
+    flag : str, default="python"
         Choose to calculate via python or cython
 
     """
@@ -94,9 +101,9 @@ def analyze_clustering(cluster_array, ncut=1, show_plot=False):
     ----------
     cluster_array : numpy.ndarray
         Two dimensional array for each frame containing the cluster numbers assigned to the atoms.
-    ncut : int, Optional, default=1
+    ncut : int, default=1
         Number of particles in a cluster that is below the percolation limit, such as 6 beads in a hydration shell.
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         If true, the outputs are plotted. This is useful for debugging purposes.
 
     Returns
@@ -151,17 +158,17 @@ def write_vmd(filename, column_name, frame=0, file_xyz="cluster_{}.xyz", file_vm
         Name of lammps dump file with coordination information
     column_name : string
         Lammps dump file column name used the lammps dump file to indicate coordination data
-    frame : int, Optional, default=0
+    frame : int, default=0
         Frame number to render
-    file_out : str, Optional, default="cluster_{}.vmd".format(frame)
+    file_out : str, default="cluster_{}.vmd".format(frame)
         Name of VMD file
     sigma : float, default=1
         Bead diameter
-    kwargs_read_file : dict, Optional, default={"col_name": column_name, "dtype": int}
+    kwargs_read_file : dict, default={"col_name": column_name, "dtype": int}
         Keyword arguments for :func:`md_spa.read_lammps.read_lammps_dump`
-    cmap : str, Optional, default="tab20"
+    cmap : str, default="tab20"
         Name of matplotlib colormap
-    npixels : int, Optional, default=600
+    npixels : int, default=600
         Number of pixels for height and width
 
     """

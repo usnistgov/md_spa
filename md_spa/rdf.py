@@ -1,3 +1,10 @@
+""" Calculate and pull meaningful features from the radial distribution function.
+
+    Recommend loading with:
+    ``import md_spa.rdf as rdf``
+
+"""
+
 import numpy as np
 import csv
 import sys
@@ -25,9 +32,9 @@ def consolidate_arrays(rdf_array, file_out="rdf_out.txt", pairs=None):
     ----------
     rdf_array : numpy.ndarray
         The first dimension of this array disappears as the equivalent systems are averaged together. The remaining 2D array consists of the first row is the distance and subsequent rows are the rdf values that correspond to the input `pairs` (if provided). 
-    file_out : str, Optional, default='rdf_out.txt'
+    file_out : str, default='rdf_out.txt'
         Filename for consolidated data file, the output file will be equipped with two prefixes, for the rdf\_ and integrated coord\_ data.
-    pairs : list, Optional, default=None
+    pairs : list, default=None
         Optional list of iterable structure of length 2 each containing pairs of values that represent the rdf
 
     Returns
@@ -81,11 +88,11 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="out.csv",
         This string should be common to all equivalent boxes, except for one variable entry to be added with the str format function. (e.g. "path/to/box{}/run1")
     boxes : list
         List of entries that individually complete the path to a lammps rdf output file.
-    file_in : str, Optional, default='rdf.txt'
+    file_in : str, default='rdf.txt'
         Name of rdf data output from lammps. If None, the filename is included in ``target_dir``
-    file_out : str, Optional, default='out.csv'
+    file_out : str, default='out.csv'
         Filename for consolidated data file, the output file will be equipped with two prefixes, for the rdf\_ and integrated coord\_ data.
-    pairs : list, Optional, default=None
+    pairs : list, default=None
         Optional list of iterable structure of length 2 each containing pairs of values that represent the rdf
 
     Returns
@@ -147,7 +154,7 @@ def consolidate_lammps(target_dir, boxes, file_in="rdf.txt", file_out="out.csv",
     fm.write_csv( fout.format("rdf"), rdf_data, header=tmp_header)
     fm.write_csv( fout.format("coord"), coord_data, header=tmp_header)
 
-def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fit=False, plotname="rdf.png",title="Pair-RDF", extrema_cutoff=0.01):
+def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fit=False, plot_name="rdf.png",title="Pair-RDF", extrema_cutoff=0.01):
     """
     From rdf, extract key points of interest.
 
@@ -157,21 +164,21 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
         Distance between bead centers
     gr : np.array
         Radial distribution function
-    tol : float, Optional, default=1e-3
+    tol : float, default=1e-3
         Tolerance used in determining r_0.
-    show_fit : bool, Optional, default=False
+    show_fit : bool, default=False
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
     smooth_sigma : float, default=None
-        If the data should be smoothed, provide a value of sigma used in ``scipy gaussian_filter1d``
-    error_length : int, Optional, default=8
+        If the data should be smoothed, provide a value of sigma used in `scipy.ndimage.gaussian_filter1d <https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter1d.html>`_
+    error_length : int, default=8
         The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
-    save_fit : bool, Optional, default=False
-        Save comparison plot of each rdf being analyzed. With the name ``plotname``
-    plotname : str, Optional, default="rdf.png"
+    save_fit : bool, default=False
+        Save comparison plot of each rdf being analyzed. With the name ``plot_name``
+    plot_name : str, default="rdf.png"
         If `save_fit` is true, the generated plot is saved. The ``title`` is added as a prefix to this str
-    title : str, Optional, default="Pair-RDF"
-        The title used in the pair distribution function plot, note that this str is also added as a prefix to the ``plotname``.
-    extrema_cutoff : float, Optional, default=0.01
+    title : str, default="Pair-RDF"
+        The title used in the pair distribution function plot, note that this str is also added as a prefix to the ``plot_name``.
+    extrema_cutoff : float, default=0.01
         All peaks with an absolute value of gr that is less than this value are ignored.
 
     Returns
@@ -307,7 +314,7 @@ def extract_keypoints(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_
         plt.xlim(rfit[0],rfit[-1])
         plt.tight_layout()
         if save_fit:
-            tmp = os.path.split(plotname)
+            tmp = os.path.split(plot_name)
             filename = os.path.join(tmp[0],title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(filename, dpi=300)
         if show_fit:
@@ -328,24 +335,24 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
     ----------
     filename : str
         Input filename and path to lammps rdf output file
-    fileout : str, Optional, default="rdf.csv"
+    fileout : str, default="rdf.csv"
         Filename of output .csv file
-    mode : str, Optional, default="a"
+    mode : str, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    titles : list[str], Optional, default=None
+    titles : list[str], default=None
         Titles for plots if that is specified in the ``extract_keypoints_kwargs``
-    additional_entries : list, Optional, default=None
+    additional_entries : list, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
-    additional_header : list, Optional, default=None
+    additional_header : list, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
-    extract_keywords_kwargs : dict, Optional, default={}
+    extract_keywords_kwargs : dict, default={}
         Keywords for `extract_keypoints` function
-    file_header_kwargs : dict, Optional, default={}
-        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
-    column_list : list, Optional, default=None
+    file_header_kwargs : dict, default={}
+        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+    column_list : list, default=None
         If not None, this list specifies the column indices (starting from 0) to analyze. Note, the first column must be the distance.
-    kwargs_genfromtxt : dict, Optional, default={}
-        Dictionary of keyword arguments for ``np.genfromtxt`` to import the file, ``filename``.
+    kwargs_genfromtxt : dict, default={}
+        Dictionary of keyword arguments for `numpy.genfromtxt() <https://numpy.org/doc/stable/reference/generated/numpy.genfromtxt.html>`_ to import the file, ``filename``.
 
     Returns
     -------
@@ -418,7 +425,7 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
         fm.write_csv(fileout, tmp_data, mode=mode)
 
 
-def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fit=False, plotname="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
+def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fit=False, plot_name="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
     """ Extract Debye-Waller FACTOR (not parameter like from MSD)
 
     Based on the work found at `DOI: 10.1021/jp064661f <https://doi.org/10.1021/jp064661f>`_
@@ -429,23 +436,23 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
         Distance between bead centers
     gr : np.array
         Radial distribution function
-    tol : float, Optional, default=1e-3
+    tol : float, default=1e-3
         Tolerance used in determining where the rdf function first becomes nonzero.
-    show_fit : bool, Optional, default=False
+    show_fit : bool, default=False
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
     smooth_sigma : float, default=None
-        If the data should be smoothed, provide a value of sigma used in ``scipy gaussian_filter1d``
-    error_length : int, Optional, default=8
+        If the data should be smoothed, provide a value of sigma used in `scipy.ndimage.gaussian_filter1d <https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter1d.html>`_
+    error_length : int, default=8
         The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
-    save_fit : bool, Optional, default=False
-        Save comparison plot of each rdf being analyzed. With the name ``plotname``
-    plotname : str, Optional, default="rdf_debye-waller.png"
+    save_fit : bool, default=False
+        Save comparison plot of each rdf being analyzed. With the name ``plot_name``
+    plot_name : str, default="rdf_debye-waller.png"
         If `save_fit` is true, the generated plot is saved. The ``title`` is added as a prefix to this str
-    title : str, Optional, default="Pair-RDF"
-        The title used in the pair distribution function plot, note that this str is also added as a prefix to the ``plotname``.
-    extrema_cutoff : float, Optional, default=0.01
+    title : str, default="Pair-RDF"
+        The title used in the pair distribution function plot, note that this str is also added as a prefix to the ``plot_name``.
+    extrema_cutoff : float, default=0.01
         All peaks with an absolute value of gr that is less than this value are ignored.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Set whether calculation will be run with comments
 
     Returns
@@ -455,7 +462,7 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
     stnd_errors : numpy.ndarray
         Array containing uncertainties for parameters
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
 
     """
 
@@ -598,7 +605,7 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
         plt.legend(loc="best")
         plt.tight_layout()
         if save_fit:
-            tmp = os.path.split(plotname)
+            tmp = os.path.split(plot_name)
             filename = os.path.join(tmp[0],"rdf_"+title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(filename, dpi=300)
 
@@ -618,7 +625,7 @@ def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, err
         plt.legend(loc="best")
         plt.tight_layout()
         if save_fit:
-            tmp = os.path.split(plotname)
+            tmp = os.path.split(plot_name)
             filename = os.path.join(tmp[0],"fit_"+title.replace(" ", "")+"_"+tmp[1])
             plt.savefig(filename, dpi=300)
         if show_fit:
@@ -635,22 +642,22 @@ def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", delimiter="
     ----------
     filename : str
         Input filename and path to lammps rdf output file
-    fileout : str, Optional, default="rdf.csv"
+    fileout : str, default="rdf.csv"
         Filename of output .csv file
-    mode : str, Optional, default="a"
+    mode : str, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    delimiter : str, Optional, default=","
+    delimiter : str, default=","
         Delimiter between data in input file
-    titles : list[str], Optional, default=None
+    titles : list[str], default=None
         Titles for plots if that is specified in the ``extract_debye_waller_kwargs``
-    additional_entries : list, Optional, default=None
+    additional_entries : list, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
-    additional_header : list, Optional, default=None
+    additional_header : list, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
-    extract_debye_waller_kwargs : dict, Optional, default={}
-        Keywords for ``extract_debye_waller`` function
-    file_header_kwargs : dict, Optional, default={}
-        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
+    extract_debye_waller_kwargs : dict, default={}
+        Keywords for :func:`md_spa.rdf.extract_debye_waller`
+    file_header_kwargs : dict, default={}
+        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
 
     Returns
     -------

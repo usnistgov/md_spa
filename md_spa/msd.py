@@ -1,3 +1,9 @@
+""" Analyze mean-squared displacement trajectories for diffusivity, debye-waller parameters, and nongaussian parameter.
+
+    Recommend loading with:
+    ``import md_spa.msd as msd``
+
+"""
 
 #import read_lammps as f
 import re
@@ -21,23 +27,23 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
     ----------
     filename : str
         Input filename and path to lammps msd output file
-    fileout : str, Optional, default="msd.csv"
+    fileout : str, default="msd.csv"
         Filename of output .csv file
-    mode : str, Optional, default="a"
+    mode : str, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    delimiter : str, Optional, default=","
+    delimiter : str, default=","
         Delimiter between data in input file
-    titles : list[str], Optional, default=None
+    titles : list[str], default=None
         Titles for plots if that is specified in the ``kwargs_find_diffusivity`` or ``kwargs_debye_waller``
-    additional_entries : list, Optional, default=None
+    additional_entries : list, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
-    additional_header : list, Optional, default=None
+    additional_header : list, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
-    kwargs_find_diffusivity : dict, Optional, default={}
+    kwargs_find_diffusivity : dict, default={}
         Keywords for :func:`md_spa.msd.find_diffusivity` function
-    kwargs_debye_waller : dict, Optional, default={}
+    kwargs_debye_waller : dict, default={}
         Keywords for :func:`md_spa.msd.debye_waller` function
-    file_header_kwargs : dict, Optional, default={}
+    file_header_kwargs : dict, default={}
         Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
 
     Returns
@@ -111,23 +117,23 @@ def nongaussian2csv(filename, fileout="nongaussian.csv", mode="a", delimiter=","
     Parameters
     ----------
     filename : str
-        Input filename and path to nongaussian output file created from :func:`md_spa.msd.calc_msds`
-    fileout : str, Optional, default="msd.csv"
+        Input filename and path to nongaussian output file created from :func:`md_spa.mdanalysis.calc_msds`
+    fileout : str, default="msd.csv"
         Filename of output .csv file
-    mode : str, Optional, default="a"
+    mode : str, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    delimiter : str, Optional, default=","
+    delimiter : str, default=","
         Delimiter between data in input file
-    titles : list[str], Optional, default=None
-        Titles for plots if that is specified in the ``kwargs_find_diffusivity`` or ``kwargs_debye_waller``
-    additional_entries : list, Optional, default=None
+    titles : list[str], default=None
+        Titles for plots if that is specified in the ``kwargs_extrema``
+    additional_entries : list, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
-    additional_header : list, Optional, default=None
-        If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
-    file_header_kwargs : dict, Optional, default={}
+    additional_header : list, default=None
+        If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the ``additional_entries`` list.
+    file_header_kwargs : dict, default={}
         Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
-    kwargs_extrema : dict, Optional, default={}
-        Keywords for :func:`fit_data.pull_extrema`
+    kwargs_extrema : dict, default={}
+        Keywords for :func:`md_spa.fit_data.pull_extrema`
 
     Returns
     -------
@@ -200,17 +206,17 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
         Time array of the same length at MSD
     msd : numpy.ndarray
         MSD array with one dimension
-    use_frac : float, Optional, default=1
+    use_frac : float, default=1
         Choose what fraction of the msd to use. This will cut down on comutational time in spending time on regions with poor statistics.
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
+    title : str, default=None
         The title used in the msd plot, note that this str is also added as a prefix to the ``plot_name``.
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    plot_name : str, Optional, default="debye-waller.png"
+    plot_name : str, default="debye-waller.png"
         If ``save_plot==True`` the msd will be saved with the debye-waller factor marked. The ``title`` is added as a prefix to this str
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Will print intermediate values or not
     
     Returns
@@ -318,29 +324,29 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
         Time array of the same length at MSD .
     msd : numpy.ndarray
         MSD array with one dimension.
-    min_exp : float, Optional, default=0.991
+    min_exp : float, default=0.991
         Minimum exponent value used to determine the longest acceptably linear region.
-    min_Npts : int, Optional, default=10
+    min_Npts : int, default=10
         Minimum number of points in the "best" region outputted.
-    skip : int, Optional, default=1
+    skip : int, default=1
         Number of points to skip over in scanning different regions. A value of 1 will be most thorough, but a larger value will decrease computation time.
-    min_R2 : float, Optional, default=0.97
+    min_R2 : float, default=0.97
         Minimum allowed coefficient of determination to consider proposed exponent. This prevents linearity from skipping over curves.
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         choose to save a plot of the fit
-    title : str, Optional, default=None
-        The title used in the msd plot, note that this str is also added as a prefix to the ``plotname``.
-    show_plot : bool, Optional, default=False
+    title : str, default=None
+        The title used in the msd plot, note that this str is also added as a prefix to the ``plot_name``.
+    show_plot : bool, default=False
         choose to show a plot of the fit
-    plot_name : str, Optional, default="diffusivity.png"
+    plot_name : str, default="diffusivity.png"
         If ``save_plot==True`` the msd will be saved with the debye-waller factor marked, The ``title`` is added as a prefix to this str
-    dim : int, Optional, default=3
+    dim : int, default=3
         Dimensions of the system, usually 3
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Will print intermediate values or not
-    use_frac : float, Optional, default=1
+    use_frac : float, default=1
         Choose what fraction of the msd to use. This will cut down on comutational time in spending time on regions with poor statistics.
-    bounds : tuple, Optional, default=(None,None)
+    bounds : tuple, default=(None,None)
         Values of time to act as the minimum or maximum of searching. It is recommended that the lower bound be ten times the timescale for the debye-waller parameter, see :func:`md_spa.msd.debye_waller`. This is applied after ``use_frac``
     
     Returns
@@ -399,7 +405,7 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
             raise ValueError("Provided maximum in time is greater that the time interval provided")
 
     if min_Npts > len(time):
-        warning.warn("Resetting minimum number of points, {}, to be within length of provided data * use_frac, {}".format(min_Npts,len(time)))
+        warnings.warn("Resetting minimum number of points, {}, to be within length of provided data * use_frac, {}".format(min_Npts,len(time)))
         min_Npts = len(time)-1
 
     best = np.array([np.nan for x in range(7)])
@@ -509,9 +515,9 @@ def diffusivity(time, msd, verbose=False, dim=3):
         Time array of the same length at MSD in picoseconds.
     msd : numpy.ndarray
         MSD array with one dimension in angstroms.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Will print intermediate values or not
-    dim : int, Optional, default=3
+    dim : int, default=3
         Dimensions of the system, usually 3
     
     Returns

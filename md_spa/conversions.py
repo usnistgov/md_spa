@@ -1,3 +1,10 @@
+""" Functions to perform conversion, such as between functional forms.
+
+    Recommend loading with:
+    ``import md_spa.conversions as conv``
+
+"""
+
 import sys
 import numpy as np
 
@@ -10,7 +17,7 @@ def periodic2rb(filename, fileout="rb_constants.csv"):
     ----------
     filename : str
         Filename of csv file containing parameters
-    fileout : str, Optional, default="rb_constants.csv"
+    fileout : str, default="rb_constants.csv"
         Name of output RB constants.
 
     Returns

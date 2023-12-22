@@ -1,4 +1,9 @@
+""" This module contains functions to pull meaningful features from data using splines. This may not be the fastest method, but it is robust in our experience.
 
+    Recommend loading with:
+    ``import md_spa.fit_data as fd``
+
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -10,7 +15,7 @@ import md_spa.custom_fit as cfit
 
 def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_peaks={}, kwargs_fit={}, show_plot=False, save_plot=False, plot_name="n_gaussians.png"):
     """
-    Fit parameters to a set of gaussian curves using ``custom_fit.n_gaussians``. If the number to fit to is not provided, then the number of gaussians is set to the number of maxima in the data set.
+    Fit parameters to a set of gaussian curves using :func:`md_spa.custom_fit.n_gaussians`. If the number to fit to is not provided, then the number of gaussians is set to the number of maxima in the data set.
 
     Parameters
     ----------
@@ -18,20 +23,20 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
         Independent dataset
     ydata : numpy.ndarray
         Dependent dataset
-    n_gaussians : int, Optional, default=None
+    n_gaussians : int, default=None
         The number of gaussian functions to fit to. If None the number of peaks is extracted and used as an initial guess.
-    normalize : bool, Optional, default=False
+    normalize : bool, default=False
         If True, the prefactors are scaled by the integral of the set of Gaussian functions from negative infinity to infinity. 
-    kwargs_peaks : dict, Optional, default={}
-        Keyword arguments used in ``custom_plotting.pull_extrema``
-    kwargs_fit : dict, Optional, default={}
-        Keyword arguments for ``custom_fit.n_gaussians``
-    show_plot : bool, Optional, default=False
+    kwargs_peaks : dict, default={}
+        Keyword arguments used in :func:`md_spa.fit_data.pull_extrema`
+    kwargs_fit : dict, default={}
+        Keyword arguments for :func:`md_spa.custom_fit.n_gaussians`
+    show_plot : bool, default=False
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
-    save_fit : bool, Optional, default=False
+    save_fit : bool, default=False
         Save comparison plot of each rdf being analyzed. With the name ``plot_name``
-    plot_name : str, Optional, default="n_gaussians.png"
-        If `save_fit` is true, the generated plot is saved
+    plot_name : str, default="n_gaussians.png"
+        If ``save_fit`` is true, the generated plot is saved
 
     Returns
     -------
@@ -40,7 +45,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
     parameters : numpy.ndarray
         An array of the dimensions (n_gaussians, 3) containing the standard error for parameters
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
 
     """
 
@@ -118,18 +123,18 @@ def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cu
         independent data
     ydata : numpy.ndarray
         dependent data
-    smooth_sigma : float, Optional, default=None
-        If the data should be smoothed, provide a value of sigma used in ``scipy gaussian_filter1d``
-    error_length : int, Optional, default=25
+    smooth_sigma : float, default=None
+        If the data should be smoothed, provide a value of sigma used in `scipy.ndimage.gaussian_filter1d <https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter1d.html>`_
+    error_length : int, default=25
         The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
-    extrema_cutoff : float, Optional, default=0.0
+    extrema_cutoff : float, default=0.0
         All peaks with an absolute value of gr that is less than this value are ignored. If values that are expects are not returned, try adding a small value of `smooth_sigma` as minute fluculations in a noninteresting beginning part of the array may be at fault.
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
-    save_fit : bool, Optional, default=False
+    save_fit : bool, default=False
         Save comparison plot of each rdf being analyzed. With the name ``plot_name``
-    plot_name : str, Optional, default="extrema.png"
-        If `save_fit` is true, the generated plot is saved
+    plot_name : str, default="extrema.png"
+        If ``save_fit`` is true, the generated plot is saved
         
     Returns
     -------

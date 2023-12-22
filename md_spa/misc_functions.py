@@ -1,3 +1,9 @@
+""" Miscellaneous functions, mostly for coordinate or vector transformations.
+
+    Recommend loading with:
+    ``import md_spa.misc_functions as mf``
+
+"""
 
 import numpy as np
 
@@ -77,7 +83,7 @@ def check_wrap(pos_diff, dimensions, dist_type="distance"):
         Matrix of atoms by coordinates, represents the difference between atom set and some reference point.
     dimensions : numpy.ndarray
         Array of box length in three dimensions, assuming origin at (0,0,0)
-    dist_type : str, Optional, default="distance"
+    dist_type : str, default="distance"
         Type of coordinate data. By default it is assumed to be an array to calculate the distance between atoms and some reference. Thus, the "coordinates" should be transformed if the value is greater than half the box length. 
     
         - distance : A matrix of displacement vectors representing the distance between atoms and some reference 
@@ -86,8 +92,7 @@ def check_wrap(pos_diff, dimensions, dist_type="distance"):
     Returns
     -------
     pos_diff_new : numpy.ndarray
-        Matrix of atoms by coordinates, represents the difference between atom set and some reference poin
-t, wrapped if approproate.
+        Matrix of atoms by coordinates, represents the difference between atom set and some reference point, wrapped if approproate.
 
     """
     dimensions = np.expand_dims(dimensions, tuple(range(len(np.shape(pos_diff))-1)))

@@ -1,3 +1,9 @@
+""" Calculate the volume of overlappying spheres
+
+    Recommend loading with:
+    ``import md_spa.monte_carlo_volume as mcv``
+
+"""
 
 import numpy as np
 
@@ -7,7 +13,7 @@ def random_points(npts, ranges):
     """
     Random points for Monte Carlo use.
 
-    Using ``numpy.random.uniform``, ``npts`` vectors are generated of length ``len(ranges)``.
+    Using `numpy.random.uniform <https://numpy.org/doc/stable/reference/random/generated/numpy.random.uniform.html>`_, ``npts`` vectors are generated of length ``len(ranges)``.
     The iterable, ranges contains iterables of length 2 with the minimum and maximum of that point.
 
     An example of this might be ``npts=1e+3`` with a 3x4x2 box, ``ranges=[[0,3],[0,4],[0,2]]``
@@ -42,9 +48,9 @@ def overlapping_spheres(rcut, ref_pts, npts=1e+4, repeats=3):
         Radius of the circles, or an array of different radii for each circle.
     ref_pts : numpy.ndarray
         Array of reference points for centers of circles    
-    npts : int, Optional, default=1e+4
+    npts : int, default=1e+4
         Number of vector "points" to produce. 
-    repeats : int, Optional, default=3
+    repeats : int, default=3
         Number of times this MC calculation is performed to obtain the standard deviation
 
     Returns

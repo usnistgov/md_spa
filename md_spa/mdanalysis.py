@@ -1,4 +1,9 @@
+""" Wrapper functions to aggregate repeditive tasks when using MDAnalysis.
 
+    Recommend loading with:
+    ``import md_spa.mdanalysis as spa_mda``
+
+"""
 import numpy as np
 import sys
 import os
@@ -22,28 +27,32 @@ def center_universe_around_group(universe, select, verbose=False, reference="ini
 
     Parameters
     ----------
-    universe : obj
-        ``MDAnalysis.Universe`` object instance
+    universe : obj/tuple
+        Can either be:
+        
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
+        - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
     select : str
-        This string should align with ``MDAnalysis.universe.select_atoms(select)`` rules
-    verbose : bool, Optional, default=False
+        This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules
+    verbose : bool, default=False
         Set whether calculation will be run with comments
-    reference : str, Optional, default="intitial"
+    reference : str, default="intitial"
         Options for how to transform the coordinates:
         
         - "initial": Move the center of mass for the group in the first frame to the center of the box and use that same transformation in all other frames. This will allow further dynamic analysis without interference of boundary conditions.
         - "relative": Move the center of mass for a group to the center of the box for each respective frame. All dynamic movement will be distorted and lost, but the group will not migrate to the boundary for static property calculations.
 
-    com_kwargs : dict, Optional, default={"unwrap": True}
+    com_kwargs : dict, default={"unwrap": True}
         Keyword arguements for mdanalysis.core.topologyattrs.center_of_mass()
 
     Returns
     -------
     universe : obj 
-        ``MDAnalysis.Universe`` object instance
+        `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_ object instance
 
     """
 
+    universe = check_universe(universe)
     universe.trajectory[0]
     group_target = universe.select_atoms(select)
     group_remaining = universe.select_atoms("all") - group_target
@@ -88,14 +97,15 @@ def check_universe(universe):
     universe : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
     Returns
     -------
     universe : obj
-        ``MDAnalysis.Universe`` object instance
+        `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_ object instance
+
     """
 
     if isinstance(universe, mda.core.universe.Universe):
@@ -121,7 +131,7 @@ def generate_universe(package, args, kwargs={}):
     """
     Generate MDAnalysis universe
 
-    e.g., ``universe = spa_mda.generate_universe("LAMMPS",(data_file, dump_files), {"dt":dt})``, where data_file is a filename and path, and dump_files is a list of filenames and paths.
+    e.g., ``import md_spa.mdanalysis as spa_mda; universe = spa_mda.generate_universe("LAMMPS",(data_file, dump_files), {"dt":dt})``, where data_file is a filename and path, and dump_files is a list of filenames and paths.
 
     Parameters
     ----------
@@ -131,14 +141,14 @@ def generate_universe(package, args, kwargs={}):
         - LAMMPS: Must include the path to a data file with the atom_type full (unless otherwise specified.), and optionally include a list of paths to sequential dump files.           
 
     args : tuple
-        Arguments for ``MDAnalysis.Universe``
-    kwargs : dict, Optional, default={"format": package_identifier, "continuous": True}
-        Keyword arguments for ``MDAnalysis.Universe``. Note that the ``format`` will be added internally.
+        Arguments for `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_ object instance
+    kwargs : dict, default={"format": package_identifier, "continuous": True}
+        Keyword arguments for `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_ object instance. Note that the ``format`` will be added internally.
                  
     Returns
     -------
     universe : obj
-        ``MDAnalysis.Universe`` object instance
+        `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_ object instance.
 
     """
 
@@ -167,28 +177,29 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
     groups : list[tuples]
-        List of tuples containing pairs of strings that individually identify a MDAnalysis AtomGroup with universe.select_atoms(groups[i])
-    rmin : float, Optional, default=0.1
+        List of tuples containing pairs of strings that individually identify a MDAnalysis AtomGroup with ``universe.select_atoms(groups[i])``
+        This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules.
+    rmin : float, default=0.1
         Minimum rdf cutoff
-    rmax : float, Optional, default=12.0
+    rmax : float, default=12.0
         Maximum rdf cutoff
-    nbins : 100, Optional, default=1000
+    nbins : 100, default=1000
         Number of bins in the rdf
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Set whether calculation will be run with comments
-    exclusion_block : tuple, Optional, default=None
-        Allows the masking of pairs from within the same molecule.  For example, if there are 7 of each atom in each molecule, the exclusion mask `(7, 7)` can be used. The default removes self interaction.
-    exclusion_mode : str, Optional, default="block"
-        Set to "block" for traditional mdanalysis use, and use "relative" to remove ``exclusion_block[0]`` neighbors around reference atom.
-    exclude : str, Optional, default=None
-        Set the type of exclusion: ["include bound", "exclude bound", "explicit"]
-    run_kwargs : dict, Optional, default={}
-        Other keyword arguments from ``MDAnalysis.analysis.rdf.InterRDF.run()``
+    exclusion_block : tuple, default=None
+        Allows the masking of pairs from within the same molecule.  For example, if there are 7 of each atom in each molecule, the exclusion mask `(7, 7)` can be used. The default removes self interaction. **Not Yet Supported**
+    exclusion_mode : str, default="block"
+        Set to "block" for traditional mdanalysis use, and use "relative" to remove ``exclusion_block[0]`` neighbors around reference atom. **Not Yet Supported**
+    exclude : str, default=None
+        Set the type of exclusion: ["include bound", "exclude bound", "explicit"] **Not Yet Supported**
+    run_kwargs : dict, default={}
+        Other keyword arguments from `MDAnalysis.analysis.rdf.InterRDF.run() <https://docs.mdanalysis.org/1.1.1/documentation_pages/analysis/rdf.html>`_
 
     Returns
     -------
@@ -236,27 +247,27 @@ def calc_msds(u, groups, dt=None, verbose=False, fft=False, run_kwargs={}):
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
     group : list
-        List of strings that identify a MDAnalysis AtomGroup with universe.select_atoms(group[i])
-    dt : float, Optional, default=1
+        List of strings that identify a MDAnalysis AtomGroup with ``universe.select_atoms(group[i])``. This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules.
+    dt : float, default=1
         Define dt to convert frame numbers to desired time unit. If nothing is provided, the dt of the universe is used.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Set whether calculation will be run with comments
-    fft : bool, Optional, default=False
+    fft : bool, default=False
         Choose whether to use the fft method, in that case the non gaussian parameter will not be computed.
-    run_kwargs : dict, Optional, default={}
-        Other keyword arguments from ``MDAnalysis.analysis.msd.MSD.run()``
+    run_kwargs : dict, default={}
+        Other keyword arguments from `MDAnalysis.analysis.msd.MSD.run() <https://docs.mdanalysis.org/stable/documentation_pages/analysis/msd.html#MDAnalysis.analysis.msd.EinsteinMSD.run>`_
 
     Returns
     -------
     msd_output : numpy.ndarray
         Array of times and MSD values. msd_output[0] is the time values and the remaining rows represent the given group MSDs.
     second_order_nongaussian_parameter : numpy.ndarray
-        Array of times and second order nongaussian parameter of the MSD. A first peak for an atomistic system may indicate bond vibration, while a second or solitary peak will represent the characteristic time for the cross over from ballistic to diffusive regimes. The MSD at this time equals six times the mean localization characterization length squared. DOI: 10.1103/PhysRevE.65.041804 
+        Array of times and second order nongaussian parameter of the MSD. A first peak for an atomistic system may indicate bond vibration, while a second or solitary peak will represent the characteristic time for the cross over from ballistic to diffusive regimes. The MSD at this time equals six times the mean localization characterization length squared. DOI: 10.1103/PhysRevE.65.041804. **Not Yet Supported**
 
     """
 
@@ -291,7 +302,11 @@ def calc_msds(u, groups, dt=None, verbose=False, fft=False, run_kwargs={}):
                 nongaussian_parameter[0,:MSD.n_frames] = np.arange(MSD.n_frames)*dt # time
         msd_output[i+1,:MSD.n_frames] = MSD.results.timeseries # distance^2
         if not fft:
-            nongaussian_parameter[i+1,:MSD.n_frames] = MSD.results.nongaussian_parameter
+            try:
+                nongaussian_parameter[i+1,:MSD.n_frames] = MSD.results.nongaussian_parameter
+            except:
+                warning.warn("Sorry, the ability to calculate the nongaussian_parameter has not yet been contributed to MDAnalysis.")
+                nongaussian_parameter = None
 
     if not fft:
         return msd_output, nongaussian_parameter
@@ -307,17 +322,17 @@ def calc_persistence_length(u, backbone_indices, save_plot=True, figure_name="pl
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
     backbone_indices : list
         List of atomID for atoms along backbone, starting at 1
-    save_plot : bool, Optional, default=True
+    save_plot : bool, default=True
         Optionally save plot of data and fit
-    figure_name : str, Optional, default="plot_lp_fit.png"
+    figure_name : str, default="plot_lp_fit.png"
         Name of the plot to be saved
-    verbose : bool, Optional, default=True
+    verbose : bool, default=True
         If True, the persistence length will be printed to the screen
 
     Returns
@@ -362,13 +377,13 @@ def calc_gyration(universe, select="all", pbc=False):
     universe : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
-    select : str, Optional, default="all"
-        This string should align with MDAnalysis universe.select_atoms(select) rules
-    pbc : bool, Optional, default=True
+    select : str, default="all"
+        This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules
+    pbc : bool, default=True
         If ``True``, move all atoms within the primary unit cell before calculation.
 
     Returns
@@ -408,7 +423,7 @@ def calc_end2end(u, indices):
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
@@ -451,7 +466,7 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
@@ -459,32 +474,32 @@ def hydrogen_bonding(u, indices, dt, tau_max=200, verbose=False, show_plot=False
         A list of lists containing the type for the hydrogen bond donor, hydrogen, and acceptor. If an atom type is unknown or more than one is desired, put None instead.
     dt : float
         Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
-    tau_max : int, Optional, default=200
+    tau_max : int, default=200
         Number of timesteps to calculate the decay to, this value times dt is the maximum time. Cannot be greater than the number of frames,
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Print intermediate updates on progress
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         In a debugging mode, this option allows the time autocorrelation function to be viewed
-    intermittency : int, Optional, default=0
+    intermittency : int, default=0
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
-    path : str, Optional, default=""
+    path : str, default=""
         Path to save files
-    filename : str, Optional, default="lifetime.csv"
+    filename : str, default="lifetime.csv"
         Prefix on filename to further differentiate
-    acceptor_kwargs : dict, Optional, default={}
-        Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_acceptors()``
-    donor_kwargs : dict, Optional, default={}
-        Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_donors()``
-    hydrogen_kwargs : dict, Optional, default={}
-        Keyword arguments for ``MDAnalysis.analysis.hydrogenbonds.hbond_analysis.HydrogenBondAnalysis.guess_hydrogens()``
-    d_h_cutoff : float/numpy.ndarray, Optional, default=1.2
+    acceptor_kwargs : dict, default={}
+        Keyword arguments for `MDAnalysis HydrogenBondAnalysis.guess_acceptors() <https://docs.mdanalysis.org/2.0.0/documentation_pages/analysis/hydrogenbonds.html>`_
+    donor_kwargs : dict, default={}
+        Keyword arguments for `MDAnalysis HydrogenBondAnalysis.guess_donors() <https://docs.mdanalysis.org/2.0.0/documentation_pages/analysis/hydrogenbonds.html>`_
+    hydrogen_kwargs : dict, default={}
+        Keyword arguments for `MDAnalysis HydrogenBondAnalysis.guess_hydrogens() <https://docs.mdanalysis.org/2.0.0/documentation_pages/analysis/hydrogenbonds.html>`_
+    d_h_cutoff : float/numpy.ndarray, default=1.2
         Cutoff distance between hydrogen bond donor and hydrogen. If an array, it must be of the same length as ``indices``.
-    d_a_cutoff : float/numpy.ndarray, Optional, default=3.5
+    d_a_cutoff : float/numpy.ndarray, default=3.5
         Cutoff distance between hydrogen bond donor and acceptor. If an array, it must be of the same length as ``indices``.
-    d_h_a_angle_cutoff : float/numpy.ndarray, Optional, default=125.0
+    d_h_a_angle_cutoff : float/numpy.ndarray, default=125.0
         Cutoff angle for hydrogen bonding. Assumed to be 125.0 to eliminate the constraint imposed in MDAnalysis, since MD isn't constrained by orbitals. If an array, it must be of the same length as ``indices``. This value was chosen from a lower limit determined in our MD simulations.
-    kwargs_run : dict, Optional, default={}
-        Keyword arguments for ``MDAnalysis.analysis.base.AnalysisBase.run()``
+    kwargs_run : dict, default={}
+        Keyword arguments for `MDAnalysis.analysis.base.AnalysisBase.run() <https://docs.mdanalysis.org/1.1.0/documentation_pages/analysis/base.html>`_
 
     Returns
     -------
@@ -654,7 +669,7 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", in
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
@@ -662,26 +677,27 @@ def survival_probability(u, indices, dt, zones=[(0, 3)], select="isosurface", in
         A list of lists containing the type for the (reference_atom_type, target_atom_type)
     dt : float
         Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
-    zones : list[tuple], Optional, default=[(0, 3.0)*len(indices)]
+    zones : list[tuple], default=[(0, 3.0)*len(indices)]
         List of tuples containing zones boundary information to evaluate the survival probability for each interaction pair in ``indices``. Must be the same length as ``indices``, and each sublist the same length as the number of format placeholders minus two (e.g. min max values for ``select="isolayer"`` and a max value for ``select="around"``.
-    select : str, Optional, default="isosurface"
+    select : str, default="isosurface"
         Can be "isosurface", "around", or a string to overwrite one of the previous two selection criteria where the number of placeholders must be ``2+len(zones[0])``.
+        This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules.
 
         - "isolayer": ``type {select_target} and isolayer {zones[i][0]} {zones[i][1]} type {select_reference}``. This option will make "one" region, even if parts of it are fragmented (in this case the "around" is probably what you want). Consider this option where the backbone of a polymer is the reference and a uniform "shell" is desired.
-        - "around": ``type {select_target} and around {zones[i][0]} type {select_reference}``. Useful for obtaining the residence time of ions around specific groups (https://nms.kcl.ac.uk/lorenz.lab/wp/?p=1045).
+        - "around": ``type {select_target} and around {zones[i][0]} type {select_reference}``. Useful for obtaining the residence time of ions around specific groups, as was constributed by the `Lorentz Lab <https://nms.kcl.ac.uk/lorenz.lab/wp/?p=1045>`_.
 
-    intermittency : int, Optional, default=0
+    intermittency : int, default=0
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         If true, progress will be printed
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         In a debugging mode, this option allows the time autocorrelation function to be viewed
-    path : str, Optional, default=""
+    path : str, default=""
         Path to save files
-    filename : str, Optional, default="survival.csv"
+    filename : str, default="survival.csv"
         Prefix on filename to further differentiate
-    kwargs_run : dict, Optional, default={"intermittency": intermittency, :verbose": verbose}
-        Keyword arguments for ``MDAnalysis.analysis.base.AnalysisBase.run()``
+    kwargs_run : dict, default={"intermittency": intermittency, :verbose": verbose}
+        Keyword arguments for `MDAnalysis.analysis.base.AnalysisBase.run() <https://docs.mdanalysis.org/1.1.0/documentation_pages/analysis/base.html>`_
 
     Returns
     -------
@@ -775,32 +791,32 @@ def survival_probability_by_zones(u, dt, type_reference=None, type_target=None, 
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
     dt : float
         Define the timestep as used in ``mdanalysis.Universe``, or the number of ps between frames.
-    type_reference : int, Optional, default=None
+    type_reference : int, default=None
         This atom type must be provided unless ``select`` is provided. This atom type represents the core for the radial analysis. Note that with how this selection criteria is written, that if two atoms of this type are close together, a sort of iso-line is formed around the two atoms so that the DW parameter is not skewed by target atoms that are far from one reference type and close to another.
-    type_target : int, Optional, default=None
+    type_target : int, default=None
         This atom type must be provided unless ``select`` is provided. The DW parameter of this atom type is the output of this function. 
-    zones : list[tuple], Optional, default=[(2.0, 5.0)]
+    zones : list[tuple], default=[(2.0, 5.0)]
         List of tuples containing minimum and maximum zones to evaluate the survival probability
-    select : str, Optional, default=None
-        A string to overwrite the default selection criteria: ``type {type_target} and isolayer {zones[i][0]} {zones[i][1]} type {type_reference}``
-    intermittency : int, Optional, default=0
+    select : str, default=None
+        A string to overwrite the default selection criteria: ``type {type_target} and isolayer {zones[i][0]} {zones[i][1]} type {type_reference}``. This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules.
+    intermittency : int, default=0
         The intermittency specifies the number of times a hydrogen bond can be made and break while still being considered in the correlation function.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         If true, progress will be printed
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         In a debugging mode, this option allows the time autocorrelation function to be viewed
-    path : str, Optional, default=""
+    path : str, default=""
         Path to save files
-    filename : str, Optional, default="survival.csv"
+    filename : str, default="survival.csv"
         Prefix on filename to further differentiate
-    kwargs_run : dict, Optional, default={"intermittency": intermittency, :verbose": verbose}
-        Keyword arguments for ``MDAnalysis.analysis.base.AnalysisBase.run()``
+    kwargs_run : dict, default={"intermittency": intermittency, :verbose": verbose}
+        Keyword arguments for `MDAnalysis.analysis.base.AnalysisBase.run() <https://docs.mdanalysis.org/1.1.0/documentation_pages/analysis/base.html>`_
 
     Returns
     -------
@@ -865,41 +881,42 @@ def debye_waller_by_zones(universe, frames_per_tau, select_reference=None, selec
     This method requires a characteristic time, generally on the order of a picosecond. This time is equal to the beta relaxation time and is generally temperature independent, and so can be determined from the minimum of the logarithmic derivative of the MSD, and low temperature may be necessary.
 
     Note that this method should not be used for distances expected to be close to half the box length.
+    Selection strings should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules.
 
     Parameters
     ----------
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
     frames_per_tau : int
         Number of frames in the characteristic time, tau.
-    select_reference : int, Optional, default=None
+    select_reference : int, default=None
         This atom type must be provided unless ``select`` is provided. This atom type represents the core for the radial analysis. Note that with how this selection criteria is written, that if two atoms of this type are close together, a sort of iso-line is formed around the two atoms so that the DW parameter is not skewed by target atoms that are far from one reference type and close to another.
-    select_target : int, Optional, default=None
+    select_target : int, default=None
         This atom type must be provided unless ``select`` is provided. The DW parameter of this atom type is the output of this function. 
-    select : str, Optional, default=None
+    select : str, default=None
         A string to overwrite the default selection criteria: ``({select_target}) and around {r_start} {r_start+i_zone*dr} ({select_reference})``
-    stop_frame : int, Optional, default=None
+    stop_frame : int, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
-    r_start : float, Optional, default=2.0
+    r_start : float, default=2.0
         Inner most radius to define the core sphere, this is Zone 0
-    dr : float, Optional, default=1.0
+    dr : float, default=1.0
         Thickness of the radial zones, for LAMMPS this is in angstroms
-    nzones : int, Optional, default=5.0
+    nzones : int, default=5.0
         Number of zones, counting the central Zone 0
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         If true, progress will be printed
-    write_increment : int, Optional, default=100
+    write_increment : int, default=100
         If ``verbose`` write out progress every, this many frames.
-    select_recenter : str, Optional, default=None
+    select_recenter : str, default=None
         If not None, the trajectory will be centered around the select_atom() group in a relative sense. The center of mass will be extracted first to correct the difference in positions.
-    flag_com : bool, Optional, default=False
+    flag_com : bool, default=False
         If true, the trajectory is centered around the group specified with ``select_recenter`` for every frame, and in calculating the displacement, a correction between the frame centers of mass is applied. With this option, the effect of periodic boundary conditions is ensureed to be removed for calculations sufficiently far from the boundary. 
-    include_center : bool, Optional, default=True
+    include_center : bool, default=True
         If True, the first shell will be a sphere from zero to ``r_start`` and the second shell will be ``r_start`` to ``r_start+dr``. If ``include_center==False``, the first shell is ``r_start+dr``
 
     Returns
@@ -1040,7 +1057,7 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
@@ -1048,11 +1065,12 @@ def debye_waller_by_selection(universe, frames_per_tau, select_list, stop_frame=
         Number of frames in the characteristic time, tau.
     select_list : list
         List of atom selection strings according to the MDAnalysis selection string format. 
-    stop_frame : int, Optional, default=None
+        This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules.
+    stop_frame : int, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         If true, progress will be printed
-    write_increment : int, Optional, default=100
+    write_increment : int, default=100
         If ``verbose`` write out progress every, this many frames.
 
     Returns
@@ -1123,47 +1141,48 @@ def tetrahedral_order_parameter_by_zone(universe, select_target, select_referenc
     Notice that if more than four atoms are found, a warning is issued and the closest four are used. In the case that there are less than four atoms within the cutoff, the metric is still computed for n==3, but reported in a separate matrix.
 
     Note that the reference select should encompass atom types, and not regions for this function to be meaningful.
+    Selection strings should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules
 
     Parameters
     ----------
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
     select_target : list
         Atom type selection string according to the MDAnalysis selection string format. 
-    select_reference : int, Optional, default=None
+    select_reference : int, default=None
         This atom type must be provided unless ``select`` is provided. This atom type represents the core for the radial analysis. Note that with how this selection criteria is written, that if two atoms of this type are close together, a sort of iso-line is formed around the two atoms so that the DW parameter is not skewed by target atoms that are far from one reference type and close to another.
     select_neighbor : str
         Selection string restricting the atom types to be included. For example, ``reference_select="type 2 and type 4"``, although one atom type is probably recommended.
-    step : int, Optional, default=None
+    step : int, default=None
         Optionally evaulate for a single step, this will overwrite ``r_cut, stop_frame, skip_frame, and stop_frame``
-    select : str, Optional, default=None
+    select : str, default=None
         A string to overwrite the default selection criteria: ``({select_target}) and around {r_start} {r_start+i_zone*dr} ({select_reference})``
-    r_start : float, Optional, default=2.0
+    r_start : float, default=2.0
         Inner most radius to define the core sphere, this is Zone 0
-    dr : float, Optional, default=1.0
+    dr : float, default=1.0
         Thickness of the radial zones, for LAMMPS this is in angstroms
-    nzones : int, Optional, default=5.0
+    nzones : int, default=5.0
         Number of zones, counting the central Zone 0
-    stop_frame : int, Optional, default=None
+    stop_frame : int, default=None
         Frame at which to start calculation. This function can take a long time, so the entire trajectory may not be desired.
-    stop_frame : int, Optional, default=None
+    stop_frame : int, default=None
         Frame at which to stop calculation. This function can take a long time, so the entire trajectory may not be desired.
-    skip_frame : int, Optional, default=1
+    skip_frame : int, default=1
         Interval of frames to skip. Advised if given universe frames are not independent.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         If true, progress will be printed
-    write_increment : int, Optional, default=100
+    write_increment : int, default=100
         If ``verbose`` write out progress every, this many frames.
-    bins = int, Optional, default=100
+    bins = int, default=100
         Number of binds used in histogram. Can be any valid input for ``numpy.histogram(x, bins=bins)``
-    kwargs_metric : dict, Optional, default={}
+    kwargs_metric : dict, default={}
         Keyword arguments for execution of `tetrahedral_order_parameter`
-    include_center : bool, Optional, default=True
+    include_center : bool, default=True
         If True, the first shell will be a sphere from zero to ``r_start`` and the second shell will be ``r_start`` to ``r_start+dr``. If ``include_center==False``, the first shell is ``r_start+dr``
 
     Returns
@@ -1261,7 +1280,7 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, ang
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
@@ -1269,9 +1288,10 @@ def tetrahedral_order_parameter(universe, group, select_neighbor, r_cut=3.4, ang
         Atom group to be analyzed 
     select_neighbor : str
         Selection string restricting the atom types to be included. For example, ``reference_select="type 2 and type 4"``, although one atom type is probably recommended.
-    r_cut : float, Optional, default=3.4
+        This string should align with `MDAnalysis universe.select_atoms(select) <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_ rules.
+    r_cut : float, default=3.4
         Cutoff used to determine ``reference_atoms`` used in calculation.
-    angle_cut :float, Optional, default=30 
+    angle_cut :float, default=30 
         Cutoff for angle between interacting hydrogen, its donor, and the acceptor oxygen in the tetrahedral. A value of None will remove this contraint.
 
     Returns
@@ -1345,17 +1365,17 @@ def create_ndx(groups=[], names=None, separate_by=None, filename="index.ndx", kw
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
-    groups : list, Optional, default=[]
-        List of ``AtomGroups`` to be included in the index file.
-    names : list, Optional, default=None
+    groups : list, default=[]
+        List of `AtomGroups <https://userguide.mdanalysis.org/stable/atomgroup.html>`_ to be included in the index file.
+    names : list, default=None
         List of equal length to ``groups`` to separate different "molecules" (i.e., groups) to call in gromacs
-    separate_by : str, Optional, default=None
+    separate_by : str, default=None
         Subdivide groups with this mdanalysis `selection string <https://docs.mdanalysis.org/stable/documentation_pages/selections.html>`_. Could be any value used in AtomGroup.groupby method.
-    kwargs_writer : dict, Optional, default={}
+    kwargs_writer : dict, default={}
         Keyword arguments used in the `Gromacs writer <https://docs.mdanalysis.org/documentation_pages/selections/gromacs.html>`_ 
 
     Returns
@@ -1396,7 +1416,7 @@ def add_elements2types(universe, conversion_dict):
     u : obj/tuple
         Can either be:
         
-        - MDAnalysis universe
+        - `MDAnalysis.Universe <https://userguide.mdanalysis.org/stable/universe.html>`_
         - A tuple of length 2 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe` and appropriate arguments in a tuple 
         - A tuple of length 3 containing the format type keyword from :func:`md_spa.mdanalysis.generate_universe`, appropriate arguments in a tuple, and dictionary of keyword arguments
 
