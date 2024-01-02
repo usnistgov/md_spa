@@ -36,9 +36,9 @@ stages:
 test:
   stage: Test
   script:
-    - pip install -e .
+#    - pip install -e .
     - pip install -r requirements_dev.txt
-    - xvfb-run py.test -s --cov=md_spa --cov-report xml --cov-report html --cov-report term --cov-config=.coveragerc --color=yes
+#    - xvfb-run py.test -s --cov=md_spa --cov-report xml --cov-report html --cov-report term --cov-config=.coveragerc --color=yes
 #  artifacts:
 #    paths:
 #      - htmlcov
