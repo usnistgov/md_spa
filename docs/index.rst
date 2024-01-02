@@ -10,7 +10,6 @@ Welcome to MD-SPA's documentation!
    readme
    installation
    usage
-   modules
    contributing
    authors
    changelog

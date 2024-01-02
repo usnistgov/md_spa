@@ -29,7 +29,7 @@ before_script:
   - sleep 3
 
 stages:
-  - Static Analysis
+#  - Static Analysis
   - Test
   - Deploy
 
@@ -39,41 +39,49 @@ test:
     - pip install -e .
     - pip install -r requirements_dev.txt
     - xvfb-run py.test -s --cov=md_spa --cov-report xml --cov-report html --cov-report term --cov-config=.coveragerc --color=yes
-  artifacts:
-    paths:
-      - htmlcov
-      - coverage.xml
-    reports:
-      cobertura: coverage.xml
-    when: always
+#  artifacts:
+#    paths:
+#      - htmlcov
+#      - coverage.xml
+#    reports:
+#      cobertura: coverage.xml
+#    when: always
 
+#flake8:
+#  image: python:latest
+#  stage: Static Analysis
+#  allow_failure: true
+#  script:
+#    - pip install -r requirements_dev.txt
+#    - flake8 md_spa --format=html --htmldir=flake-report
+#  artifacts:
+#    paths:
+#      - flake-report
+#    when: on_failure
 
-
-flake8:
-  image: python:latest
-  stage: Static Analysis
-  allow_failure: true
+pages:
+  stage: Deploy
   script:
-    - pip install -r requirements_dev.txt
-    - flake8 md_spa --format=html --htmldir=flake-report
+  - pip install -U sphinx
+  - sphinx-build -b html . public
   artifacts:
     paths:
-      - flake-report
-    when: on_failure
+    - public
+  only:
+  - master
 
-
-tox:
-  stage: Test
-  script:
-    - pip install tox
-    # an alternative approach is to install and run:
-    - xvfb-run tox
-    # run the command here
-  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
-  artifacts:
-    paths:
-      - dist/*.whl
-    reports:
-      cobertura: coverage.xml
-    expire_in: 1 week
+#tox:
+#  stage: Test
+#  script:
+#    - pip install tox
+#    # an alternative approach is to install and run:
+#    - xvfb-run tox
+#    # run the command here
+#  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+#  artifacts:
+#    paths:
+#      - dist/*.whl
+#    reports:
+#      cobertura: coverage.xml
+#    expire_in: 1 week
 

@@ -19,7 +19,7 @@ sphinx-rtd-theme==0.5.0rc2
 sphinxcontrib-blockdiag
 jupyter_sphinx>=0.3.2
 sphinx-jsonschema>=1.15
-sphinxcontrib.blockdiag
+sphinxcontrib-svg2pdfconverter
 sphinx-argparse
 pygments==2.6.1
 
