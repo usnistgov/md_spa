@@ -113,7 +113,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
 
     return parameters, uncertainties, redchi
 
-def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cutoff=0.0, show_plot=False, save_plot=False, plot_name="extrema.png"):
+def pull_extrema( xarray, yarray, sigma_spline=None, sigma_ddspline=None, error_length=25, extrema_cutoff=0.0, show_plot=False, save_plot=False, plot_name="extrema.png"):
     """
     Pull minima, maxima, and inflection points from x-y data.
 
@@ -123,12 +123,14 @@ def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cu
         independent data
     ydata : numpy.ndarray
         dependent data
-    smooth_sigma : float, default=None
+    sigma_spline : float, default=None
         If the data should be smoothed, provide a value of sigma used in `scipy.ndimage.gaussian_filter1d <https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter1d.html>`_
+    sigma_ddspline : float, default=None
+        Smooth the second derivative of the spline to extract reliable inflection points. Values of sigma used in `scipy.ndimage.gaussian_filter1d <https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter1d.html>`_
     error_length : int, default=25
         The number of extrema found to trigger an error. This indicates the data is noisy and should be smoothed. 
     extrema_cutoff : float, default=0.0
-        All peaks with an absolute value of gr that is less than this value are ignored. If values that are expects are not returned, try adding a small value of `smooth_sigma` as minute fluculations in a noninteresting beginning part of the array may be at fault.
+        All peaks with an absolute value of gr that is less than this value are ignored. If values that are expects are not returned, try adding a small value of `sigma_spline` as minute fluculations in a noninteresting beginning part of the array may be at fault.
     show_plot : bool, default=False
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
     save_fit : bool, default=False
@@ -147,20 +149,20 @@ def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cu
 
     """
     #######
-    #if smooth_sigma == None: # Trying to automate choosing a smoothing value
+    #if sigma_spline == None: # Trying to automate choosing a smoothing value
     #    Npts_avg = 20
     #    stderror = 1e-5
     #    sigma_min = 1.1
     #    window_len = (np.std(yarray[-Npts_avg:])/stderror)**2
-    #    smooth_sigma = (window_len-1)/6.0
-    #    print(smooth_sigma, window_len, np.std(yarray[-Npts_avg:]))
-    #    if smooth_sigma < sigma_min:
-    #        smooth_sigma = sigma_min 
-    #print(smooth_sigma)
-    #yarray = gaussian_filter1d(yarray, sigma=smooth_sigma)
+    #    sigma_spline = (window_len-1)/6.0
+    #    print(sigma_spline, window_len, np.std(yarray[-Npts_avg:]))
+    #    if sigma_spline < sigma_min:
+    #        sigma_spline = sigma_min 
+    #print(sigma_spline)
+    #yarray = gaussian_filter1d(yarray, sigma=sigma_spline)
     #######
-    if smooth_sigma != None:
-        yarray = gaussian_filter1d(yarray, sigma=smooth_sigma)
+    if sigma_spline != None:
+        yarray = gaussian_filter1d(yarray, sigma=sigma_spline)
     ######
 
     spline = InterpolatedUnivariateSpline(xarray,yarray, k=4)
@@ -178,7 +180,7 @@ def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cu
                 plt.plot([tmp,tmp],[0,np.max(yarray)],"c",linewidth=0.5)
             plt.plot(r2,gr2,"r",label="Spline",linewidth=0.5)
             plt.show()
-        raise ValueError("Found {} extrema, consider smoothing the data with `smooth_sigma` option.".format(len(extrema)))
+        raise ValueError("Found {} extrema, consider smoothing the data with `sigma_spline` option.".format(len(extrema)))
     tmp_spline = spline.derivative().derivative()
     concavity = tmp_spline(extrema)
 
@@ -191,22 +193,50 @@ def pull_extrema( xarray, yarray, smooth_sigma=None, error_length=25, extrema_cu
             maxima.append([rtmp, spline(rtmp)])
 
     inflections = []
-    tmp_inflections = InterpolatedUnivariateSpline(xarray,yarray, k=5).derivative().derivative().roots().tolist()
+    spline_concavity = InterpolatedUnivariateSpline(xarray,yarray, k=5).derivative().derivative()
+    tmp_inflections = spline_concavity.roots().tolist()
+    if sigma_ddspline is not None:
+        spline_concavity_smooth = InterpolatedUnivariateSpline( 
+            xarray, 
+            gaussian_filter1d(spline_concavity(xarray), sigma=sigma_ddspline), 
+            k=3,
+        )
+        tmp_inflections = spline_concavity_smooth.roots().tolist()
     tmp_inflections = [x for x in tmp_inflections if np.abs(spline(x))>extrema_cutoff]
     for rtmp in tmp_inflections:
         inflections.append([rtmp, spline(rtmp)])
 
     if show_plot or save_plot:
-        plt.plot(xarray,yarray,"k",label="Data")
         xarray2 = np.linspace(xarray[0],xarray[-1],int(1e+4))
         yarray2 = spline(xarray2)
-        plt.plot(xarray2,yarray2,"r",linewidth=0.5,label="Spline")
-        for i in range(len(maxima)):
-            plt.plot([maxima[i][0],maxima[i][0]],[min(yarray),max(yarray)],"c",linewidth=0.5)
-        for i in range(len(minima)):
-            plt.plot([minima[i][0],minima[i][0]],[min(yarray),max(yarray)],"b",linewidth=0.5)
-        for i in range(len(inflections)):
-            plt.plot([inflections[i][0],inflections[i][0]],[min(yarray),max(yarray)],"r",linewidth=0.5)
+        if sigma_ddspline is not None:
+            ddtmp = spline_concavity(xarray)
+            fig, axs = plt.subplots( 2, 1, figsize=(4, 6), sharex=True)
+            axs[0].plot( xarray, yarray, "k", linewidth=0.5, label="Data")
+            axs[0].plot( xarray2, yarray2, "r", linewidth=0.5, linestyle="--", label="Spline")
+            for i in range(len(maxima)):
+                axs[0].plot([maxima[i][0],maxima[i][0]],[min(yarray),max(yarray)],"c",linewidth=0.5)
+            for i in range(len(minima)):
+                axs[0].plot([minima[i][0],minima[i][0]],[min(yarray),max(yarray)],"b",linewidth=0.5)
+            for i in range(len(inflections)):
+                axs[0].plot([inflections[i][0],inflections[i][0]],[min(yarray),max(yarray)],"r",linewidth=0.5)
+                axs[1].plot([inflections[i][0],inflections[i][0]],[min(ddtmp),max(ddtmp)],"r",linewidth=0.5)
+            axs[0].set_xlim( xarray[0], xarray[-1])
+            axs[0].set_title("Data and Spline")
+            axs[1].plot(xarray, ddtmp, "r", linewidth=0.5, label="Spline")
+            axs[1].plot(xarray, spline_concavity_smooth(xarray), "b", linewidth=0.5, linestyle="--", 
+                label="Smooth 2nd Derivative")
+            axs[1].plot([xarray[0], xarray[-1]],[0,0], "k", linewidth=0.5)
+            axs[1].set_title("Spline 2nd Derivative")
+        else:
+            plt.plot(xarray,yarray,"k",label="Data")
+            plt.plot(xarray2,yarray2,"r",linewidth=0.5,label="Spline")
+            for i in range(len(maxima)):
+                plt.plot([maxima[i][0],maxima[i][0]],[min(yarray),max(yarray)],"c",linewidth=0.5)
+            for i in range(len(minima)):
+                plt.plot([minima[i][0],minima[i][0]],[min(yarray),max(yarray)],"b",linewidth=0.5)
+            for i in range(len(inflections)):
+                plt.plot([inflections[i][0],inflections[i][0]],[min(yarray),max(yarray)],"r",linewidth=0.5)
         plt.xlim(xarray[0],xarray[-1])
         plt.tight_layout()
         if save_plot:
