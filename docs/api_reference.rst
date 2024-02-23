@@ -17,4 +17,7 @@
     scattering
     viscosity
     zeno
+    os_manipulation
+    data_manipulation
+    file_manipulation
     

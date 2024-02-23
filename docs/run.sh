@@ -7,7 +7,7 @@ cwd=$(pwd)
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd ${SCRIPT_DIR}
 
-if [ $2 == "True" ];
+if [[ $2 == "True" ]];
 then
     rm -rf _build
     rm -rf _autosummary
@@ -15,7 +15,7 @@ then
 #    make latexpdf
 fi
 
-if [ $1 == "True" ];
+if [[ $1 == "True" ]];
 then
     if [ ! -f "_build/html/index.html"  ];
     then
