@@ -61,9 +61,12 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
     cluster_arrays = []
     avg_nparticles = []
     largest_cluster = []
+    n_total_array = []
     maxparticles = 0
     for i, box in enumerate(boxes):
         cluster_array = rl.read_lammps_dump( os.path.join(target_dir.format(box),file_in), **tmp_kwargs)[0]
+        n_total = np.array([len(np.where(~np.isnan(x))[0]) for x in cluster_array])
+        n_total_array.append(list(dm.basic_stats(n_total)))
         if flag == "python":
             clust_sizes, nparticles = analyze_clustering(cluster_array, **kwargs_analysis)
         elif flag == "cython":
@@ -80,7 +83,7 @@ def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_
         
     bins = np.arange(0.5, maxparticles+1.5, 1)
     output = [bins[:-1]+0.5] + [np.histogram(x.flatten(), bins=bins)[0] for x in cluster_arrays]
-    header = ",".join(["#Avg number of nonpercolated beads: {}\n#Average size and standard deviation of largest cluster: {}\n#Particles/Cluster".format(avg_nparticles, largest_cluster)]+["Box {}".format(box) for box in boxes])
+    header = ",".join(["#Avg number of nonpercolated beads: {}\n#Average size and standard deviation of largest cluster: {}\n#Average number of beads in frame and std: {}\n#Particles/Cluster".format(avg_nparticles, largest_cluster, n_total_array)]+["Box {}".format(box) for box in boxes])
     fm.write_csv(file_out, np.array(output).T, delimiter=",", header=[header])
 
 def analyze_clustering(cluster_array, ncut=1, show_plot=False):
