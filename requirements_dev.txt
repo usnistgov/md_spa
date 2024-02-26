@@ -28,4 +28,3 @@ matplotlib
 numpy
 scipy
 lmfit>=1.1
-md_spa_utils
