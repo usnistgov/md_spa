@@ -21,10 +21,10 @@ except Exception:
     )
     flag_cython = False
 
+extensions = []
 if flag_cython:
     fpath = os.path.join("md_spa", "cython_modules")
     cython_list = glob.glob(os.path.join(fpath, "*.pyx"))
-    extensions = []
     for cyext in cython_list:
         cypath = list(os.path.split(cyext))
         cypath[-1] = cypath[-1].split(".")[-2]
