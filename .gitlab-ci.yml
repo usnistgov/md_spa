@@ -63,6 +63,7 @@ pages:
   stage: Deploy
   script:
   - pip install -r requirements_dev.txt
+  - pip install -e .
   - pip install -U sphinx sphinx-argparse sphinx_rtd_theme sphinx-jsonschema sphinxcontrib-svg2pdfconverter sphinxcontrib.blockdiag
   - sphinx-build -b html docs/ public
   artifacts:
