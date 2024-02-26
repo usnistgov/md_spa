@@ -1,15 +1,15 @@
+""" Combine LAMMPS output for coordination numbers.
+
+    Recommend loading with:
+    ``import md_spa.coordination_number as cn``
+
+"""
+
 import numpy as np
 import os
-import sys
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import matplotlib.image as img
-from scipy.interpolate import CubicSpline
-from scipy.interpolate import UnivariateSpline
 
-import md_spa_utils.data_manipulation as dm
-
-from . import read_lammps as f
+from md_spa.utils import data_manipulation as dm
+from md_spa import read_lammps as f
 
 def consolidate(target_dir, boxes, column_names, file_in="coord.lammpstrj", file_out="coord_histogram.txt", bins=None):
     """
@@ -23,11 +23,11 @@ def consolidate(target_dir, boxes, column_names, file_in="coord.lammpstrj", file
         List of entries that individually complete the path to a lammps data.
     column_names : list
         List of column names used the lammps dump file to indicate coordination data
-    file_in : str, Optional, default='coord.lammpstrj'
+    file_in : str, default='coord.lammpstrj'
         Name of lammps dump file with coordination information
-    file_out : str, Optional, default='coord_histogram.txt'
+    file_out : str, default='coord_histogram.txt'
         Filename for consolidated data file
-    bins : list, Optional, default = (0,20)
+    bins : list, default = (0,20)
         Define the range of bins in the histogram
 
     Returns

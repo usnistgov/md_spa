@@ -4,27 +4,15 @@ Welcome to MD-SPA's documentation!
 .. include:: readme.rst
 
 .. toctree::
-   :maxdepth: 2
    :caption: Contents:
 
    readme
    installation
-   usage
-   modules
    contributing
-   authors
    changelog
+   API Reference <_autosummary/md_spa>
 
-API Reference
-===================
-
-Contents:
-
-.. toctree::
-   :maxdepth: 1
-
-   api_reference
-
+.. include:: authors.rst
 
 Indices and tables
 ==================

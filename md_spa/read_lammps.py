@@ -1,14 +1,16 @@
+""" Functions to extract data from LAMMPS files.
 
+    Recommend loading with:
+    ``import md_spa.read_lammps as rl``
+
+"""
 
 import numpy as np
 import warnings
-import fileinput
 import os
 import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.image as img
 
-from md_spa_utils import data_manipulation as dm
+from md_spa.utils import data_manipulation as dm
 
 def read_lammps_ave_time(filename, dtype=float):
     """Read a LAMMPS ave/time file. Written By Lauren Abbott"""
@@ -61,7 +63,7 @@ def read_lammps_ave_time_flat(filename, dtype=float):
 
 def redefine_lammps_dump_timesteps( filename, timestep0, filename_out=None, overwrite=False, replace=False):
     """
-    Renumber timestamps in lammps dump file. This is most appropriate when one accidentally restarts the numbering when continuing a simulation.
+    Renumber timestamps in `LAMMPS dump file <https://docs.lammps.org/dump.html>`_. This is most appropriate when one accidentally restarts the numbering when continuing a simulation.
 
     Parameters
     ----------
@@ -69,11 +71,11 @@ def redefine_lammps_dump_timesteps( filename, timestep0, filename_out=None, over
         Filename and path to lammps dump file
     timestep0 : int
         The initial timestep the dump file should be set to. The later timesteps will be renumbered according to the frequency detected in the file.
-    filename_out : str, Optional, default=None
+    filename_out : str, default=None
         Filename and path for the output file. If None, the new dump file uses the given name and path with the prefix "renumbered\_".
-    overwrite : bool, Optional, default=False
+    overwrite : bool, default=False
         If True, and filename_out already exists, the file will be overwritten
-    replace : bool, Optional, default=False
+    replace : bool, default=False
         If True, the original file, filename, will be overwritten
 
     Returns
@@ -121,7 +123,7 @@ def redefine_lammps_dump_timesteps( filename, timestep0, filename_out=None, over
         os.system("mv {} {}".format(filename_out, filename))
 
 def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, unwrap=False, dtype=float):
-    """Read a LAMMPS dump file.
+    """Read a `LAMMPS dump file <https://docs.lammps.org/dump.html>`_.
 
     Note:
 
@@ -133,13 +135,13 @@ def read_lammps_dump(filename, col_name='', atom_indices=None, max_frames=None, 
     ----------
     filename : str
         Path and filename to lammps dump file
-    col_name : list/str, Optional, default=""
+    col_name : list/str, default=""
         A list of column names in the header or a specific column name to pull from the dump file
-    atom_indices : list, Optional, default=None
+    atom_indices : list, default=None
         A list of atom indices to pull from the trajectory where the indices start from 0 to N-1 (this function offsets the lammps default of numbering from 1 to N)
-    max_frames : int, Optional, default=None
+    max_frames : int, default=None
         Stop reading the file when this many timesteps have been read
-    unwrap : bool, Optional, default=False
+    unwrap : bool, default=False
         If the columns ['x', 'y', 'z'] are requested and the columns ['ix', 'iy', 'iz'] are found, the coordinates will be unwrapped. 
 
     Returns

@@ -1,18 +1,22 @@
-import os
+""" Function wrappers to quickly fit data with lmfit using reasonable initial guesses.
+
+    Recommend loading with:
+    ``import md_spa.custom_fit as cfit``
+
+"""
+
 import copy
-import warnings
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.optimize as spo
 import scipy.special as sps
 
 import lmfit
-from lmfit import minimize, Parameters
+from lmfit import Parameters
 
 
 def matrix_least_squares(xdata, ydata, sample_array={}, method="nnls", method_kwargs={}, function="exponential_decay", verbose=False):
-    """
-    Use non-negative least squares to determine a set of additive ``functions`` (e.g., exponential decay) to reproduce a data set. 
+    """ Use non-negative least squares to determine a set of additive ``functions`` (e.g., exponential decay) to reproduce a data set. 
+
     Unlike curve-fitting where the number of additive functions is predetermined and fit, the data is fit as sets of delta functions to reveal a smaller set of a yet unknown number of parameters. The result is highly accurate, but dependant on the parameters used to generate the ``sample_array`` and how fine the mesh is.
 
     The target function can only have two parameters. The first are the prefactors of the linearly combined functions which must sum to unity. The second lies within a more complicated functional form and so is captured in a matrix of trial values (e.g., np.exp(np.outer(-xdata, 1/tau_array))).
@@ -23,22 +27,22 @@ def matrix_least_squares(xdata, ydata, sample_array={}, method="nnls", method_kw
         Independent data set
     ydata : numpy.ndarray
         Dependent data set
-    sample_array : dict, Optional, default={mode: "log", lower: "-4", "upper": 4, npts: 1e+5}
+    sample_array : dict, default={mode: "log", lower: "-4", "upper": 4, npts: 1e+5}
         Details of producing an array of arbitrary length for possible values of the parameter within the functional form. This array may be generated on a linear or log scale by specifying the ``mode``. If the ``mode`` is "log" the default values are {lower: "-4", "upper": 4, Npts: 1e+5}, if the mode is "linear", the default parameters are {lower: 1e-4, "upper": 1e+4, Npts: 1e+4}. These arrays are produced with np.logspace and np.linspace, respectively.
 
         - mode (str): Choose between an array generated on a "linear" or "log" scale
         - lower (float): Lower bound of array
         - upper (float): Upper bound of array
         - npts (int): Number of points in array
-        - **kwargs: Additional keyword arguments for np.logspace or np.linspace
+        - \*\*kwargs: Additional keyword arguments for np.logspace or np.linspace
 
-    method : str, Optional, default="nnls"
+    method : str, default="nnls"
         Default method of solving, can be "nnls" or "lsq_linear" corresponding to the functions in ``scipy.optimize``.
-    method_kwargs : dict, Optional, default={}
+    method_kwargs : dict, default={}
         Additional keyword arguments used in chosen ``scipy.optimize`` method. For ``method=="lsq_linear"``, ``method_kwargs={"bounds": (0, np.inf), tol=1e-16, method="bvls"}``
-    function : str, Optional, default="exponential_decay"
+    function : str, default="exponential_decay"
         Function type of which a linear combination reproduced the dependent data. Options include: "exponential_decay". 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting information. (Also see method_kwargs)
 
     Returns
@@ -122,8 +126,8 @@ def matrix_least_squares(xdata, ydata, sample_array={}, method="nnls", method_kw
 
 
 def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
-    """
-    Provided data fit to:
+    r"""
+    Provided data fit to: :math:`y = \eta / \eta_0 = 1 + A\sqrt{x} + Bx` via :math:`y' = (y-1/\sqrt{x}) = A + B\sqrt{x}`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -133,19 +137,19 @@ def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_pa
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}``
         - ``"B" = {"value": 0.0, "min": -1e+3, "max":1e+3}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
 
     Returns
@@ -155,7 +159,7 @@ def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_pa
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'B']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
     kwargs_min = copy.deepcopy(kwargs_minimizer)
@@ -197,8 +201,8 @@ def jones_dole(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_pa
     Params = Parameters()
     Params.add("A", **param_kwargs["A"])
     Params.add("B", **param_kwargs["B"])
-    if minimizer in ["leastsq"]:
-        kwargs_min["Dfun"] = _d_jones_dole
+    #if minimizer in ["leastsq"]:
+    #    kwargs_min["Dfun"] = _d_jones_dole
     Result1 = lmfit.minimize(_res_jones_dole, Params, method=minimizer, args=(xarray, yarray), kws={"switch": switch, "weighting": weighting}, **kwargs_min)
 
     # Format output
@@ -251,7 +255,7 @@ def _d_jones_dole(params, xarray, yarray, switch=None,  weighting=None):
 
 def exponential_decay(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False, log_transform=False):
     """
-    Provided data fit to:
+    Provided data fit to: :math:`y = a_1\exp(-x/t_1)`, or alternatively as: :math:`\log(y) = \log(a_1) - x/t_1`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -261,21 +265,21 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"a1" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}``
         - ``"t1" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
-    log_transform : bool, Optional, default=False
+    log_transform : bool, default=False
         Choose whether to transform the data with the log of both sides
 
     Returns
@@ -285,7 +289,7 @@ def exponential_decay(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["a1", t1']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_ 
         
     """
 
@@ -381,7 +385,7 @@ def _d_exponential_decay(params, xarray, yarray, switch=None, weighting=None, lo
 
 def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False, log_transform=False, ymax=None, ymin=None):
     """
-    Provided data fit to:
+    Provided data fit to: :math:`y_i = A_i\exp(-x D q_i)`, or alternatively as: :math:`\log(y_i) = \log(A_i) - x D q_i`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -391,27 +395,27 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
         independent data set
     ymatrix : numpy.ndarray
         dependent data set where each row is a function to be fit corresponding to each q_value. Shape is ``(len(q_array), len(xdata))``
-   q_array : numpy.ndarray
+    q_array : numpy.ndarray
         q-values associated with first dimension of ``ymatrix``
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3, "vary": False}`` Prefactor, one created for every q-value unless {"equal": True}
         - ``"D" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
-    log_transform : bool, Optional, default=False
+    log_transform : bool, default=False
         Choose whether to transform the data with the log of both sides
-    ymax : float, Optional, default=None
+    ymax : float, default=None
         Maximum value of the exponential decay to capture the long time relaxation only
-    ymin : float, Optional, default=None
+    ymin : float, default=None
         Minimum value of the exponential decay to capture the short time relaxation only
 
     Returns
@@ -421,8 +425,8 @@ def q_dependent_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq",
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", D']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
-        
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
+
     """
 
     xdata = np.array(xdata)
@@ -541,8 +545,8 @@ def _res_q_dependent_exponential_decay(params, xdata, ymatrix, q_array, switch=N
 
 
 def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False, ymax=None, ymin=None):
-    """
-    Provided data fit to:
+    r"""
+    Provided data fit to: :math:`y_i = A_i\exp(-x D q_i) + (1-A_i)\exp(-x^{\beta} / \tau^{\beta})`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -552,16 +556,16 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
         independent data set
     ymatrix : numpy.ndarray
         dependent data set where each row is a function to be fit corresponding to each q_value. Shape is ``(len(q_array), len(xdata))``
-   q_array : numpy.ndarray
+    q_array : numpy.ndarray
         q-values associated with first dimension of ``ymatrix``
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"D" = {"value": 0.1, "min": np.finfo(float).eps, "max":1e+3}``
         - ``"taubeta" = {"value": 1.0, "min": np.finfo(float).eps, "max": 1e+4}``
@@ -569,11 +573,11 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
         - ``"A" = {"value": 1.0, "min": np.finfo(float).eps, "max":1.0}`` Prefactor, one created for every q-value unless {"equal": True}
         - ``"A*" = {"value": 1.0}`` May provide individual coefficients, value only. 
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
-    ymax : float, Optional, default=None
+    ymax : float, default=None
         Maximum value of the exponential decay to capture the long time relaxation only
-    ymin : float, Optional, default=None
+    ymin : float, default=None
         Minimum value of the exponential decay to capture the short time relaxation only
 
     Returns
@@ -583,7 +587,7 @@ def q_dependent_stretched_and_exponential_decay(xdata, ymatrix, q_array,  minimi
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", D']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -702,12 +706,10 @@ def _res_q_dependent_stretched_and_exponential_decay(params, xdata, ymatrix, q_a
 
 
 def q_dependent_hydrodynamic_exponential_decay(xdata, ymatrix, q_array,  minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False, ymax=None, ymin=None):
-    """
-    Provided data fit to:
+    r""" 
+    Provided data fit to: :math:`y_i = (1-C_i)[\exp(-x G q_i^2)\cos(c q_i x) + q_ix\sin(c q_i x)/c] + C_i\exp(-x/\tau)`
 
-    Values of zero and NaN are ignored in the fit.
-
-    The parameter ``C`` should be q-dependent, but for now we assume it's constant
+    Values of zero and NaN are ignored in the fit. The parameter ``C`` should be q-dependent, but for now we assume it's constant.
 
     Parameters
     ----------
@@ -715,27 +717,27 @@ def q_dependent_hydrodynamic_exponential_decay(xdata, ymatrix, q_array,  minimiz
         independent data set
     ymatrix : numpy.ndarray
         dependent data set where each row is a function to be fit corresponding to each q_value. Shape is ``(len(q_array), len(xdata))``
-   q_array : numpy.ndarray
+    q_array : numpy.ndarray
         q-values associated with first dimension of ``ymatrix``
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"C" = {"value": 0.5, "min": np.finfo(float).eps, "max":1}`` Prefactor, one created for every q-value unless {"equal": True}
         - ``"G" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}`` The Acoustic Attenuation
         - ``"c" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}``: The sound velocity
         - ``"tau" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+3}`` Relaxation of Q0-mode
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
-    ymax : float, Optional, default=None
+    ymax : float, default=None
         Maximum value of the exponential decay to capture the long time relaxation only
-    ymin : float, Optional, default=None
+    ymin : float, default=None
         Minimum value of the exponential decay to capture the short time relaxation only
 
     Returns
@@ -745,7 +747,8 @@ def q_dependent_hydrodynamic_exponential_decay(xdata, ymatrix, q_array,  minimiz
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", D']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
+ 
         
     """
 
@@ -861,8 +864,8 @@ def _res_q_dependent_hydrodynamic_exponential_decay(params, xdata, ymatrix, q_ar
 
 
 def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False):
-    """
-    Provided data fit to:
+    r"""
+    Provided data fit to: :math:`y = a_1\exp(-x / t_1) + a_2\exp(-x / t_2)`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -872,14 +875,14 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
 
         - ``"a1" = {"value": 0.8, "min": 0, "max":1}``
@@ -887,9 +890,9 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
         - ``"a2" = {"value": 0.2, "min": 0, "max":1, "expr":"1 - a1"}``
         - ``"t2" = {"value": 0.05, "min": np.finfo(float).eps, "max":1e+3}``
 
-    tau_logscale : bool, Optional, default=False
+    tau_logscale : bool, default=False
         Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -899,7 +902,7 @@ def two_exponential_decays(xdata, ydata, minimizer="leastsq", weighting=None, kw
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['a1', 't1', 'a2', 't2']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_ 
         
     """
 
@@ -1058,7 +1061,7 @@ def _d_two_exponential_decays(params0, xarray, yarray, switch=None, weighting=No
 
 def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False, weighting=None):
     """
-    Provided data fit to:
+    Provided data fit to: :math:`y = a_1\exp(-x / t_1) + a_2\exp(-x / t_2) + a_3\exp(-x / t_3)`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -1068,12 +1071,12 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
 
         - ``"a1" = {"value": 0.8, "min": 0, "max":1}``
@@ -1083,11 +1086,11 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
         - ``"a3" = {"value": 0.01, "min": 0, "max":1, "expr":"1 - a1 - a2"}``
         - ``"t3" = {"value": 0.02, "min": np.finfo(float).eps, "max":1e+3}``
 
-    tau_logscale : bool, Optional, default=False
+    tau_logscale : bool, default=False
         Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -1097,7 +1100,7 @@ def three_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['a1', 't1', 'a2', 't2', 'a3', 't3']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -1297,8 +1300,7 @@ def _d_three_exponential_decays(params0, xarray, yarray, switch=None, weighting=
 
 def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, tau_logscale=False, verbose=False):
     r"""
-    Provided data fit to: 
-    ..math:`y= (1 - C)exp(-(x/\tau_{1})) + C(1+A)exp(-(x/\tau_{2})) + C \cdot Aexp(-(x/\tau_{3}))` 
+    Provided data fit to: :math:`y = (1 - C)\exp(-x/t_1) + C(1+A)\exp(-x/t_2) + C \cdot A\exp(-x/t_3)` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -1308,12 +1310,12 @@ def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_mi
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"C" = {"value": 0.8, "min": 0, "max":1}``
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
@@ -1321,9 +1323,9 @@ def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_mi
         - ``"t2" = {"value": 0.09, "min": np.finfo(float).eps, "max":1e+4}``
         - ``"t3" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4``
 
-    tau_logscale : bool, Optional, default=False
+    tau_logscale : bool, default=False
         Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -1333,7 +1335,7 @@ def scattering_3_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_mi
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['C', 'A', 't1', 't2', 't3']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_ 
         
     """
 
@@ -1474,8 +1476,8 @@ def _d_scattering_3_exponential_decays(params0, xarray, yarray, switch=None):
 
 
 def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
-    """
-    Provided data fit to:
+    r"""
+    Provided data fit to: :math:`y = \exp(-x^{\beta}/\tau^{\beta})` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -1485,19 +1487,19 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"taubeta" = {"value": 1.0, "min": np.finfo(float).eps, "max":1e+4}`` : Calculated as a constant, the time constant can be extract when beta is known.
         - ``"beta" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -1507,7 +1509,7 @@ def stretched_exponential_decay(xdata, ydata, minimizer="leastsq", kwargs_minimi
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: [beta']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -1603,8 +1605,8 @@ def _d_stretched_exponential_decay(params, xarray, yarray, switch=None, weightin
 
 
 def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
-    """
-    Provided data fit to:
+    r"""
+    Provided data fit to: :math:`y = A\exp(-x^{\beta_1}/\tau_1^{\beta_1}) + (1-A)\exp(-x^{\beta_2}/\tau_2^{\beta_2})` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -1614,14 +1616,14 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
@@ -1630,7 +1632,7 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
         - ``"tau2beta2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
         - ``"beta2" = {"value": 3/2, "min": np.finfo(float).eps, "max":5}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -1640,7 +1642,7 @@ def two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_m
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -1756,8 +1758,8 @@ def _d_two_stretched_exponential_decays(params, xarray, yarray, switch=None, wei
 
 
 def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
-    """
-    Provided data fit to a regular and stretched exponential
+    r"""
+    Provided data fit to: :math:`y = A\exp(-x^{\beta_1}/\tau_1^{\beta_1}) + (1-A)\exp(-x/\tau_2)` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -1767,14 +1769,14 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A" = {"value": 0.8, "min": 0, "max":1}``
@@ -1782,7 +1784,7 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         - ``"beta1" = {"value": 1/2, "min": np.finfo(float).eps, "max":5}``
         - ``"tau2" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -1792,7 +1794,7 @@ def reg_n_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1', 'beta1', 'tau2', 'beta2']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -1903,8 +1905,8 @@ def _d_reg_n_stretched_exponential_decays(params, xarray, yarray, switch=None, w
 
 
 def reg_n_two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
-    """
-    Provided data fit to a regular and two stretched exponential decays
+    r"""
+    Provided data fit to: :math:`y = A_1\exp(-x^{\beta_1}/\tau_1^{\beta_1}) + A_2\exp(-x^{\beta_2}/\tau_2^{\beta_2}) + (1-A_1-A_2)\exp(-x/\tau_3)`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -1914,14 +1916,14 @@ def reg_n_two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kw
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A1" = {"value": 0.8, "min": 0, "max":1}``
@@ -1932,7 +1934,7 @@ def reg_n_two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kw
         - ``"beta2" = {"value": 2, "min": np.finfo(float).eps, "max":5}``
         - ``"tau3" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+2}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -1942,7 +1944,7 @@ def reg_n_two_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kw
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1beta1', 'beta1', 'tau2beta2', 'beta2', 'tau3']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -2066,8 +2068,8 @@ def _d_reg_n_two_stretched_exponential_decays(params, xarray, yarray, switch=Non
 
 
 def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False, weighting=None):
-    """
-    Provided data fit to three stretched exponential decays
+    r"""
+    Provided data fit to: :math:`y = A_1\exp(-x^{\beta_1}/\tau_1^{\beta_1}) + A_2\exp(-x^{\beta_2}/\tau_2^{\beta_2}) + (1-A_1-A_2)\exp(-x^{\beta_3}/\tau_3^{\beta_3})`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -2077,14 +2079,14 @@ def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
         Although ``kwargs_parameters["a2"]["expr"]`` can be overwritten to be None, no other expressions can be specified for vaiables if the method ``leastsq`` is used, as the Jacobian does not support this.
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
 
         - ``"A1" = {"value": 0.8, "min": 0, "max":1}``
@@ -2096,7 +2098,7 @@ def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
         - ``"tau3beta3" = {"value": 0.5, "min": np.finfo(float).eps, "max":1e+4}``
         - ``"beta3" = {"value": 2, "min": np.finfo(float).eps, "max":5}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -2106,7 +2108,7 @@ def three_stretched_exponential_decays(xdata, ydata, minimizer="leastsq", kwargs
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'tau1beta1', 'beta1', 'tau2beta2', 'beta2', 'tau3beta3', 'beta3',]
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -2235,18 +2237,18 @@ def _d_three_stretched_exponential_decays(params, xarray, yarray, switch=None, w
 
 def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
     """
-    Fit Gaussian function to data with ``lmfit.GaussianModel``
+    Fit Gaussian function to data with `lmfit.GaussianModel <https://lmfit.github.io/lmfit-py/builtin_models.html#lmfit.models.GaussianModel>`_
 
     Parameters
     ----------
     xdata : numpy.ndarray
         independent data set
     ydata : dependent data set
-    fit_kws : dict, Optional, default={}
-        Keywords used in ``lmfit.minimize``
-    set_parameters : dict, Optional, default={}
-        Dictionary where keys are one of the Gaussian parameters: "center", "amplitude", "height", "sigma", "fwhm" and the value is a dictionary containing parameter settings according to ``lmfit.Model.set_param_hint()``
-    verbose : bool, Optional, default=False
+    fit_kws : dict, default={}
+        Keywords used in `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    set_parameters : dict, default={}
+        Dictionary where keys are one of the Gaussian parameters: "center", "amplitude", "height", "sigma", "fwhm" and the value is a dictionary containing parameter settings according to `lmfit.Model.set_param_hint() <https://lmfit.github.io/lmfit-py/model.html#lmfit.model.Model.set_param_hint>`_
+    verbose : bool, default=False
         If true, final parameters will be printed
 
     Returns
@@ -2256,7 +2258,7 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
     stnd_errors : numpy.ndarray
         Array containing uncertainties for parameters
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_ 
     
     """
 
@@ -2291,8 +2293,8 @@ def gaussian(xdata, ydata, fit_kws={}, set_params={}, verbose=False):
 
 
 def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
-    """
-    Fit data to a flexible number of gaussian functions. Parameters are ``"a{}".format(n_gaussians)``, ``"b{}".format(n_gaussians)``, and ``"c{}".format(n_gaussians)``.
+    r"""
+    Fit data to a flexible number of gaussian functions: :math:`\sum^{num}_{i} a_i\exp(-(x-b_i)^2 / (2c_i^2))` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -2304,18 +2306,18 @@ def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, k
         dependent data set
     num : int
         Number of Gaussian functions in model
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"a{}".format(n_gaussian) = {"value": 1.0, "min": 0, "max":1e+4}``
         - ``"b{}".format(n_gaussian) = {"value": 1.0}``
         - ``"c{}".format(n_gaussian) = {"value": 0.1, "min": 0, "max":1e+4}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -2325,7 +2327,7 @@ def n_gaussians(xarray, yarray, num, minimizer="leastsq", kwargs_minimizer={}, k
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: [t1']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -2412,7 +2414,7 @@ def _d_n_gaussians(params, xarray, yarray, num):
 
 def cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
     """
-    Fit data to a cumulative exponential: ``f(x)=A*(1-np.exp(-x/lc)) + C``
+    Fit data to a cumulative exponential: :math:`y = A(1-\exp(-x/l_c)) + C`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -2422,20 +2424,20 @@ def cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kw
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="nelder"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add() <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"A": {"value": np.nanmax(yarray), "min": 0.0, "max": 1e+4}``
         - ``"lc": {"value": np.max(xarray), "min": np.finfo(float).eps, "max":1e+4}``
         - ``"C": {"value": 0.0, "min": -1e+4, "max": 1e+4}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -2445,7 +2447,7 @@ def cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kw
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'lc', 'C']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_ 
         
     """
 
@@ -2561,9 +2563,8 @@ def _d_cumulative_exponential(params, xarray, yarray, weighting=None, switch=Non
 
 
 def stretched_cumulative_exponential(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False):
-    """
-    Fit data to a cumulative stretch exponential: ``f(x)=A*(1-np.exp(-(x/lc)**beta)) + C``
-    This function is fit with the expression ``f(x)=A*(1-np.exp(-(x)**beta/lc_beta)) + C`` and lc is derived from the resulting exponential
+    r"""
+    Fit data to a cumulative stretch exponential: :math:`y = A(1-\exp(-x^\beta/l_c^\beta) + C`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -2573,21 +2574,21 @@ def stretched_cumulative_exponential(xdata, ydata, minimizer="leastsq", weightin
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="nelder"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"A": {"value": np.nanmax(yarray), "min": 0.0, "max": 1e+4}``
         - ``"lc_beta": {"value": np.max(xarray), "min": np.finfo(float).eps, "max":1e+4}``
         - ``"beta": {"value": 0.5, "min": 0.0, "max":1.0}``
         - ``"C": {"value": 0.0, "min": -1e+4, "max": 1e+4}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -2597,7 +2598,7 @@ def stretched_cumulative_exponential(xdata, ydata, minimizer="leastsq", weightin
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ['A', 'lc', 'beta', 'C']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -2716,8 +2717,7 @@ def _d_stretched_cumulative_exponential(params, xarray, yarray, weighting=None, 
 
 def double_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}, include_C=False):
     r"""
-    Provided data fit to:
-    ..math:`y= A_{1}*\{alpha}*(1-exp(-(x/\tau_{1}))) + A_{2}*(1-\{alpha})*(1-exp(-(x/\tau_{2}))) +C` 
+    Provided data fit to: :math:`y = A\alpha(1-\exp(-x/\tau_1)) + A(1 - \alpha)(1-\exp(-x/\tau_2))` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -2727,22 +2727,21 @@ def double_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=Fal
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
-        Fitting method supported by ``lmfit.minimize``
-    verbose : bool, Optional, default=False
+    minimizer : str, default="nelder"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    verbose : bool, default=False
         Output fitting statistics
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"A": {"value": max(yarray), "min": 0, "max":1e+4}``
         - ``"alpha": {"value": 0.1, "min": 0, "max":1.0}``
         - ``"tau1": {"value": xarray[yarray==max(yarray)][0], "min": np.finfo(float).eps, "max":1e+4}``
         - ``"tau2": {"value": xarray[yarray==max(yarray)][0]/2, "min": np.finfo(float).eps, "max":1e+4}``
-        - ``"C": {"value": 0.0, "min": 0, "max":np.max(yarray)}``
 
     include_C : bool, default=False
         Whether to include vertical offset
@@ -2754,7 +2753,7 @@ def double_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=Fal
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", "alpha", "tau1", "tau2"]
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -2834,8 +2833,7 @@ def _res_double_cumulative_exponential(x, xarray, yarray, weighting=None):
 
 def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="leastsq", verbose=False, weighting=None, kwargs_minimizer={}, kwargs_parameters={}):
     r"""
-    Provided data fit to:
-    ..math:`y= A*\{alpha}*\tau_{1}*(1-exp(-(x/\tau_{1}))) + A*(1-\{alpha})*\tau_{2}*(1-exp(-(x/\tau_{2})))` 
+    Provided data fit to: :math:`y = A\alpha\tau_1*(1-\exp(-x/\tau_1)) + A*(1-\alpha)\tau_2(1-\exp(-x/\tau_2))` 
 
     Values of zero and NaN are ignored in the fit.
 
@@ -2845,16 +2843,16 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="leastsq", v
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
-        Fitting method supported by ``lmfit.minimize``
-    verbose : bool, Optional, default=False
+    minimizer : str, default="nelder"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    verbose : bool, default=False
         Output fitting statistics
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"A": {"value": max(yarray), "min": 0, "max":1e+4}``
         - ``"alpha": {"value": 0.1, "min": 0, "max":1.0}``
@@ -2868,7 +2866,7 @@ def double_viscosity_cumulative_exponential(xdata, ydata, minimizer="leastsq", v
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", "alpha", "tau1", "tau2"]
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -2971,7 +2969,7 @@ def _d_double_viscosity_cumulative_exponential(params, xarray, yarray, weighting
 
 def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, kwargs_parameters={}, kwargs_minimizer={}):
     """
-    Provided data fit to: ..math:`A*x^{b}` after linearizing with a log transform.
+    Provided data fit to: :math:`y = Ax^{b}` via :math:`\log(y) = \log(A) + b\log(x)`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -2981,17 +2979,17 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="nelder"
-        Fitting method supported by ``lmfit.minimize``
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    minimizer : str, default="nelder"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"A" = {"value": 1, "min": 0, "max":1e+4}``
         - ``"b" = {"value": 2, "min": 0, "max":100}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -3001,7 +2999,7 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["A", "b"]
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 
@@ -3067,8 +3065,8 @@ def power_law(xdata, ydata, minimizer="nelder", verbose=False, weighting=None, k
 
 
 def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs_minimizer={}, kwargs_parameters={}, verbose=False,):
-    """
-    Provided data fit to: ..math:`A*x^{b}` after linearizing with a log transform.
+    r"""
+    Provided data fit to: :math:`y = \beta^{\alpha} x^{\alpha-1} exp(-\beta x)`
 
     Values of zero and NaN are ignored in the fit.
 
@@ -3078,19 +3076,19 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
         independent data set
     ydata : numpy.ndarray
         dependent data set
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    weighting : numpy.ndarray, Optional, default=None
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimizer()``
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
     kwargs_parameters : dict, Optional
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
 
         - ``"alpha" = {"value": 0.1, "min": 0, "max":100}``
         - ``"beta" = {"value": 1.0, "min": 0, "max":100}``
 
-    verbose : bool, Optional, default=False
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns
@@ -3100,7 +3098,7 @@ def gamma_distribution(xdata, ydata, minimizer="leastsq", weighting=None, kwargs
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors: ["alpha", "beta"]
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
         
     """
 

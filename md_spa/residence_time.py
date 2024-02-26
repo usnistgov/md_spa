@@ -1,3 +1,9 @@
+""" Extract meaningful data from residence time data
+
+    Recommend loading with:
+    ``import md_spa.residence_time as rt``
+
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -5,14 +11,13 @@ import os
 import copy
 import warnings
 
-import md_spa_utils.file_manipulation as fm
-import md_spa_utils.data_manipulation as dm
-
-from . import custom_fit as cfit
+from md_spa.utils import file_manipulation as fm
+from md_spa.utils import data_manipulation as dm
+from md_spa import custom_fit as cfit
 
 def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, tau_logscale=False):
     """
-    Extract the characteristic times fit and weighted with one, two, and three exponential functions for a total of three fits. Because the prefactors sum to unity, the total characteristic time is equal to a sum weighted by the prefactors. See ``custom_fit.exponential`` for more details.
+    Extract the characteristic times fit and weighted with one, two, and three exponential functions for a total of three fits. Because the prefactors sum to unity, the total characteristic time is equal to a sum weighted by the prefactors. See :func:`md_spa.custom_fit.exponential` for more details.
 
     Parameters
     ----------
@@ -20,21 +25,21 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         Independent data set ranging from 0 to some quantity
     ydata : numpy.ndarray
         Dependent data set, starting at unity and decaying exponentially 
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    verbose : bool, Optional, default=False
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    verbose : bool, default=False
         Output fitting statistics
-    save_plots : bool, Optional, default=False
+    save_plots : bool, default=False
         If not None, plots comparing the exponential fits will be saved to this filename 
-    plot_name : str, Optional, default=None
+    plot_name : str, default=None
         Plot filename and path
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         If true, the fits will be shown
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimize()``
-    ydata_min : float, Optional, default=0.1
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    ydata_min : float, default=0.1
         Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
-    tau_logscale : bool, Optional, default=False
+    tau_logscale : bool, default=False
         Have minimization algorithm fit the residence times with a log transform to search orders of magnitude
 
     Returns
@@ -185,23 +190,23 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
     ----------
     filename : str
         Input filename and path to file with two column format
-    fileout : str, Optional, default="res_time.csv"
+    fileout : str, default="res_time.csv"
         Filename of output .csv file
-    mode : str, Optional, default="a"
+    mode : str, default="a"
         Mode used in writing the csv file, either "a" or "w".
-    delimiter : str, Optional, default=","
+    delimiter : str, default=","
         Delimiter between data in input file
-    titles : list[str], Optional, default=None
-        Titles for plots if that is specified in the ``kwargs_find_diffusivity`` or ``kwargs_debye_waller``
-    additional_entries : list, Optional, default=None
+    titles : list[str], default=None
+        Titles for plots if that is specified in the ``kwargs_fit``
+    additional_entries : list, default=None
         This iterable structure can contain additional information about this data to be added to the beginning of the row
-    additional_header : list, Optional, default=None
+    additional_header : list, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the `additional_entries` list.
-    kwargs_fit : dict, Optional, default={}
+    kwargs_fit : dict, default={}
         Keywords for `characteristic_time` function
-    file_header_kwargs : dict, Optional, default={}
-        Keywords for ``md_spa_utils.os_manipulation.file_header`` function    
-    verbose : bool, Optional, default=False
+    file_header_kwargs : dict, default={}
+        Keywords for :func:`md_spa.os_manipulation.file_header` function    
+    verbose : bool, default=False
         Output fitting statistics
 
     Returns

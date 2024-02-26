@@ -34,12 +34,6 @@ You can either clone the public repository:
 
     $ git clone git://gitlab.com/jac16/md_spa
 
-Or download the `tarball`_:
-
-.. code-block:: console
-
-    $ curl -OJL https://git@gitlab.nist.gov/jac16/md-spa/tarball/master
-
 Once you have a copy of the source, you can install it with:
 
 .. code-block:: console
@@ -48,4 +42,3 @@ Once you have a copy of the source, you can install it with:
 
 
 .. _GitLab repo: https://git@gitlab.nist.gov/jac16/md-spa
-.. _tarball: https://git@gitlab.nist.gov/jac16/md-spa/tarball/master

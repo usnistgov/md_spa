@@ -1,10 +1,14 @@
+""" Process `Zeno <https://zeno.nist.gov>`_ output file to a dictionary
+    Recommend loading with:
+    ``import md_spa.zeno as zeno``
+
+"""
 
 import os
-import copy
 import warnings
 import numpy as np
 
-import md_spa_utils.data_manipulation as dm
+from md_spa.utils import data_manipulation as dm
 
 def extract_csv(filename, extract_array=None):
     """
@@ -16,7 +20,7 @@ def extract_csv(filename, extract_array=None):
     ----------
     filename : str
         Filename and path for zeno .csv output file
-    extract_array : list[str], Optional, default=None
+    extract_array : list[str], default=None
         List of lines headers, where the value, units, and std_dev will be pulled. By default values for the following are pulled: "hydrodynamic_radius","gyration_eigenvalues[0]","gyration_eigenvalues[1]","gyration_eigenvalues[2]","intrinsic_viscosity".
 
     Returns

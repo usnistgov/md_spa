@@ -1,17 +1,21 @@
+""" Calculate the intermediate scattering function and static structure factor using an isotropic assumption.
+
+    Recommend loading with:
+    ``import md_spa.scattering as scat``
+
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 
-from md_spa_utils import file_manipulation as fm
-from md_spa_utils import data_manipulation as dm
-
 from scipy.interpolate import InterpolatedUnivariateSpline
 
-from .cython_modules import _scattering_functions as scat
-from . import misc_functions as mf
-from . import read_lammps as rl
-from . import custom_fit as cfit
+from md_spa.cython_modules import _scattering_functions as scat
+from md_spa import misc_functions as mf
+from md_spa import custom_fit as cfit
+from md_spa.utils import file_manipulation as fm
+from md_spa.utils import data_manipulation as dm
 
 
 def scattering_length(elements, natoms, scattering_type):
@@ -69,7 +73,7 @@ def finite_size_correction(q_value, NR, natoms, dims, R=None):
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
-    R : float, Optional, default=None
+    R : float, default=None
         Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used.        
 
     Returns
@@ -108,7 +112,7 @@ def n_particles_radius_R(q_value, natoms, dims, R=None):
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
-    R : float, Optional, default=None
+    R : float, default=None
         Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used.        
 
     Returns
@@ -145,7 +149,7 @@ def isotropic_weighted_incoherent_distances( displacements, f_values, q_values, 
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
-    R : float, Optional, default=None
+    R : float, default=None
         Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used. 
 
     Returns
@@ -215,9 +219,9 @@ def isotropic_weighted_coherent_distances( displacements, f_reference, f_values,
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
-    R : float, Optional, default=None
+    R : float, default=None
         Spherical cutoff value. This should rarely be set unless a q_value less than 2*np.pi/(L/2) is used. 
-    include_self : bool, Optional, default=True
+    include_self : bool, default=True
         If False, the self displacements are discarded
 
     Returns
@@ -279,16 +283,16 @@ def static_structure_factor(traj, dims, elements=None, sigma=1, kwargs_linspace=
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
-    elements : list, Optional, default=None
+    elements : list, default=None
         List of atom elements symbols from which to pull the atomic form factor. 
         Note that an isotope may be chosen by preceeding the elemental symbol with the 
         number of neutrons. If None, f_values of one are used.
-    sigma : float, Optional, default=1
+    sigma : float, default=1
         The particle size in the system used to define q_max = 2*np.pi/sigma
-    kwargs_linspace : dict, Optional, default={"num":200}
+    kwargs_linspace : dict, default={"num":200}
         Keyword arguments for np.linspace function to produce q array to calculate the 
         structure factor 
-    flag : str, Optional, default='python'
+    flag : str, default='python'
         Choose 'python' implementation or accelerated 'cython' option.
 
     Returns
@@ -343,7 +347,7 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
 
     Note that if the calculation for the whole system or specific atom types is desired without further
     breakdown into subcategories (e.g., hydration shells) consider a faster alternative `LiquidLab 
-    <https://z-laboratory.github.io/LiquidLib/>`  
+    <https://z-laboratory.github.io/LiquidLib/>`_
 
     Note that self displacements are identified from displacements less than machine precision in the first
     frame. Thus, the trajectory must start from t=0.
@@ -357,24 +361,24 @@ def collective_intermediate_scattering(traj, dims, elements=None, q_value=2.25, 
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
-    elements : list, Optional, default=None
+    elements : list, default=None
         List of atom elements symbols from which to pull the atomic form factor. 
         Note that an isotope may be chosen by preceeding the elemental symbol with the 
         number of neutrons. If ``None``, f_values of one are used.
-    q_value : float, Optional, default=2.25
+    q_value : float, default=2.25
         The qvalue at which to calculate the isotropic static structure factor. The default
         value of 2.25 inverse angstroms comes from DOI:10.1063/1.4941946
-    group_ids : list[lists], Optional, default=None
+    group_ids : list[lists], default=None
         Optional list of group ids will produce the total c-isf, in addition to c-isf of other groups 
         (if any) as determined by ``group_cross_interaction``.
-    group_cross_interaction : bool, Optional, default=False
+    group_cross_interaction : bool, default=False
         If True, the group_id list is computed between all permutations of itself and other group_ids lists. The use of 
         the theory we applied in these functions is for homogenous systems and this option may not be mathematically 
         valid.
         If False, each group_id list is computed between itself and all other particles
-    flag : str, Optional, default='python'
+    flag : str, default='python'
         Choose 'python' implementation or accelerated 'cython' option.
-    include_self : bool, Optional, default=True
+    include_self : bool, default=True
         If False, the self displacements are discarded leaving only the distinct signal
 
     Returns
@@ -484,7 +488,7 @@ def self_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="
 
     Note that if the calculation for the whole system or specific atom types is desired without further
     breakdown into subcategories (e.g., hydration shells) consider a faster alternative `LiquidLab 
-    <https://z-laboratory.github.io/LiquidLib/>`  
+    <https://z-laboratory.github.io/LiquidLib/>`_ 
 
     Parameters
     ----------
@@ -495,19 +499,19 @@ def self_intermediate_scattering(traj, dims, elements=None, q_value=2.25, flag="
     dims : numpy.ndarray
         Maximum coordinate values in the box representing the box lengths of length equal to the number of 
         dimensions. This requires that the lowest box values be located at the origin
-    elements : list, Optional, default=None
+    elements : list, default=None
         List of atom elements symbols from which to pull the atomic form factor. 
         Note that an isotope may be chosen by preceeding the elemental symbol with the 
         number of neutrons. If ``None``, f_values of one are used.
-    q_value : float, Optional, default=2.25
+    q_value : float, default=2.25
         The qvalue at which to calculate the isotropic static structure factor. The default
         value of 2.25 inverse angstroms comes from DOI:10.1063/1.4941946
-    group_ids : list[lists], Optional, default=None
+    group_ids : list[lists], default=None
         Optional list of group ids will produce the total isf, in addition to isf of other groups
        destinguished by the given ids.
-    flag : str, Optional, default='python'
+    flag : str, default='python'
         Choose 'python' implementation or accelerated 'cython' option.
-    wrapped : bool, Optional, default=True
+    wrapped : bool, default=True
         Assume the coordinates are wrapped in determining displacement. Timeframes where a particle has traversed
         more than half a box length are set to nan.
 
@@ -578,10 +582,10 @@ def self_van_hove(traj, r_max=7.0, dr=0.1, flag="python", group_ids=None):
         choice doesn't affect the inner workings of this function. Dimensions are 
         (Nframes, Natoms, Ndims)
     
-    group_ids : list[lists], Optional, default=None
+    group_ids : list[lists], default=None
         Optional list of group ids will produce the total isf, in addition to isf of other groups
         destinguished by the given ids.
-    flag : str, Optional, default='python'
+    flag : str, default='python'
         Not yet enabled! Choose 'python' implementation or accelerated 'cython' option.
 
     Returns
@@ -625,27 +629,27 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
         Independent data set ranging from 0 to some quantity
     ydata : numpy.ndarray
         Dependent data set, starting at unity and decaying exponentially 
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    verbose : bool, Optional, default=False
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    verbose : bool, default=False
         Output fitting statistics
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         If not None, plots comparing the exponential fits will be saved to this filename 
-    plot_name : str, Optional, default=None
+    plot_name : str, default=None
         Plot filename and path
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         If true, the fits will be shown
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimize()``
-    ydata_min : float, Optional, default=0.1
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    ydata_min : float, default=0.1
         Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
-    n_exponentials : int, Optional, default=1
+    n_exponentials : int, default=1
         Can be 1 or 2, if the latter, the default exponent for the first exponential is the phenomenological form of 3/2 (DOI: 10.1007/978-3-030-60443-1_5) unless ``beta`` is defined.
-    beta : float, Optional, default=None
+    beta : float, default=None
         Exponent of the stretched exponential decay. If ``n_exponential == 2 and beta == None`` then ``beta = 3/2`` is used. Set beta as an iterable of length two to set both exponents when appropriate. Set ``beta == False`` to remove the set value of 3/2.
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same length as the provided data, contains the weights for each data point.
-    collective : bool, Optional, default=False
+    collective : bool, default=False
         If True, the data will be normalized to the first value and plot axis labeled accordingly
 
     Returns
@@ -655,7 +659,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     stnd_errors : numpy.ndarray
         Array containing parameter standard errors from lmfit: ['tau'] or ['A', 'tau1', 'beta1', 'tau2', 'beta2']
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_ 
 
     """
 
@@ -779,8 +783,7 @@ def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_p
     return output, uncertainties, redchi
 
 def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="diffusive_exponential_fit.png", kwargs_minimizer={}, kwargs_parameters={}, ydata_min=0.1, isf_max=None, isf_min=0.0, weighting=None, log_transform=False, include_beta_relaxation=True):
-    """
-    Extract the diffusive characteristic time from the self-intermediate scattering function.
+    """ Extract the diffusive characteristic time from the self-intermediate scattering function.
 
     This function assumes the expected q-dependence and should only be used at q-values in the
     level, constant region before the point where the static structure factor begins to increase.
@@ -791,34 +794,34 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
         1D array of tau values representing the x-axis of the intermediate scattering function
     isf_matrix : numpy.ndarray
         2D matrix of intermediate scattering functions with varied q-dependence, thus the dimensions
-        are ``(len(q_array), len(t_array))'`
+        are ``(len(q_array), len(t_array))``
     q_array : numpy.ndarray
         1D array of q-values representing the the first dimension of isf_matrix
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    verbose : bool, Optional, default=False
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    verbose : bool, default=False
         Output fitting statistics
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         If not None, plots comparing the exponential fits will be saved to this filename 
-    plot_name : str, Optional, default=None
+    plot_name : str, default=None
         Plot filename and path
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         If true, the fits will be shown
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimize()``
-    kwargs_parameters : dict, Optional, default={}
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
-    ydata_min : float, Optional, default=0.1
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_parameters : dict, default={}
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
+    ydata_min : float, default=0.1
         Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
-    isf_max : float, Optional, default=None
+    isf_max : float, default=None
         Maximum value of the exponential decay to capture the long time relaxation only
-    isf_min : float, Optional, default=0.0
+    isf_min : float, default=0.0
         Minimum value of the exponential decay to capture the long time relaxation only
-    log_transform : bool, Optional, default=False
+    log_transform : bool, default=False
         Choose whether to transform the data with the log of both sides. Only for ``include_beta_relaxation==False``.
-    include_beta_relaxation : bool, Optional, default=True
+    include_beta_relaxation : bool, default=True
         If true, a stretched exponential is included to fit the beta relaxation time.
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same size/shape as ``isf_matrix``, contains the weights for each data point. By default, the points are weighted
         by the negative of their derivative times scaled by maximum peak value.
 
@@ -829,7 +832,7 @@ def intermediate_scattering_diffusivity(t_array, isf_matrix, q_array, minimizer=
     tau_D_standard_error : numpy.ndarray
         standard error for D
     redchi : float
-        Reduced Chi^2 from ``lmfit.MinimizerResult`` 
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
 
     """
 
@@ -938,30 +941,30 @@ def intermediate_scattering_low_q_collective(t_array, isf_matrix, q_array, minim
         1D array of tau values representing the x-axis of the intermediate scattering function
     isf_matrix : numpy.ndarray
         2D matrix of intermediate scattering functions with varied q-dependence, thus the dimensions
-        are ``(len(q_array), len(t_array))'`
+        are ``(len(q_array), len(t_array))``
     q_array : numpy.ndarray
         1D array of q-values representing the the first dimension of isf_matrix
-    minimizer : str, Optional, default="leastsq"
-        Fitting method supported by ``lmfit.minimize``
-    verbose : bool, Optional, default=False
+    minimizer : str, default="leastsq"
+        Fitting method supported by `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    verbose : bool, default=False
         Output fitting statistics
-    save_plot : bool, Optional, default=False
+    save_plot : bool, default=False
         If not None, plots comparing the exponential fits will be saved to this filename 
-    plot_name : str, Optional, default=None
+    plot_name : str, default=None
         Plot filename and path
-    show_plot : bool, Optional, default=False
+    show_plot : bool, default=False
         If true, the fits will be shown
-    kwargs_minimizer : dict, Optional, default={}
-        Keyword arguments for ``lmfit.minimize()``
-    kwargs_parameters : dict, Optional, default={}
-        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from lmfit.Parameters.add() and ``var`` is one of the following parameter names.
-    ydata_min : float, Optional, default=0.1
+    kwargs_minimizer : dict, default={}
+        Keyword arguments for `lmfit.minimize <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.minimize>`_
+    kwargs_parameters : dict, default={}
+        Dictionary containing the following variables and their default keyword arguments in the form ``kwargs_parameters = {"var": {"kwarg1": var1...}}`` where ``kwargs1...`` are those from `lmfit.Parameters.add <https://lmfit.github.io/lmfit-py/parameters.html#lmfit.parameter.Parameters>`_ and ``var`` is one of the following parameter names.
+    ydata_min : float, default=0.1
         Minimum value of ydata allowed before beginning fitting process. If ydata[-1] is greater than this value, an error is thrown.
-    isf_max : float, Optional, default=None
+    isf_max : float, default=None
         Maximum value of the exponential decay to capture the long time relaxation only
-    isf_min : float, Optional, default=0.0
+    isf_min : float, default=0.0
         Minimum value of the exponential decay to capture the long time relaxation only
-    weighting : numpy.ndarray, Optional, default=None
+    weighting : numpy.ndarray, default=None
         Of the same size/shape as ``isf_matrix``, contains the weights for each data point. By default, the points are weighted
         by the negative of their derivative times scaled by maximum peak value.
 
@@ -971,6 +974,8 @@ def intermediate_scattering_low_q_collective(t_array, isf_matrix, q_array, minim
         Value of the diffusion coefficient that represents the provided data
     tau_D_standard_error : numpy.ndarray
         standard error for D
+    redchi : float
+        Reduced Chi^2 from `lmfit.MinimizerResult <https://lmfit.github.io/lmfit-py/fitting.html#lmfit.minimizer.MinimizerResult>`_
 
     """
 

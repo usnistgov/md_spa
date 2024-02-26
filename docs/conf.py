@@ -35,10 +35,10 @@
 import sys
 import os
 
+import md_spa
+
 package_path = os.path.abspath('..')
 sys.path.insert(0, package_path)
-
-import md_spa
 
 
 # -- General configuration ------------------------------------------------
@@ -65,14 +65,16 @@ extensions = ['sphinx.ext.autodoc',  # auto document docstrings
               ]
 
 autosummary_generate = True
+autoclass_content = "both"
 add_module_names = False
+autodoc_inherit_docstrings = True
 napoleon_google_docstring = False
 napoleon_use_param = False
 napoleon_use_ivar = True
 #todo_include_todos = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = [os.path.join('_templates', "autosummary")]
 
 
 # Add any external modules you want to refer to in the docs here.
@@ -110,7 +112,7 @@ release = md_spa.__version__
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -184,6 +186,10 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+html_css_files = [
+    'custom.css',
+]
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied

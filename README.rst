@@ -15,7 +15,15 @@ MD-SPA
 Molecular Dynamics Simulation Properties Analysis (MD-SPA) will ease the extraction of relevant property information.
 
 * Free software: BSD license
-* Documentation: ``python -m md_spa -d``
+
+Documentation
+-------------
+Run the following in the command line: ``python -m md_spa -d``
+
+Installation
+------------
+* Step 1: Download the master branch from our gitlab page as a zip file, or clone it with git via ``git clone https://gitlab.nist.gov/gitlab/jac16/md-spa`` to your working directory.
+* Step 2: Install with ``pip install md-spa/.``, or change directories and run ``pip install .``. Adding the flag ``-e`` will allow you to make changes that will be functional without reinstallation.
 
 Features
 --------
