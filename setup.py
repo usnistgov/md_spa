@@ -65,7 +65,6 @@ requirements = [
                 'scipy',
                 'lmfit',
                 'matplotlib',
-                'md_spa_utils',
                 ]
 
 setup_requirements = ['pytest-runner', 'wheel', ]

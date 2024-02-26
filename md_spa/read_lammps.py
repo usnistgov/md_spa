@@ -7,13 +7,10 @@
 
 import numpy as np
 import warnings
-import fileinput
 import os
 import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.image as img
 
-from md_spa_utils import data_manipulation as dm
+from md_spa.utils import data_manipulation as dm
 
 def read_lammps_ave_time(filename, dtype=float):
     """Read a LAMMPS ave/time file. Written By Lauren Abbott"""

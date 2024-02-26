@@ -9,15 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import warnings
 
-from md_spa_utils import file_manipulation as fm
-from md_spa_utils import data_manipulation as dm
-
 from scipy.interpolate import InterpolatedUnivariateSpline
 
-from .cython_modules import _scattering_functions as scat
-from . import misc_functions as mf
-from . import read_lammps as rl
-from . import custom_fit as cfit
+from md_spa.cython_modules import _scattering_functions as scat
+from md_spa import misc_functions as mf
+from md_spa import custom_fit as cfit
+from md_spa.utils import file_manipulation as fm
+from md_spa.utils import data_manipulation as dm
 
 
 def scattering_length(elements, natoms, scattering_type):

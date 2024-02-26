@@ -5,22 +5,16 @@
 
 """
 
-import sys
 import copy
 import numpy as np
-import warnings
 import os
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-from scipy import signal
 from scipy import integrate
-from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import linregress
-from scipy.interpolate import InterpolatedUnivariateSpline
 
-import md_spa_utils.data_manipulation as dm
-import md_spa_utils.file_manipulation as fm
-from . import custom_fit as cfit
+from md_spa.utils import data_manipulation as dm
+from md_spa.utils import file_manipulation as fm
+from md_spa import custom_fit as cfit
 
 def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", calc_kwargs={}, csv_kwargs={}, method="Green-Kubo"):
     """
@@ -40,7 +34,7 @@ def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", calc_kwa
     calc_kwargs : dict, default={}
         Keyword arguements for :func:`md_spa.viscosity.running_acf_integral` or :func:`md_spa.viscosity.running_einstein`
     csv_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.file_manipulation.write_csv`
+        Keywords for :func:`md_spa.file_manipulation.write_csv`
     method : str, default="Green-Kubo"
         Method of extracting viscosity from equilibrium MD calculation, kwargs adjusted with ``calc_kwargs``
 
@@ -99,7 +93,7 @@ def pressure2shear_modulus_csv(time, p_xy, filename="shear_modulus_values.csv", 
     calc_kwargs : dict, default={}
         Keyword arguements for :func:`md_spa.viscosity.dynamic_shear_modulus`
     csv_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.file_manipulation.write_csv`
+        Keywords for :func:`md_spa.file_manipulation.write_csv`
         
     Returns
     -------
@@ -485,7 +479,7 @@ def keypoints2csv(filename, fileout="viscosity.csv", mode="a", delimiter=",", ti
     kwargs_find_viscosity : dict, default={}
         Keywords for :func:`md_spa.viscosity.find_green_kubo_viscosity` or :func:`md_spa.viscosity.find_einstein_viscosity` functions depending on ``method``
     file_header_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+        Keywords for :func:`md_spa.os_manipulation.file_header` function    
     method : str, default=None
         Can be 'Einstein' or 'Green-Kubo', specifies the type of data to be analyzed. If :func:`md_spa.viscosity.pressure2viscosity_csv` was used to generate the data, the method is extracted from the header.
 

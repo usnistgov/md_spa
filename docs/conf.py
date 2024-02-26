@@ -35,10 +35,10 @@
 import sys
 import os
 
+import md_spa
+
 package_path = os.path.abspath('..')
 sys.path.insert(0, package_path)
-
-import md_spa
 
 
 # -- General configuration ------------------------------------------------
@@ -65,14 +65,16 @@ extensions = ['sphinx.ext.autodoc',  # auto document docstrings
               ]
 
 autosummary_generate = True
+autoclass_content = "both"
 add_module_names = False
+autodoc_inherit_docstrings = True
 napoleon_google_docstring = False
 napoleon_use_param = False
 napoleon_use_ivar = True
 #todo_include_todos = True
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = [os.path.join('_templates', "autosummary")]
 
 
 # Add any external modules you want to refer to in the docs here.

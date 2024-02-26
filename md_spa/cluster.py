@@ -5,21 +5,14 @@
 
 """
 
-import numpy as np
 import os
-import sys
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import matplotlib.image as img
-from scipy.interpolate import CubicSpline
-from scipy.interpolate import UnivariateSpline
+import numpy as np
 import matplotlib.pyplot as plt
 
-from .cython_modules import _clustering as clust
-import md_spa_utils.data_manipulation as dm
-import md_spa_utils.file_manipulation as fm
-
-from . import read_lammps as rl
+from md_spa.cython_modules import _clustering as clust
+from md_spa.utils import data_manipulation as dm
+from md_spa.utils import file_manipulation as fm
+from md_spa import read_lammps as rl
 
 def consolidate(target_dir, boxes, column_name, file_in="coord.lammpstrj", file_out="cluster_histogram.csv", max_frames=None, kwargs_analysis={}, kwargs_read_file={}, flag="python"):
     """

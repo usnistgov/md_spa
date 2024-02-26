@@ -5,9 +5,7 @@
 
 """
 
-import sys
 import numpy as np
-
 
 def periodic2rb(filename, fileout="rb_constants.csv"):
     """

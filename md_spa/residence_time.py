@@ -11,10 +11,9 @@ import os
 import copy
 import warnings
 
-import md_spa_utils.file_manipulation as fm
-import md_spa_utils.data_manipulation as dm
-
-from . import custom_fit as cfit
+from md_spa.utils import file_manipulation as fm
+from md_spa.utils import data_manipulation as dm
+from md_spa import custom_fit as cfit
 
 def characteristic_time(xdata, ydata, minimizer="leastsq", verbose=False, save_plot=False, show_plot=False, plot_name="exponential_fit.png", kwargs_minimizer={}, ydata_min=0.1, tau_logscale=False):
     """
@@ -206,7 +205,7 @@ def keypoints2csv(filename, fileout="res_time.csv", mode="a", delimiter=",", tit
     kwargs_fit : dict, default={}
         Keywords for `characteristic_time` function
     file_header_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+        Keywords for :func:`md_spa.os_manipulation.file_header` function    
     verbose : bool, default=False
         Output fitting statistics
 

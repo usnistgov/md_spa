@@ -90,7 +90,7 @@ def find_csv_entries(filename, matching_entries=None, indices=None, convert_floa
     tmp_indices = [i for i,x in enumerate(matching_entries) if x is None]
     if dm.isiterable(indices):
         pass
-    elif indices != None:
+    elif indices is not None:
         indices = list(range(indices+lx, len(data[0])))
     else:
         indices = tmp_indices + list(range(lx, len(data[0])))
@@ -130,7 +130,7 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_err
     New file written to ``file_out``
     """
 
-    if headers != None and not isinstance(type(headers),str) and not dm.isiterable(headers):
+    if headers is not None and not isinstance(type(headers),str) and not dm.isiterable(headers):
         raise ValueError("The input `headers` should be iterable")
 
     if not dm.isiterable(filenames):
@@ -147,7 +147,7 @@ def average_csv_files(filenames, file_out, headers=None, delimiter=",", calc_err
         data = np.transpose(data)
         data_se = np.transpose(data_se)
     
-    if headers == None:
+    if headers is None:
         with open(filenames[0],"r") as f:
             headers = f.readline().rstrip()
     elif dm.isiterable(headers):
@@ -198,7 +198,7 @@ def write_csv(filename, array, mode="w", header=None, header_comment="#", delimi
 
     mode = "w" if not os.path.isfile(filename) else mode
     with open(filename,mode) as f:
-        if header != None and "w" in mode:
+        if header is not None and "w" in mode:
             f.write(header_comment+delimiter.join([str(x) for x in header])+"\n")
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")

@@ -6,23 +6,17 @@
 """
 
 import numpy as np
-import csv
-import sys
+
 import copy
 import os
 import warnings
-import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.image as img
-from matplotlib.ticker import FormatStrFormatter
-import matplotlib
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.ndimage.filters import gaussian_filter1d
 
-from . import read_lammps as f
-import md_spa_utils.file_manipulation as fm
-import md_spa_utils.data_manipulation as dm
-import md_spa.custom_fit as cfit
+from md_spa.utils import file_manipulation as fm
+from md_spa.utils import data_manipulation as dm
+from md_spa import custom_fit as cfit
 
 def consolidate_arrays(rdf_array, file_out="rdf_out.txt", pairs=None):
     """
@@ -348,7 +342,7 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
     extract_keywords_kwargs : dict, default={}
         Keywords for `extract_keypoints` function
     file_header_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+        Keywords for :func:`md_spa.utils.os_manipulation.file_header` function    
     column_list : list, default=None
         If not None, this list specifies the column indices (starting from 0) to analyze. Note, the first column must be the distance.
     kwargs_genfromtxt : dict, default={}
@@ -657,7 +651,7 @@ def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", delimiter="
     extract_debye_waller_kwargs : dict, default={}
         Keywords for :func:`md_spa.rdf.extract_debye_waller`
     file_header_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+        Keywords for :func:`md_spa.utils.os_manipulation.file_header` function    
 
     Returns
     -------

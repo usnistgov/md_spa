@@ -5,9 +5,7 @@
 
 """
 
-#import read_lammps as f
 import re
-import sys
 import numpy as np
 import warnings
 import os
@@ -15,9 +13,9 @@ import matplotlib.pyplot as plt
 from scipy.stats import linregress
 from scipy.interpolate import InterpolatedUnivariateSpline
 
-import md_spa_utils.data_manipulation as dm
-import md_spa_utils.file_manipulation as fm
-from . import fit_data as fd
+from md_spa.utils import data_manipulation as dm
+from md_spa.utils import file_manipulation as fm
+from md_spa import fit_data as fd
 
 def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=None, additional_entries=None, additional_header=None, kwargs_find_diffusivity={}, kwargs_debye_waller={}, file_header_kwargs={}):
     """
@@ -44,7 +42,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
     kwargs_debye_waller : dict, default={}
         Keywords for :func:`md_spa.msd.debye_waller` function
     file_header_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+        Keywords for :func:`md_spa.utils.os_manipulation.file_header` function    
 
     Returns
     -------
@@ -93,7 +91,7 @@ def keypoints2csv(filename, fileout="msd.csv", mode="a", delimiter=",", titles=N
         if "title" not in tmp_kwargs_dw:
             tmp_kwargs_dw["title"] = titles[i]
         dw, tau = debye_waller(t_tmp, data[i], **tmp_kwargs_dw)
-        if ("bounds" not in tmp_kwargs_diff or (tmp_kwargs_diff["bounds"][0] is not None or np.isnan(bounds[0]))) and not np.isnan(tau):
+        if ("bounds" not in tmp_kwargs_diff or (tmp_kwargs_diff["bounds"][0] is not None or np.isnan(tmp_kwargs_diff["bounds"][0]))) and not np.isnan(tau):
             if "bounds" not in tmp_kwargs_diff:
                 tmp_kwargs_diff["bounds"] = (10*tau, None)
             else:
@@ -131,7 +129,7 @@ def nongaussian2csv(filename, fileout="nongaussian.csv", mode="a", delimiter=","
     additional_header : list, default=None
         If the csv file does not exist, these values will be added to the beginning of the header row. This list must be equal to the ``additional_entries`` list.
     file_header_kwargs : dict, default={}
-        Keywords for :func:`md_spa_utils.os_manipulation.file_header` function    
+        Keywords for :func:`md_spa.utils.os_manipulation.file_header` function    
     kwargs_extrema : dict, default={}
         Keywords for :func:`md_spa.fit_data.pull_extrema`
 
@@ -345,7 +343,7 @@ def find_diffusivity(time, msd, min_exp=0.991, min_Npts=10, skip=1, show_plot=Fa
     verbose : bool, default=False
         Will print intermediate values or not
     use_frac : float, default=1
-        Choose what fraction of the msd to use. This will cut down on comutational time in spending time on regions with poor statistics.
+        Choose what fraction of the msd to use. This will cut down on computational time in spending time on regions with poor statistics.
     bounds : tuple, default=(None,None)
         Values of time to act as the minimum or maximum of searching. It is recommended that the lower bound be ten times the timescale for the debye-waller parameter, see :func:`md_spa.msd.debye_waller`. This is applied after ``use_frac``
     

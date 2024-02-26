@@ -1,7 +1,6 @@
 
 import numpy as np
 import scipy.stats
-import warnings
 
 def basic_stats(data, axis=None, data_type="individuals", error_type="standard_deviation", error_descriptor="mean", confidence=0.95, population_dist_type="unknown", verbose=False):
     """

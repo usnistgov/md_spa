@@ -5,16 +5,13 @@
 
 """
 
-import os
 import copy
-import warnings
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.optimize as spo
 import scipy.special as sps
 
 import lmfit
-from lmfit import minimize, Parameters
+from lmfit import Parameters
 
 
 def matrix_least_squares(xdata, ydata, sample_array={}, method="nnls", method_kwargs={}, function="exponential_decay", verbose=False):

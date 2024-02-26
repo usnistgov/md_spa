@@ -5,21 +5,19 @@
 
 """
 import numpy as np
-import sys
 import os
 import warnings
 
 import MDAnalysis as mda
 from MDAnalysis.analysis import polymer as mda_polymer
 from MDAnalysis.analysis import rdf as mda_rdf
-from MDAnalysis.transformations import unwrap
 from MDAnalysis.analysis.hydrogenbonds.hbond_analysis import HydrogenBondAnalysis as HBA
 from MDAnalysis.analysis.waterdynamics import SurvivalProbability as SP
 import MDAnalysis.analysis.msd as mda_msd
 from MDAnalysis import transformations as trans
 
-from . import misc_functions as mf
-import md_spa_utils.data_manipulation as dm
+from md_spa import misc_functions as mf
+from md_spa.utils import data_manipulation as dm
 
 def center_universe_around_group(universe, select, verbose=False, reference="initial", com_kwargs={"unwrap": True}):
     """

@@ -1,32 +1,70 @@
 {{ name | escape | underline }}
 
+.. currentmodule:: {{ fullname }}
+
 .. rubric:: Description
 
 .. automodule:: {{ fullname }}
 
-.. currentmodule:: {{ fullname }}
+   {% block attributes %}
+   {% if attributes %}
+   .. rubric:: Module attributes
 
-{% if classes %}
-.. rubric:: Classes
+   .. autosummary::
+      :toctree:
+   {% for item in attributes %}
+      {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
 
+   {% block functions %}
+   {% if functions %}
+   .. rubric:: {{ _('Functions') }}
+
+   .. autosummary::
+      :toctree:
+      :nosignatures:
+   {% for item in functions %}
+      {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
+
+   {% block classes %}
+   {% if classes %}
+   .. rubric:: {{ _('Classes') }}
+
+   .. autosummary::
+      :toctree:
+      :template: class.rst
+      :nosignatures:
+   {% for item in classes %}
+      {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
+
+   {% block exceptions %}
+   {% if exceptions %}
+   .. rubric:: {{ _('Exceptions') }}
+
+   .. autosummary::
+      :toctree:
+   {% for item in exceptions %}
+      {{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
+
+{% block modules %}
+{% if modules %}
 .. autosummary::
-    :toctree: .
-    {% for class in classes %}
-    {{ class }}
-    {% endfor %}
-
+   :toctree:
+   :template: module.rst
+   :recursive:
+{% for item in modules %}
+   {{ item }}
+{%- endfor %}
 {% endif %}
-
-{% if functions %}
-.. rubric:: Functions
-
-.. autosummary::
-    :toctree: .
-    {% for function in functions %}
-    {{ function }}
-    {% endfor %}
-
-{% endif %}
-
-..
-   Taken from https://github.com/jaclark5/despasito/
+{% endblock %}

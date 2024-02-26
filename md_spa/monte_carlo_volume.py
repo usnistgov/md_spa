@@ -7,7 +7,7 @@
 
 import numpy as np
 
-import md_spa_utils.data_manipulation as dm
+from md_spa.utils import data_manipulation as dm
 
 def random_points(npts, ranges):
     """

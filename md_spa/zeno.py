@@ -5,11 +5,10 @@
 """
 
 import os
-import copy
 import warnings
 import numpy as np
 
-import md_spa_utils.data_manipulation as dm
+from md_spa.utils import data_manipulation as dm
 
 def extract_csv(filename, extract_array=None):
     """
