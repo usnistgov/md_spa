@@ -16,6 +16,8 @@ from md_spa.utils import data_manipulation as dm
 from md_spa.utils import file_manipulation as fm
 from md_spa import custom_fit as cfit
 
+styles = ["-", "--", ":"]
+
 def pressure2viscosity_csv(time, p_xy, filename="viscosity_values.csv", calc_kwargs={}, csv_kwargs={}, method="Green-Kubo"):
     """
     Calculate the viscosity of an equilibrium molecular dynamics simulation from the pressure tensor.
@@ -238,15 +240,12 @@ def running_einstein(time, p_xy, error_type="standard error", scale_coefficient=
     if save_plot or show_plot:
         p_labels = {0: "($\eta_{xx} - \eta_{yy}$)/2", 1: "($\eta_{yy} - \eta_{zz}$)/2", 2: "$\eta_{xy}$", 3: "$\eta_{xz}$", 4: "$\eta_{yz}$"}
         for i,eta_tmp in enumerate(integral_set):
-            if lx ==5 and i < 2:
-                color = "c"
-            else:
-                color = "b"
+            color = "c" if (lx ==5 and i < 2) else "b"
             if lx <5:
                 label = p_labels[i+2]
             else:
                 label = p_labels[i]
-            plt.plot(time, scale_coefficient*eta_tmp, linewidth=0.5, color=color, label=label)
+            plt.plot(time, scale_coefficient*eta_tmp, linewidth=0.5, color=color, label=label, linestyle=style)
         plt.plot(time, scale_coefficient*eta, "k", label="$\bar{\eta}$")
         plt.fill_between(time, scale_coefficient*(eta-stnderror), scale_coefficient*(eta+stnderror), alpha=0.25, color="black")
         plt.plot([time[0], time[-1]], [0,0], "k", linewidth=0.5)
@@ -267,7 +266,7 @@ def running_einstein(time, p_xy, error_type="standard error", scale_coefficient=
 
     return scale_coefficient*eta, scale_coefficient*stnderror
 
-def running_acf_integral(time, p_xy, error_type="standard error", scale_coefficient=1, skip=1, show_plot=False, title=None, save_plot=False, plot_name="green-kubo_viscosity_components.png"):
+def running_acf_integral(time, p_xy, error_type="standard error", scale_coefficient=1, skip=1, show_plot=False, title=None, save_plot=False, plot_name="green-kubo_viscosity_components.png", dims="xyz"):
     """
     Calculate the viscosity of an equilibrium molecular dynamics simulation from the independent pressure components: pxy, pxz, pyz, (pxx-pyy)/2, and (pyy-pzz)/2.
 
@@ -311,12 +310,7 @@ def running_acf_integral(time, p_xy, error_type="standard error", scale_coeffici
     elif len(p_xy) != 6:
         raise ValueError("The array `p_xy` must be of shape (6,N)")
 
-    _, npts = np.shape(p_xy)
-    lx = 5
-    p_new = np.zeros((5,npts))
-    p_new[0] = (p_xy[0]-p_xy[1])/2
-    p_new[1] = (p_xy[1]-p_xy[2])/2
-    p_new[2:] = p_xy[3:]
+    p_new, lx, labels = _dim_integrals(p_xy, dims)
 
     # Same result whether the integral is taken before or after averaging the tensor components
     acf_set = np.array([dm.autocorrelation(x) for x in p_new])
@@ -331,17 +325,10 @@ def running_acf_integral(time, p_xy, error_type="standard error", scale_coeffici
          raise ValueError("The `error_type`, {}, is not supported".format(error_type))
 
     if save_plot or show_plot:
-        p_labels = {0: "($\eta_{xx} - \eta_{yy}$)/2", 1: "($\eta_{yy} - \eta_{zz}$)/2", 2: "$\eta_{xy}$", 3: "$\eta_{xz}$", 4: "$\eta_{yz}$"}
         for i,eta_tmp in enumerate(integral_set):
-            if lx ==5 and i < 2:
-                color = "c"
-            else:
-                color = "b"
-            if lx <5:
-                label = p_labels[i+2]
-            else:
-                label = p_labels[i]
-            plt.plot(time, scale_coefficient*eta_tmp, linewidth=0.5, color=color, label=label)
+            color = "c" if i < lx-3 else "b"
+            style = styles[i] if i < lx-3 else styles[i-lx+3]
+            plt.plot(time, scale_coefficient*eta_tmp, linewidth=0.5, color=color, label=labels[i], linestyle=style)
         plt.plot(time, scale_coefficient*eta, "k", label=r"$\bar{\eta}$")
         plt.fill_between(time, scale_coefficient*(eta-stnderror), scale_coefficient*(eta+stnderror), alpha=0.25, color="black")
         plt.plot([time[0], time[-1]], [0,0], "k", linewidth=0.5)
@@ -361,6 +348,42 @@ def running_acf_integral(time, p_xy, error_type="standard error", scale_coeffici
         plt.close("all")
         
     return scale_coefficient*eta, scale_coefficient*stnderror
+
+
+def _dim_integrals(p_xy, dims):
+    """Given target dimensions, provide indices
+    """
+
+    _, npts = np.shape(p_xy)
+    if dims == "xyz":
+        labels = ["($\eta_{xx} - \eta_{yy}$)/2", "($\eta_{yy} - \eta_{zz}$)/2", "$\eta_{xy}$", "$\eta_{xz}$", "$\eta_{yz}$"]
+        lx = 5
+        p_new = np.zeros((lx,npts))
+        p_new[0] = (p_xy[0]-p_xy[1])/2
+        p_new[1] = (p_xy[1]-p_xy[2])/2
+        p_new[2:] = p_xy[3:]
+    elif dims == "xy":
+        labels = ["($\eta_{xx} - \eta_{yy}$)/2", "$\eta_{xy}$", "$\eta_{xz}$", "$\eta_{yz}$"]
+        lx = 4
+        p_new = np.zeros((lx,npts))
+        p_new[0] = (p_xy[0]-p_xy[1])/2
+        p_new[1:] = p_xy[3:]
+    elif dims == "xz":
+        labels = ["($\eta_{xx} - \eta_{zz}$)/2", "$\eta_{xy}$", "$\eta_{xz}$", "$\eta_{yz}$"]
+        lx = 4
+        p_new = np.zeros((lx,npts))
+        p_new[1] = (p_xy[0]-p_xy[2])/2
+        p_new[1:] = p_xy[3:]
+    elif dims == "yz":
+        labels = ["($\eta_{yy} - \eta_{zz}$)/2", "$\eta_{xy}$", "$\eta_{xz}$", "$\eta_{yz}$"]
+        lx = 4
+        p_new = np.zeros((lx,npts))
+        p_new[1] = (p_xy[1]-p_xy[2])/2
+        p_new[1:] = p_xy[3:]
+    else:
+        raise ValueError(f"Dimensions, {dims}, are not recognized. Choose 'xyz', 'xy', 'xz', or 'xz'.")
+
+    return p_new, lx, labels
 
 def dynamic_shear_modulus(time, p_xy, error_type="standard error", scale_coefficient=1, skip=1, show_plot=False, title=None, save_plot=False, plot_name="green-kubo_viscosity_components.png"):
     """

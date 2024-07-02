@@ -18,7 +18,8 @@ Molecular Dynamics Simulation Properties Analysis (MD-SPA) will ease the extract
 
 Documentation
 -------------
-Run the following in the command line: ``python -m md_spa -d``
+Online: Checkout the documentation on GitLab_
+Local: Run the following in the command line: ``python -m md_spa -d``
 
 Installation
 ------------
@@ -28,13 +29,22 @@ Installation
 Features
 --------
 
-* TODO
+* Cluster Analysis (cluster)
+* Coordination Number Analysis (coordination_number)
+* Calculation of Volume with Monte Carlo (monte_carlo_volume)
+* Radial Distribution Function (rdf)
+* Read LAMMPS Files (read_lammps)
+* Residence Time Analysis (residence_time)
+* Intermediate Scattering Functions and Static Structure Factors (scattering)
+* Viscosity (viscosity)
+* Zeno output file handling (Zeno)
 
 Credits
 -------
 
 This package was created with Cookiecutter_ and the `cookiecutter-nist-python`_ project template.
 
+.. _GitLab: https://jac16.ipages.nist.gov/md-spa
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`cookiecutter-nist-python`: https://gitlab.nist.gov/gitlab/jac16/cookiecutter-nist-python
 
