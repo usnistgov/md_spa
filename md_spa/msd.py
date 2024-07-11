@@ -12,6 +12,7 @@ import os
 import matplotlib.pyplot as plt
 from scipy.stats import linregress
 from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.ndimage import gaussian_filter1d
 
 from md_spa.utils import data_manipulation as dm
 from md_spa.utils import file_manipulation as fm
@@ -193,7 +194,7 @@ def nongaussian2csv(filename, fileout="nongaussian.csv", mode="a", delimiter=","
         fm.write_csv(fileout, tmp_data, mode=mode)
 
 
-def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=None, plot_name="debye-waller.png", verbose=False):
+def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=None, plot_name="debye-waller.png", sigma_spline=None, verbose=False):
     """
     Analyzing the ballistic region of an MSD curve yields the debye-waller factor, which relates to the cage region that the atom experiences.
     DOI: 10.1073/pnas.1418654112
@@ -205,7 +206,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
     msd : numpy.ndarray
         MSD array with one dimension
     use_frac : float, default=1
-        Choose what fraction of the msd to use. This will cut down on comutational time in spending time on regions with poor statistics.
+        Choose what fraction of the msd to use. This will cut down on computational time in spending time on regions with poor statistics.
     save_plot : bool, default=False
         choose to save a plot of the fit
     title : str, default=None
@@ -214,6 +215,8 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
         choose to show a plot of the fit
     plot_name : str, default="debye-waller.png"
         If ``save_plot==True`` the msd will be saved with the debye-waller factor marked. The ``title`` is added as a prefix to this str
+    sigma_spline : float, default=None
+        If the data should be smoothed, provide a value of sigma used in `scipy.ndimage.gaussian_filter1d <https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.gaussian_filter1d.html>`_
     verbose : bool, default=False
         Will print intermediate values or not
     
@@ -238,24 +241,28 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
     if len(msd) != len(time):
         raise ValueError("Arrays for time and msd are not of equal length.")
 
-    time = time[:int(len(time)*use_frac)]
     msd = msd[:int(len(time)*use_frac)]
+    time = time[:int(len(time)*use_frac)]
     logtime = np.log10(time)
     logmsd = np.log10(msd)
     if np.isnan(logmsd[0]) or np.isinf(logtime[0]):
         logtime = logtime[1:]
         logmsd = logmsd[1:]
+    if sigma_spline != None:
+        logmsd = gaussian_filter1d(logmsd, sigma=sigma_spline)
 
-    spline = InterpolatedUnivariateSpline(logtime,logmsd, k=5)
     if np.all(np.isnan(logmsd)):
         raise ValueError("Spline could not be created with provided data:\n{}\n{}".format(time,msd))
+    spline = InterpolatedUnivariateSpline( logtime, logmsd, k=5)
     dspline = spline.derivative()
     d2spline = dspline.derivative()
     extrema = d2spline.roots().tolist()
     extrema_concavity = dspline.derivative().derivative()
-    dw = np.ones(4)*np.nan
-    tau = np.ones(4)*np.nan
-    min_value = np.ones(4)*np.inf
+    
+    n_min = 50
+    dw = np.ones(n_min)*np.nan
+    tau = np.ones(n_min)*np.nan
+    min_value = np.ones(n_min)*np.inf
     i = 0
     for min_max in extrema:
         if extrema_concavity(min_max) > 0:
@@ -263,7 +270,7 @@ def debye_waller(time, msd, use_frac=1, show_plot=False, save_plot=False, title=
             dw[i] = 10**spline(min_max)
             min_value[i] = dspline(min_max)
             i += 1
-        if i == 3:
+        if i == n_min:
             break
 
     # Cut off minima after deepest

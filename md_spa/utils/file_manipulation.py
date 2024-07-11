@@ -203,7 +203,7 @@ def write_csv(filename, array, mode="w", header=None, header_comment="#", delimi
         for line in array:
             f.write(delimiter.join([str(x) for x in line])+"\n")
 
-def csv2dict(filename, comment="#", tiers=1, skip_cols=0):
+def csv2dict(filename, comment="#", label_col=None, tiers=1, skip_cols=0, header_row=0):
     """ Create dict from csv file
 
     The last commented header line is assumed to be the categories and the first column the keys.
@@ -235,11 +235,15 @@ def csv2dict(filename, comment="#", tiers=1, skip_cols=0):
     filename : str
         File name to the csv file
     comment : str, Optional, default="#"
-        String at the beginning of a line to denote a comment
+        String at the beginning of a line to denote a comment or header
     tiers : int, Optional, default=1
         Number of tiers in dictionary before the remaining entries are in a single dictionary with column header values as keys.
     skip_cols : int, Optional, default=0
         Number of columns to skip 
+    label_col : int, Optional, default=None
+        Specify the label column, regardless of the `skip_cols` value. This allows one to choose the first column as the label, but ignore a series of labels after the fact.
+    header_row : int, Optional, default=0
+        Define the row used to pull the header and generate keys
 
     Returns
     -------
@@ -260,16 +264,24 @@ def csv2dict(filename, comment="#", tiers=1, skip_cols=0):
     header = None
     output = {}
     for i,line in enumerate(data):
-        if isinstance(line[0], str) and comment in line[0]:
+        if i == header_row:
             header = line[skip_cols:][tiers:] # Column headers for tiers are irrelevant
+            header = [x.replace(comment, "") for x in header]
         else:
+            if label_col is not None and label_col < skip_cols:
+                label = line[label_col]
+            else:
+                label = skip_cols
             line = line[skip_cols:]
             if header is None:
                 raise ValueError("Commented column headers were not found")
             if len(header) != len(line[tiers:]):
                 raise ValueError("The number of column headers ({}) does not equal the number of columns ({}) in line {}".format(len(header),len(line[tiers:]),i))
 
-            tier_keys = line[:tiers]
+            if label_col is None:
+                tier_keys = line[:tiers]
+            else:
+                tier_keys = [label] + line[:tiers-1]
             tmp_dict = output
             for j, key in enumerate(tier_keys):
                 if j+1 == tiers:
