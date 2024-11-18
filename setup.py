@@ -88,7 +88,7 @@ setup(
     ],
     description="Molecular Dynamics Simulation Properties Analysis (MD-SPA) will ease the extraction of relevant property information.",
     install_requires=requirements,
-    license="BSD license",
+    license="NIST license",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
     keywords='md_spa',
