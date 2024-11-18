@@ -271,7 +271,7 @@ def csv2dict(filename, comment="#", label_col=None, tiers=1, skip_cols=0, header
             if label_col is not None and label_col < skip_cols:
                 label = line[label_col]
             else:
-                label = skip_cols
+                label = line[skip_cols]
             line = line[skip_cols:]
             if header is None:
                 raise ValueError("Commented column headers were not found")
