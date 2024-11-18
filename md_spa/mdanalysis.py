@@ -166,7 +166,7 @@ def generate_universe(package, args, kwargs={}):
 
     return universe
         
-def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, exclusion_block=None, exclusion_mode="block", exclude=True, run_kwargs={}):
+def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, exclusion_block=None, exclusion_mode="block", exclude=True, run_kwargs={}, updating=False):
     """
     Calculate the partial rdf of a polymer given a LAMMPS data file, dump file(s), and a list of the atomIDs along the backbone (starting at 1).
 
@@ -198,6 +198,8 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
         Set the type of exclusion: ["include bound", "exclude bound", "explicit"] **Not Yet Supported**
     run_kwargs : dict, default={}
         Other keyword arguments from `MDAnalysis.analysis.rdf.InterRDF.run() <https://docs.mdanalysis.org/1.1.1/documentation_pages/analysis/rdf.html>`_
+    updating : bool, default=False
+        Force the atom groups to be updated every timestep
 
     Returns
     -------
@@ -224,10 +226,19 @@ def calc_partial_rdf(u, groups, rmin=0.1, rmax=12.0, nbins=1000, verbose=False, 
     flag_bins = False
     for i, (group1, group2) in enumerate(groups):
         if group1 not in group_dict:
-            group_dict[group1] = u.select_atoms(group1)
+            group_dict[group1] = u.select_atoms(group1, updating=updating)
         if group2 not in group_dict:
-            group_dict[group2] = u.select_atoms(group2)
-        Rdf = mda_rdf.InterRDF(group_dict[group1],group_dict[group2],nbins=nbins,range=(rmin,rmax),verbose=verbose, exclusion_block=exclusion_block[i],exclusion_mode=exclusion_mode, exclude=exclude)
+            group_dict[group2] = u.select_atoms(group2, updating=updating)
+        Rdf = mda_rdf.InterRDF(
+            group_dict[group1],
+            group_dict[group2],
+            nbins=nbins,
+            range=(rmin,rmax),
+            verbose=verbose,
+            exclusion_block=exclusion_block[i],
+            exclusion_mode=exclusion_mode,
+            exclude=exclude,
+        )
         Rdf.run(verbose=verbose, **run_kwargs)
         if not flag_bins:
             flag_bins = True
