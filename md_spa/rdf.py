@@ -13,6 +13,8 @@ import warnings
 import matplotlib.pyplot as plt
 from scipy.interpolate import InterpolatedUnivariateSpline
 from scipy.ndimage.filters import gaussian_filter1d
+import scipy.integrate as spi
+import scipy.stats as sps
 
 from md_spa.utils import file_manipulation as fm
 from md_spa.utils import data_manipulation as dm
@@ -419,7 +421,7 @@ def keypoints2csv(filename, fileout="rdf.csv", mode="a", titles=None, additional
         fm.write_csv(fileout, tmp_data, mode=mode)
 
 
-def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fit=False, plot_name="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
+def extract_debye_waller(r, gr, tol=1e-3, show_fit=False, smooth_sigma=None, error_length=8, save_fig=False, plot_name="rdf_debye-waller.png",title="Pair-RDF", extrema_cutoff=0.01, verbose=False):
     """ Extract Debye-Waller FACTOR (not parameter like from MSD)
 
     Based on the work found at `DOI: 10.1021/jp064661f <https://doi.org/10.1021/jp064661f>`_
@@ -706,3 +708,208 @@ def debye_waller2csv(filename, fileout="debye-waller.csv", mode="a", delimiter="
     else:
         fm.write_csv(fileout, tmp_data, mode=mode)
 
+
+def spherical_distribution_function(xdata, ydata, smear_radius=2.3):
+    """Produce a smeared Radial Distribution Function
+    
+    Assume that xdata points are evenly distributed. The contents of this function were published in
+    Clark and Douglas, Hydration Contribution to the Solvation Free Energy of Water-Soluble Polymers
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        Distance values corresponding to the radial distribution function
+    ydata : numpy.ndarray
+        Values from the radial distribution function
+    smear_radius : float, optional
+        Radius over which to smear the radial distribution function, by default 2.3
+        
+    Returns
+    -------
+    xdata_new : numpy.ndarray
+        Distance values corresponding to the spherical distribution function that have
+        been truncated from the original due to the spherical smearing size.
+    ydata_new : numpy.ndarray
+        Values from the spherical distribution function    
+    """
+    
+    xdata, ydata = np.array(xdata), np.array(ydata)
+    dr = xdata[1] - xdata[0]
+    if np.isnan(dr):
+        raise ValueError("Initial values of distance, xdata, array should not be NaN.")
+    npoints = int(smear_radius // dr)
+    smear = npoints * dr
+
+    new_r = xdata[np.where(xdata < xdata[-1] - smear_radius)]
+    
+    new_rdf = np.zeros_like(new_r)
+    for i, r in enumerate(new_r):
+        if npoints < 2:
+            new_rdf[i] = ydata[np.where(xdata == r)[0]] 
+            warnings.warn("Smear radius is less then steps in distance. Increase the smear radius.")
+        else:
+            ind1 = max(int(i - npoints), 0)
+            ind2 = int(i + npoints + 1)
+            if ind1 == 0:
+                ind3 = abs(i - npoints)
+                xdata_subset = np.concatenate(( -np.flip(xdata[1:ind3]), xdata[ind1:ind2])) - r
+                ydata_subset = np.concatenate((np.flip(ydata[1:ind3]), ydata[ind1:ind2]))
+            else:
+                xdata_subset, ydata_subset = xdata[ind1:ind2] - r, ydata[ind1:ind2]
+
+            p_Acircle = np.pi * (r + xdata_subset) / r * (smear**2 - xdata_subset**2) # Area of slice
+            norm = 4 / 3 * np.pi * smear**3
+            new_rdf[i] = spi.simpson(
+                ydata_subset * p_Acircle,
+                x=xdata_subset
+            ) / norm
+    
+    return new_r, new_rdf
+
+
+def kbintegral(xdata, ydata, volume, closed_system_correction="Lockwood", geometry="spherical", height=None):
+    """Compute the Kirkwood Buff Integral values with r dependence
+    
+    This function corrects for the closed systems used in NVT and 
+    NPT MD simulations.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        Distance values that correspond to the radial distribution function
+    ydata : numpy.ndarray
+        Values in the radial distribution function
+    volume : float
+        Volume of the simulation box
+    closed_system_correction : str, default="Kruger"
+        Correction used for closed system. May be:
+        
+        - "Kruger" from from Kruger et al. J. Phys. Chem. Lett. 2013, 4, 235-238 (dx.doi.org/10.1021/jz301992u, 10.1080/00268976.2018.1434908)
+        - "Lockwood" from Lockwood and Rossky, J. Phys. Chem. B 1999, 103 1982, meant for an NVT system that is
+          equilibrated for solvent conditions and a solute is added
+        - ``None``
+        
+    geometry : str, default="spherical"
+        Geometry of the system, most commonly a ``"spherical"``, but can also be ``"cylindrical"``,
+        in which case, ``height`` must be defined.
+    height : float, default=None
+        Height of the box representing the axial direction of a cylinder.
+
+    Returns
+    -------
+    numpy.ndarray
+        Kirkwood Buff Integral values dependent on cutoff value
+    """
+    
+    xdata, ydata = np.array(xdata), np.array(ydata)
+    
+    kbi = np.zeros_like(xdata)
+    for i, _ in enumerate(xdata):
+        if i == 0:
+            kbi[i] = 0
+        else:
+            if geometry == "spherical":
+                geomfactor = 4 * np.pi * xdata[:i]**2
+            elif geometry == "cylindrical":
+                geomfactor = height * 2 * np.pi * xdata[:i] 
+            else:
+                raise ValueError("Geometry option, {}, is not recognized. Choose 'spherical' or 'cylindrical'".format(geometry))
+                
+            if closed_system_correction == "Kruger":
+                x = xdata[:i]/xdata[i]
+                if geometry == "spherical":
+                    factor = (1.0 - 1.5 * x + 0.5 * x**3)
+                elif geometry == "cylindrical":
+                    raise ValueError("The Krugar estimation method is not defined for the cylindrical distribution function.")
+                else:
+                    raise ValueError("Geometry option, {}, is not recognized. Choose 'spherical' or 'cylindrical'".format(geometry))
+                correction = 1
+            elif closed_system_correction == "Lockwood":
+                factor = 1
+                correction = 1 - 1 / volume * spi.simpson(
+                    ydata[:i] * geomfactor,
+                    x=xdata[:i]
+                )  
+            elif closed_system_correction is None:
+                correction, factor = 1, 1
+            else:
+                raise ValueError(
+                    f"Closed system correction, {closed_system_correction} not recognized."
+                    " Choose either 'Kruger', 'Lockwood', or None"
+                )
+                
+            kbi0 = -spi.simpson(
+                (1 - ydata[:i]) * geomfactor * factor,
+                x=xdata[:i]
+            )
+            kbi[i] = kbi0 / correction
+ 
+    return kbi          
+
+
+def extrapolate_kbi(rinv, kbi_array, rmin, rmax=None, save_fig=False, plot_name="kbi.png", show_fig=False):
+    """Extrapolate the Kirkwood Buff Integral (KBI) to zero
+
+    This method is used for the calculation of KBI's presented by Kruger where the formulation results
+    in an expression with a linear dependence on 1 / L, where L is the cutoff in r for G(L).
+
+    Parameters
+    ----------
+    rinv : numpy.ndarray
+        Inverse distance used in calculating the KBI
+    kbi_array : numpy.ndarray
+        Kirkwood Buff Integral from r is zero to some value of r
+    rmin : float
+        Distance used for the upper bound (in inverse distance) to calculate the KBI
+    rmax : float, default=None
+        Distance used for the lower bound (in inverse distance) to calculate the KBI
+    save_fit : bool, default=False
+        Save comparison plot of each rdf being analyzed. With the name ``plot_name``
+    plot_name : str, default="kbi.png"
+        If `save_fig` is true, the generated plot is saved. The ``title`` is added as a prefix to this str
+    show_fig : bool, default=False
+        Show figure
+        
+    Return
+    ------
+    kbi : float
+        Kirkwood Buff Integral extrapolated to infinity
+    kbi_se : float
+        Standard error of KBI
+    npoints : int
+        Number of points used in the calculation
+    
+    """
+    rinv, kbi_array = np.array(rinv), np.array(kbi_array)
+    
+    if rmax is None:
+        rmax = np.max(1/rinv)
+    ind = np.where(np.logical_and(rinv < 1/rmin, rinv > 1/rmax))
+    npoints = len(ind[0])
+    
+    result = sps.linregress(
+        rinv[ind], 
+        kbi_array[ind],
+    )
+    kbi = result.intercept
+    
+    if save_fig or show_fig:
+        plt.close("all")
+        plt.plot(rinv, kbi_array)
+        tmp = np.array([1/rmax, 1/rmin])
+        plt.plot(tmp, tmp*result.slope + kbi, marker="o")
+        
+        plt.plot([0], [kbi], marker="s")
+        plt.xlabel("1 / $r$")
+        plt.ylabel("Kirkwood Buff Integral, G")
+        plt.xlim((0,1/rmin))
+        yminmax = np.concatenate((kbi_array[np.where(rinv < 1/rmin)], [kbi]))
+        dy = np.abs(np.max(yminmax) - np.min(yminmax)) * 0.05
+        plt.ylim((np.min(yminmax)-dy, np.max(yminmax)+dy))
+        if save_fig:
+            plt.savefig(plot_name, dpi=300)
+        if show_fig:
+            plt.show()
+        plt.close("all")
+
+    return kbi, result.intercept_stderr, npoints
