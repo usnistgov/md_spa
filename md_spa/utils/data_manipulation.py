@@ -286,3 +286,41 @@ def remove_duplicate_pairs(array):
             new_array.append(tmp_set)
 
     return new_array
+
+def block_average(xdata, ydata, block_size):
+    """Block average data according to block size.
+    
+    If the array is not evenly divisible by the block size, the
+    initial entries in the array are discarded. Note that the
+    size of the blocks will be rounded up to the nearest block
+    size allowed by the array spacing.
+
+    Parameters
+    ----------
+    xdata : numpy.ndarray
+        Independent data array
+    ydata : numpy.ndarray
+        Dependent data array
+    block_size : float
+        Block size for averaging in units of ``xdata``
+
+    Returns
+    -------
+    ydata_avg : float
+        Overall average of ydata
+    ydata_std : float
+        Standard deviaiton between averages of ydata blocks
+    xdata_new : numpy.ndarray
+        xdata values in the middle of the blocks being averaged
+    ydata_new : numpy.ndarray
+        ydata values, averaged over blocks
+        
+    """
+    npoints = np.where(xdata-xdata[0]-block_size > 0)[0][0]
+    nblocks = len(xdata) // npoints
+    offset = len(xdata) % npoints
+    
+    xdata_new = xdata[offset] + block_size/2 + block_size * np.arange(nblocks, step=1)
+    ydata_new = np.array([np.mean(ydata[-(n+1)*npoints+1:-n*npoints+1]) for n in range(nblocks)])
+        
+    return np.mean(ydata_new), np.std(ydata_new), xdata_new, ydata_new
