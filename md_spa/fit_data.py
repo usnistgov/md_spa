@@ -4,6 +4,7 @@
     ``import md_spa.fit_data as fd``
 
 """
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -33,7 +34,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
         Keyword arguments for :func:`md_spa.custom_fit.n_gaussians`
     show_plot : bool, default=False
         Show comparison plot of each rdf being analyzed. Note that is option will interrupt the process until the plot is closed.
-    save_fit : bool, default=False
+    save_plot : bool, default=False
         Save comparison plot of each rdf being analyzed. With the name ``plot_name``
     plot_name : str, default="n_gaussians.png"
         If ``save_fit`` is true, the generated plot is saved
@@ -49,7 +50,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
 
     """
 
-    if n_gaussians == None:
+    if n_gaussians is None:
         _, maxima, _ = cplot.pull_extrema(xdata, ydata, **kwargs_peaks)
         n_gaussians = len(maxima)
         min_height = np.min(maxima.T[1])
@@ -63,7 +64,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
     else:
         maxima = None
 
-    if n_gaussians == None:
+    if n_gaussians is None:
         # Fit parameters to set peak locations
         parameters, uncertainty, redchi = cfit.n_gaussians(xdata, ydata, len(maxima), **kwargs_fit)
         parameters = np.reshape(parameters, (len(maxima), 3))
@@ -100,7 +101,7 @@ def extract_gaussians(xdata, ydata, n_gaussians=None, normalize=False, kwargs_pe
             params["c{}".format(i+1)] = c
         yarray2 = cfit._res_n_gaussians(params, xarray2, np.zeros(len(xarray2)), n_gaussians)
         plt.plot(xarray2,yarray2,"r",linewidth=0.5,label="Fit")
-        if np.all(maxima != None):
+        if np.all(maxima is not None):
             for i in range(len(maxima)):
                 plt.plot([maxima[i][0],maxima[i][0]],[min(ydata),max(ydata)],"c",linewidth=0.5)
         plt.xlim(xdata[0],xdata[-1])
@@ -148,6 +149,12 @@ def pull_extrema( xarray, yarray, sigma_spline=None, sigma_ddspline=None, error_
         All inflection points in an array of size 2 by Ninflections. Where ``inflections[0]`` is the x value corresponding to the inflection point and ``inflection[1]`` is the y value
 
     """
+    
+    # Remove values that are NaN or inf
+    indices = np.where(np.logical_and(~np.isnan(yarray), ~np.isinf(yarray)))
+    xarray = xarray[indices]
+    yarray = yarray[indices]
+    
     #######
     #if sigma_spline == None: # Trying to automate choosing a smoothing value
     #    Npts_avg = 20
@@ -161,8 +168,11 @@ def pull_extrema( xarray, yarray, sigma_spline=None, sigma_ddspline=None, error_
     #print(sigma_spline)
     #yarray = gaussian_filter1d(yarray, sigma=sigma_spline)
     #######
-    if sigma_spline != None:
+    if sigma_spline is not None:
+        yarray0 = copy.deepcopy(yarray)
         yarray = gaussian_filter1d(yarray, sigma=sigma_spline)
+    else:
+        yarray0 = None
     ######
 
     spline = InterpolatedUnivariateSpline(xarray,yarray, k=4)
@@ -212,7 +222,10 @@ def pull_extrema( xarray, yarray, sigma_spline=None, sigma_ddspline=None, error_
         if sigma_ddspline is not None:
             ddtmp = spline_concavity(xarray)
             fig, axs = plt.subplots( 2, 1, figsize=(4, 6), sharex=True)
-            axs[0].plot( xarray, yarray, "k", linewidth=0.5, label="Data")
+            if yarray0 is None:
+                axs[0].plot( xarray, yarray, "k", linewidth=0.5, label="Data")
+            else:
+                axs[0].plot( xarray, yarray0, "k", linewidth=0.5, label="Data")
             axs[0].plot( xarray2, yarray2, "r", linewidth=0.5, linestyle="--", label="Spline")
             for i in range(len(maxima)):
                 axs[0].plot([maxima[i][0],maxima[i][0]],[min(yarray),max(yarray)],"c",linewidth=0.5)
@@ -229,14 +242,17 @@ def pull_extrema( xarray, yarray, sigma_spline=None, sigma_ddspline=None, error_
             axs[1].plot([xarray[0], xarray[-1]],[0,0], "k", linewidth=0.5)
             axs[1].set_title("Spline 2nd Derivative")
         else:
-            plt.plot(xarray,yarray,"k",label="Data")
+            if yarray0 is None:
+                plt.plot(xarray,yarray,"k",linewidth=0.5, label="Data")
+            else:
+                plt.plot(xarray,yarray0,"k",linewidth=0.5, label="Data")
             plt.plot(xarray2,yarray2,"r",linewidth=0.5,label="Spline")
             for i in range(len(maxima)):
                 plt.plot([maxima[i][0],maxima[i][0]],[min(yarray),max(yarray)],"c",linewidth=0.5)
             for i in range(len(minima)):
                 plt.plot([minima[i][0],minima[i][0]],[min(yarray),max(yarray)],"b",linewidth=0.5)
-            for i in range(len(inflections)):
-                plt.plot([inflections[i][0],inflections[i][0]],[min(yarray),max(yarray)],"r",linewidth=0.5)
+#            for i in range(len(inflections)):
+#                plt.plot([inflections[i][0],inflections[i][0]],[min(yarray),max(yarray)],"r",linewidth=0.5)
         plt.xlim(xarray[0],xarray[-1])
         plt.tight_layout()
         if save_plot:
