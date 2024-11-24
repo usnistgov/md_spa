@@ -1,0 +1,2 @@
+
+md_spa.mdanalysis is covered under the GPLv2 license. All other material is subject to NIST licensing.
